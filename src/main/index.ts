@@ -435,7 +435,7 @@ async function runWorkspaceSelfCheck(win: BrowserWindow, wsDir: string, emptyDir
       const diag = await js<string>(
         `JSON.stringify({
           sel: window.getSelection()?.toString().slice(0, 30) ?? "",
-          active: (document.activeElement as HTMLElement | null)?.tagName ?? "",
+          active: document.activeElement?.tagName ?? "",
           focusedEl: !!document.querySelector("[contenteditable='true']:focus"),
         })`,
       );
@@ -610,11 +610,45 @@ async function runWorkspaceSelfCheck(win: BrowserWindow, wsDir: string, emptyDir
       return headerName === "a.md" ? true : null;
     });
     if (!aOpen) return fail("a.md reopen failed");
+    // 6.1) 查找(14):Ctrl+F(菜单通道)→ 输入 → 命中行 → 点击定位高亮 → Esc 关闭清高亮
+    win.webContents.send(IPC.menuCommand, "find");
+    const panelShown = await poll(() => js<boolean>(q("[data-testid='search-panel']")));
+    if (!panelShown) return fail("search panel not shown via find");
+    await js<void>(`(() => {
+      const input = document.querySelector("[data-testid='search-input']");
+      const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, "value")?.set;
+      setter?.call(input, "正文 a。");
+      input.dispatchEvent(new Event("input", { bubbles: true }));
+    })()`);
+    const hitRows = await poll(async () => {
+      const count = await js<string>(
+        `document.querySelector("[data-testid='search-count']")?.textContent ?? ""`,
+      );
+      return count.includes("处命中") ? count : null;
+    });
+    if (!hitRows) return fail(`find hits not computed (${hitRows})`);
+    await js<void>(`document.querySelector("[data-testid='search-hit-row-0']").click()`);
+    const hlActive = await poll(() => js<boolean>(q(".search-hit-active")));
+    if (!hlActive) return fail("active highlight missing after row click");
+    await js<void>(`(() => {
+      const input = document.querySelector("[data-testid='search-input']");
+      input.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true, cancelable: true }));
+    })()`);
+    const panelClosed = await poll(() => js<boolean>(`!document.querySelector("[data-testid='search-panel']")`));
+    if (!panelClosed) return fail("search panel did not close on Esc");
+    const hlCleared = await poll(() => js<boolean>(`document.querySelectorAll(".search-hit").length === 0`));
+    if (!hlCleared) return fail("search highlights not cleared on close");
     await delay(800);
-    const { unlink } = await import("node:fs/promises");
+    const { unlink, writeFile: wf } = await import("node:fs/promises");
     await unlink(aPath);
-    const banner = await poll(() => js<boolean>(q("[data-testid='doc-missing-banner']")));
-    if (!banner) return fail("external-delete banner not shown");
+    // Windows chokidar 偶发漏报紧接的 unlink:做一次根目录唤醒写,让同一批次送达
+    const wake = join(wsDir, `.wake-${Date.now()}.md`);
+    await wf(wake, "wake\n", "utf8");
+    await unlink(wake);
+    const banner = await poll(() => js<boolean>(q("[data-testid='doc-missing-banner']")), 10000);
+    if (!banner) {
+      return fail("external-delete banner not shown");
+    }
     if (!(await js<boolean>(`document.body.innerText.includes("文件已被删除")`))) {
       return fail("banner copy missing");
     }
@@ -725,10 +759,6 @@ async function runRestoreCheck(win: BrowserWindow, expectFile: string): Promise<
           err: document.querySelector("[data-testid='load-error']")?.textContent ?? null,
           last: await window.confidant.stateGet("lastSession"),
           dbg: window.__dbg ?? null,
-          ws: window.__ws ?? null,
-          ws2: window.__ws2 ?? null,
-          rc: window.__rc ?? 0,
-          lastRenderWs: window.__lastWsInRender ?? null,
         }))()`,
       );
       return fail(`welcome page shown instead of restore; diag=${diag}`);

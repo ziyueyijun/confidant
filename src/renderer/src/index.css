@@ -155,7 +155,15 @@ body {
   accent-color: currentColor;
 }
 
-/* front matter 等宽源码样式块(渲染层呈现,规格 §4.3) */
+/* 查找高亮(14):临时视图态,不落盘 */
+.search-hit {
+  background: rgba(255, 220, 80, 0.55);
+  border-radius: 2px;
+  box-decoration-break: clone;
+}
+.search-hit-active {
+  background: rgba(255, 160, 40, 0.75);
+}
 .fm-block {
   max-width: 820px;
   margin: 0 auto;

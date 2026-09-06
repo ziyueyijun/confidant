@@ -20,6 +20,8 @@ export interface SidebarProps {
   onEmptyContext?: (e: ReactMouseEvent) => void;
   onDragStartEntry?: (e: ReactDragEvent, entry: TreeEntry) => void;
   onDropEntry?: (e: ReactDragEvent, entry: TreeEntry) => void;
+  /** 树顶搜索框点击(14:唤起当前文件查找面板)。 */
+  onSearchBoxClick?: () => void;
 }
 
 const MIN_WIDTH = 180;
@@ -39,6 +41,7 @@ export function Sidebar({
   onEmptyContext,
   onDragStartEntry,
   onDropEntry,
+  onSearchBoxClick,
 }: SidebarProps) {
   const dragState = useRef<{ startX: number; startW: number } | null>(null);
 
@@ -91,8 +94,9 @@ export function Sidebar({
       <div style={{ padding: "0 8px 6px" }}>
         <input
           data-testid="tree-search-placeholder"
-          disabled
+          readOnly
           placeholder="搜索笔记…"
+          onClick={onSearchBoxClick}
           style={{
             width: "100%",
             boxSizing: "border-box",
@@ -102,6 +106,7 @@ export function Sidebar({
             border: "1px solid var(--shell-border, #d5d5d5)",
             background: "transparent",
             color: "inherit",
+            cursor: "text",
           }}
         />
       </div>

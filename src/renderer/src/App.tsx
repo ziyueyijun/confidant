@@ -14,6 +14,7 @@ import { Cmd, createMenuBridge, type MenuContext } from "./menu/menu-bridge";
 import { Sidebar } from "./components/Sidebar";
 import { FormatOverlay } from "./components/FormatOverlay";
 import { TextPrompt } from "./components/TextPrompt";
+import { SearchPanel } from "./components/SearchPanel";
 import { countMdInTree, dirAncestorsOf, relPathOf, wsJoin, type Workspace } from "./workspace/workspace";
 
 interface OpenNote {
@@ -73,6 +74,9 @@ export default function App() {
   /** 引擎 UI 节拍:编辑/选区/命令后递增,驱动浮动条重算。 */
   const [uiTick, setUiTick] = useState(0);
   const [linkRequest, setLinkRequest] = useState(0);
+  /** 查找面板(14):打开态与焦点请求。 */
+  const [findOpen, setFindOpen] = useState(false);
+  const [findFocus, setFindFocus] = useState(0);
   const [engine, setEngine] = useState<Engine | null>(null);
 
   // ── 文件操作(10/11/12) ──
@@ -376,6 +380,12 @@ export default function App() {
     menu.register(Cmd.save, (ctx) => ctx.docOpen, () => void pipelineRef.current?.flush());
     menu.register(Cmd.undo, (ctx) => ctx.docOpen && ctx.canUndo, () => engineRef.current?.undo());
     menu.register(Cmd.redo, (ctx) => ctx.docOpen && ctx.canRedo, () => engineRef.current?.redo());
+    // 查找(14):Ctrl+F 唤起当前文件面板
+    const openFind = (): void => {
+      setFindOpen(true);
+      setFindFocus((f) => f + 1);
+    };
+    menu.register(Cmd.find, (ctx) => ctx.docOpen, openFind);
     menu.register(Cmd.toggleSidebar, () => !!workspaceRef.current, toggleSidebar);
     menu.register(Cmd.insertImage, (ctx) => ctx.docOpen, () => void insertImageViaDialog());
     // 行内格式(07):与浮动工具条同一引擎命令面
@@ -640,6 +650,8 @@ export default function App() {
     document.title = `${next.name} · confidant`;
     window.confidant.noteOpened(path);
     setUiTick((t) => t + 1);
+    engineRef.current?.clearSearchHighlights(); // 切换文件高亮不残留(14)
+    setFindOpen(false);
   }, []);
 
   const openRel = useCallback(
@@ -1148,6 +1160,11 @@ export default function App() {
             onEmptyContext={(e) => void onTreeEmptyContext(e)}
             onDragStartEntry={onDragStartEntry}
             onDropEntry={onDropEntry}
+            onSearchBoxClick={() => {
+              if (!docRef.current) return;
+              setFindOpen(true);
+              setFindFocus((f) => f + 1);
+            }}
           />
         )}
         <div
@@ -1278,6 +1295,17 @@ export default function App() {
       </div>
       {/* 浮动格式工具条与链接编辑(07) */}
       <FormatOverlay engine={engine} tick={uiTick} openLinkRequest={linkRequest} />
+      {/* 查找面板(14) */}
+      {findOpen && doc && (
+        <SearchPanel
+          engine={engine}
+          focusRequest={findFocus}
+          onClose={() => {
+            engine?.clearSearchHighlights();
+            setFindOpen(false);
+          }}
+        />
+      )}
       {/* 文件被外部删除横幅(12) */}
       {docMissing && doc && (
         <div

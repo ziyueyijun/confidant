@@ -1,6 +1,8 @@
 // TipTap 控制器(引擎私有实现)。包外只经 ../index 的 createEngine 使用。
 
-import { Editor } from "@tiptap/core";
+import { Editor, Extension } from "@tiptap/core";
+import { Plugin, PluginKey } from "@tiptap/pm/state";
+import { Decoration, DecorationSet } from "@tiptap/pm/view";
 import { StarterKit } from "@tiptap/starter-kit";
 import { Markdown } from "@tiptap/markdown";
 import { Table } from "@tiptap/extension-table";
@@ -70,7 +72,41 @@ function makeExtensions(resolveImageUrl: ImageUrlResolver) {
     TaskItem,
     ImageNodeView,
     Markdown.configure({ markedOptions: { gfm: true } }),
+    Extension.create({ addProseMirrorPlugins: () => [createSearchPlugin()] }),
   ];
+}
+
+/** 查找高亮(14):临时 decoration 层;文档零变更、不进撤销历史、不参与序列化。 */
+interface SearchHighlightState {
+  ranges: Array<{ from: number; to: number }>;
+  active: number;
+}
+const SEARCH_KEY = new PluginKey<SearchHighlightState>("confidantSearch");
+const EMPTY_SEARCH: SearchHighlightState = { ranges: [], active: -1 };
+
+function createSearchPlugin(): Plugin<SearchHighlightState> {
+  return new Plugin<SearchHighlightState>({
+    key: SEARCH_KEY,
+    state: {
+      init: () => EMPTY_SEARCH,
+      apply: (tr, prev) => {
+        const meta = tr.getMeta(SEARCH_KEY) as SearchHighlightState | undefined;
+        return meta ?? prev;
+      },
+    },
+    props: {
+      decorations(state) {
+        const { ranges, active } = SEARCH_KEY.getState(state) ?? EMPTY_SEARCH;
+        if (ranges.length === 0) return null;
+        const decos: Decoration[] = ranges.map((r, i) =>
+          Decoration.inline(r.from, r.to, {
+            class: i === active ? "search-hit search-hit-active" : "search-hit",
+          }),
+        );
+        return DecorationSet.create(state.doc, decos);
+      },
+    },
+  });
 }
 
 function makeEditor(
@@ -211,7 +247,15 @@ export interface Engine {
   /** 区间纯文本(doc.textBetween;定位/测试)。 */
   textBetween(from: number, to: number): string;
 
-  // ── 块级命令(08;「段落」菜单入口,不依赖语法输入) ──
+  // ── 查找(14/15):子串匹配 + 临时高亮(decoration,不落盘/不进入导出) ──
+  /** 文档内子串匹配(大小写不敏感;单文本节点内),返回区间与行文本上下文。 */
+  findInDoc(query: string, limit?: number): Array<{ from: number; to: number; text: string }>;
+  /** 设置高亮区间与当前命中索引(临时视图态;文档无变更、不进历史)。 */
+  setSearchHighlights(ranges: Array<{ from: number; to: number }>, activeIndex?: number): void;
+  /** 清除高亮。 */
+  clearSearchHighlights(): void;
+  /** 滚动定位到区间并聚焦(点击命中跳转)。 */
+  revealRange(from: number, to: number): void;
   /** 选区是否在表格内(段落命令在表格内置灰,规格 9.6 表交互由右键承担)。 */
   isInsideTable(): boolean;
   /** 当前块/多块应用块命令。kind: heading1..6 / paragraph / 列表 / 引用 / 代码块。 */
@@ -231,8 +275,7 @@ export interface Engine {
   /** 列表项缩进(+1)/反缩进(-1)(任务列表与普通列表)。 */
   listIndent(dir: 1 | -1): boolean;
   /** 在光标处插入图片节点(引用相对路径;自动保存由上层管线触发)。 */
-  insertImage(src: string, alt?: string): boolean;
-  /** 在页面坐标处插入图片(drop 落点;失败回退光标处)。 */
+  insertImage(src: string, alt?: string): boolean;  /** 在页面坐标处插入图片(drop 落点;失败回退光标处)。 */
   insertImageAtCoords(clientX: number, clientY: number, src: string, alt?: string): boolean;
   /**
    * 删除图片节点(06 右键「删除」:引用移除走自动保存,图片文件由主进程入回收站)。
@@ -253,8 +296,7 @@ export function createEngine(
   callbacks: EngineCallbacks = {},
   options: EngineOptions = {},
 ): Engine {
-  const resolveImageUrl = options.resolveImageUrl ?? IDENTITY_RESOLVER;
-  // 装载 = 销毁重建,重建时直接以 markdown 内容构造(原型 06 验证路径)。
+  const resolveImageUrl = options.resolveImageUrl ?? IDENTITY_RESOLVER;  // 装载 = 销毁重建,重建时直接以 markdown 内容构造(原型 06 验证路径)。
   // 逐文件切换时历史栈随重建清空——本票范围不承诺跨文件撤销历史。
   let editor: Editor | null = null;
 
@@ -456,6 +498,62 @@ export function createEngine(
       const ed = editor;
       if (!ed) return "";
       return ed.state.doc.textBetween(from, to, "");
+    },
+
+    findInDoc(query, limit = 500) {
+      const ed = editor;
+      if (!ed) return [];
+      const q = query.trim().toLowerCase();
+      if (!q) return [];
+      const out: Array<{ from: number; to: number; text: string }> = [];
+      ed.state.doc.descendants((node, pos) => {
+        if (!node.isText) return true;
+        const text = node.text ?? "";
+        const lower = text.toLowerCase();
+        let idx = lower.indexOf(q);
+        while (idx >= 0 && out.length < limit) {
+          const before = Math.max(0, idx - 12);
+          const after = Math.min(text.length, idx + q.length + 12);
+          out.push({
+            from: pos + idx,
+            to: pos + idx + q.length,
+            text: text.slice(before, after),
+          });
+          idx = lower.indexOf(q, idx + q.length);
+        }
+        return out.length < limit;
+      });
+      return out;
+    },
+
+    setSearchHighlights(ranges, activeIndex = ranges.length > 0 ? 0 : -1) {
+      const ed = editor;
+      if (!ed) return;
+      const safeActive = ranges.length === 0 ? -1 : Math.min(Math.max(activeIndex, 0), ranges.length - 1);
+      ed.view.dispatch(
+        ed.state.tr.setMeta(SEARCH_KEY, { ranges, active: safeActive } satisfies SearchHighlightState),
+      );
+    },
+
+    clearSearchHighlights() {
+      const ed = editor;
+      if (!ed) return;
+      ed.view.dispatch(ed.state.tr.setMeta(SEARCH_KEY, { ranges: [], active: -1 }));
+    },
+
+    revealRange(from, to) {
+      const ed = editor;
+      if (!ed) return;
+      const coords = ed.view.coordsAtPos(from);
+      const scroll = host.parentElement;
+      const rect = host.getBoundingClientRect();
+      if (scroll) {
+        scroll.scrollTo({
+          top: scroll.scrollTop + coords.top - rect.top - 72,
+          behavior: "smooth",
+        });
+      }
+      ed.chain().focus().setTextSelection({ from, to: Math.max(from, to - 0) }).run();
     },
 
     isInsideTable() {
