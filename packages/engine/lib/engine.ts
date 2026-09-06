@@ -173,8 +173,8 @@ export interface EngineCallbacks {
   onSelectionChange?: () => void;
   /** 编辑器失焦(浮动条等失焦隐藏)。 */
   onBlur?: () => void;
-  /** 单击链接文字(进入编辑态;不跳转,规格 §14;跳转在 16)。 */
-  onLinkClick?: (info: LinkInfo) => void;
+  /** 单击链接文字(进入编辑态;不跳转,规格 §14)。ctrlKey 时由 App 转「打开」。 */
+  onLinkClick?: (info: LinkInfo, modifiers: { ctrl: boolean }) => void;
 }
 
 /** 链接节点信息(07 编辑 / 16 打开共用)。 */
@@ -256,6 +256,10 @@ export interface Engine {
   clearSearchHighlights(): void;
   /** 滚动定位到区间并聚焦(点击命中跳转)。 */
   revealRange(from: number, to: number): void;
+  /** 定位到首个标题文本匹配(忽略大小写、空白折叠);未匹配返回 null。 */
+  findHeadingAnchor(title: string): { from: number; to: number } | null;
+  /** 跳转定位标题(滚动 + 光标)。 */
+  jumpToHeading(title: string): boolean;
   /** 选区是否在表格内(段落命令在表格内置灰,规格 9.6 表交互由右键承担)。 */
   isInsideTable(): boolean;
   /** 当前块/多块应用块命令。kind: heading1..6 / paragraph / 列表 / 引用 / 代码块。 */
@@ -319,7 +323,7 @@ export function createEngine(
       const coords = ed.view.posAtCoords({ left: ev.clientX, top: ev.clientY });
       if (!coords) return;
       const info = linkRangeAt(ed, coords.pos);
-      if (info) callbacks.onLinkClick(info);
+      if (info) callbacks.onLinkClick(info, { ctrl: ev.ctrlKey || ev.metaKey });
     });
     return ed;
   };
@@ -554,6 +558,35 @@ export function createEngine(
         });
       }
       ed.chain().focus().setTextSelection({ from, to: Math.max(from, to - 0) }).run();
+    },
+
+    findHeadingAnchor(title) {
+      const ed = editor;
+      if (!ed) return null;
+      // 匹配规则:去全部空白 + 忽略大小写(锚点多来自链接手写,空白容忍最稳)
+      const want = title.replace(/\s+/g, "").toLowerCase();
+      if (!want) return null;
+      const hit = { from: -1, to: -1 };
+      ed.state.doc.descendants((node, pos) => {
+        if (hit.from >= 0) return false;
+        if (node.type.name !== "heading") return true;
+        const text = ed.state.doc.textBetween(pos + 1, pos + node.nodeSize - 1, "");
+        if (text.replace(/\s+/g, "").toLowerCase() === want) {
+          const inner = pos + 1;
+          hit.from = inner;
+          hit.to = inner + text.length;
+          return false;
+        }
+        return true;
+      });
+      return hit.from >= 0 ? hit : null;
+    },
+
+    jumpToHeading(title) {
+      const hit = this.findHeadingAnchor(title);
+      if (!hit) return false;
+      this.revealRange(hit.from, hit.to);
+      return true;
     },
 
     isInsideTable() {

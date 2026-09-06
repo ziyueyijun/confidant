@@ -70,6 +70,8 @@ export const IPC = {
   fsMovePath: "fs:move-path",
   /** 全工作区搜索(15):全部 .md 行内子串命中。 */
   workspaceSearch: "workspace:search",
+  /** 系统默认程序打开外部链接(16)。 */
+  openExternal: "shell:open-external",
 } as const;
 
 /** 外部变更原始事件(工作区监听批次内;树推送时一并携带,12 消费)。 */
@@ -162,6 +164,8 @@ export interface ConfidantApi {
   movePath(path: string, targetDir: string, newName?: string): Promise<Result<{ path: string }>>;
   /** 全工作区搜索(全部 .md;行内子串)。 */
   searchWorkspace(root: string, query: string): Promise<Result<WorkspaceSearchFileHit[]>>;
+  /** 系统默认浏览器/程序打开链接(16)。 */
+  openExternal(url: string): Promise<void>;
   /** 上报「某文件已成为当前文档」(主进程记录会话恢复数据)。 */
   noteOpened(path: string): void;
   /** 读取持久状态片段(不存在返回 null)。 */

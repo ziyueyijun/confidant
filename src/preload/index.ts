@@ -102,6 +102,8 @@ const api: ConfidantApi = {
   searchWorkspace: (root: string, query: string) =>
     ipcRenderer.invoke(IPC.workspaceSearch, root, query) as Promise<Result<WorkspaceSearchFileHit[]>>,
 
+  openExternal: (url: string) => ipcRenderer.invoke(IPC.openExternal, url) as Promise<void>,
+
   noteOpened: (path: string) => {
     ipcRenderer.send(IPC.fileOpened, path);
   },

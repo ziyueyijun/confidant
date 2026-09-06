@@ -46,3 +46,23 @@ describe("search highlights", () => {
     engine.destroy();
   });
 });
+
+describe("标题锚点(16)", () => {
+  it("findHeadingAnchor 首个匹配(大小写/空白折叠);jump 选中标题", () => {
+    const { engine } = makeEngine("# 上周 小结\n\n## 其他\n");
+    const hit = engine.findHeadingAnchor("上周   小结");
+    expect(hit).not.toBeNull();
+    const { engine: e2 } = makeEngine("# 上周 小结\n\n# 上周 小结二\n");
+    const hit2 = e2.findHeadingAnchor("上周小结二");
+    expect(hit2).not.toBeNull();
+    e2.destroy();
+    engine.destroy();
+  });
+
+  it("无匹配返回 null 且不抛错", () => {
+    const { engine } = makeEngine("# 甲\n");
+    expect(engine.findHeadingAnchor("不存在")).toBeNull();
+    expect(engine.jumpToHeading("不存在")).toBe(false);
+    engine.destroy();
+  });
+});

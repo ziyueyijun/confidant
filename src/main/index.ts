@@ -534,7 +534,15 @@ async function runWorkspaceSelfCheck(win: BrowserWindow, wsDir: string, emptyDir
     const restored = await poll(() => js<boolean>(q("[data-testid='sidebar']")));
     if (!restored) return fail("sidebar did not restore");
 
-    // 5) 文件操作(10):菜单「新建笔记」→ 落盘并打开;「新建文件夹」→ 输入框建目录
+    // 5) 文件操作(10):先回 a.md(确定性上下文),菜单「新建笔记」→ 落盘并打开
+    await js<void>(`document.querySelector("[data-rel='a.md']").click()`);
+    const baseOpen = await poll(async () => {
+      const headerName = await js<string>(
+        `document.querySelector("header strong")?.textContent ?? ""`,
+      );
+      return headerName === "a.md" ? true : null;
+    });
+    if (!baseOpen) return fail("base note reopen before new-note failed");
     win.webContents.send(IPC.menuCommand, "new-note");
     const nnRow = await poll(async () => {
       const has = await js<boolean>(q("[data-rel='未命名笔记.md']"));
@@ -687,7 +695,59 @@ async function runWorkspaceSelfCheck(win: BrowserWindow, wsDir: string, emptyDir
     });
     if (!aOpen2) return fail("a.md reopen after ws search failed");
 
+    // 6.3) 跨文件链接与锚点(16):c.md 内 Ctrl+单击 → b.md 打开并定位标题
+    const { writeFile: wf2 } = await import("node:fs/promises");
+    const linkDoc = join(wsDir, "c.md");
+    await wf2(linkDoc, "[去乙](笔记文件夹/b.md#乙)\n", "utf8");
+    const cRow = await poll(() => js<boolean>(q("[data-rel='c.md']")));
+    if (!cRow) return fail("c.md row missing after write");
+    await js<void>(`document.querySelector("[data-rel='c.md']").click()`);
+    const cOpen = await poll(async () => {
+      const headerName = await js<string>(
+        `document.querySelector("header strong")?.textContent ?? ""`,
+      );
+      return headerName === "c.md" ? true : null;
+    });
+    if (!cOpen) return fail("c.md not opened");
+    const ctrlOk = await js<{ ok: boolean; detail: string }>(
+      `(() => {
+        const a = document.querySelector('.editor-prose a[href]');
+        if (!a) return { ok: false, detail: "no-link" };
+        const r = a.getBoundingClientRect();
+        a.dispatchEvent(new MouseEvent("click", {
+          bubbles: true,
+          cancelable: true,
+          ctrlKey: true,
+          clientX: r.left + r.width / 2,
+          clientY: r.top + r.height / 2,
+        }));
+        return { ok: true, detail: "clicked" };
+      })()`,
+    );
+    if (!ctrlOk.ok) return fail(`ctrl-click dispatch failed: ${JSON.stringify(ctrlOk)}`);
+    const bOpen = await poll(async () => {
+      const headerName = await js<string>(
+        `document.querySelector("header strong")?.textContent ?? ""`,
+      );
+      return headerName === "b.md" ? true : null;
+    });
+    if (!bOpen) return fail("ctrl-click did not open b.md");
+    const anchorSelected = await poll(async () => {
+      const sel = await js<string>(`window.getSelection()?.toString() ?? ""`);
+      return sel.includes("乙") ? true : null;
+    });
+    if (!anchorSelected) return fail("heading anchor not selected after jump");
+
     await delay(800);
+    // 回到 a.md 作为「外部删除」测试对象
+    await js<void>(`document.querySelector("[data-rel='a.md']").click()`);
+    const aOpen3 = await poll(async () => {
+      const headerName = await js<string>(
+        `document.querySelector("header strong")?.textContent ?? ""`,
+      );
+      return headerName === "a.md" ? true : null;
+    });
+    if (!aOpen3) return fail("a.md reopen before external delete failed");
     const { unlink, writeFile: wf } = await import("node:fs/promises");
     await unlink(aPath);
     // Windows chokidar 偶发漏报紧接的 unlink:做一次根目录唤醒写,让同一批次送达
@@ -1061,6 +1121,10 @@ function registerIpc(): void {
 
   ipcMain.handle(IPC.showItemInFolder, async (_e, targetPath: string) => {
     shell.showItemInFolder(targetPath);
+  });
+
+  ipcMain.handle(IPC.openExternal, async (_e, url: string) => {
+    await shell.openExternal(url);
   });
 
   ipcMain.handle(IPC.imageCopyToClipboard, async (_e, path: string): Promise<Result<void>> => {

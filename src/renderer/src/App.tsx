@@ -10,6 +10,7 @@ import { composeNoteText, parseNoteText } from "./editor/note-document";
 import { createSavePipeline, type SaveState } from "./editor/save-pipeline";
 import { landClipboardImage, landImageFile, looksLikeImageFile } from "./editor/image-insert";
 import { isRemoteSrc, resolveImageAbsPath, resolveImageSourceUrl } from "./editor/image-source";
+import { classifyLink } from "./editor/link-target";
 import { Cmd, createMenuBridge, type MenuContext } from "./menu/menu-bridge";
 import { Sidebar } from "./components/Sidebar";
 import { FormatOverlay } from "./components/FormatOverlay";
@@ -149,6 +150,11 @@ export default function App() {
           setUiTick((t) => t + 1);
         },
         onBlur: () => setUiTick((t) => t + 1),
+        onLinkClick: (info, modifiers) => {
+          const doc = docRef.current;
+          if (!doc) return;
+          if (modifiers.ctrl) void openLinkTarget(doc.path, info.href);
+        },
       },
       {
         // 图片显示:引用按当前文档目录解析(远程不渲染;网络图裁决出)
@@ -271,6 +277,27 @@ export default function App() {
                 ? `图片文件未能移入回收站:${tr.error.message}(引用已从文档移除)。`
                 : `图片文件未能移入回收站:${tr.error.message}`,
             );
+          }
+        }
+        return;
+      }
+
+      // 链接右键(16):打开链接(分流)/复制地址
+      const anchorEl = target.closest("a[href]");
+      if (anchorEl && docRef.current) {
+        e.preventDefault();
+        e.stopPropagation();
+        const href = anchorEl.getAttribute("href") ?? "";
+        const choice = await window.confidant.showContextMenu([
+          { id: "open-link", label: "打开链接" },
+          { id: "copy-link", label: "复制链接地址" },
+        ]);
+        if (choice === "open-link") void openLinkTarget(docRef.current.path, href);
+        else if (choice === "copy-link") {
+          try {
+            await navigator.clipboard.writeText(href);
+          } catch {
+            await window.confidant.infoDialog("复制失败");
           }
         }
         return;
@@ -933,6 +960,40 @@ export default function App() {
 
   // 菜单「文件」命令(10)与「视图→侧栏」状态在 menu effect 内注册;
   // 此处给 menu 使用的引用已就绪(workspaceRef/selectedRef)。
+
+  /** 打开链接(16):web → 系统浏览器;工作区内 md → 应用内打开+锚点;其余本地 → 资源管理器。 */
+  const openLinkTarget = useCallback(
+    async (docPath: string, rawHref: string) => {
+      const ws = workspaceRef.current;
+      const target = classifyLink(docPath, ws?.root ?? null, rawHref);
+      if (target.kind === "web") {
+        await window.confidant.openExternal(target.hrefPath);
+        return;
+      }
+      if (target.kind === "local") {
+        if (target.hrefPath) await window.confidant.showItemInFolder(target.hrefPath);
+        return;
+      }
+      // note:切换/打开文件,再按锚点定位
+      const cur = docRef.current;
+      const sameFile = cur && cur.path.toLowerCase() === (target.abs ?? "").toLowerCase();
+      const jump = (): void => {
+        if (!target.anchor) return;
+        const ed = engineRef.current;
+        if (ed && !ed.jumpToHeading(target.anchor)) {
+          // 无匹配标题:正常打开不定位(记录于 16 票)
+        }
+      };
+      if (sameFile) {
+        jump();
+        return;
+      }
+      if (target.abs) await openPath(target.abs);
+      jump();
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [],
+  );
 
   // 「插入图片…」:选文件 → 复制落盘到笔记同目录 → 光标处插入相对引用
   const insertImageViaDialog = useCallback(async () => {
