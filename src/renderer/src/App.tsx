@@ -7,6 +7,7 @@ import { createEngine, type Engine } from "../../../packages/engine";
 import { basename } from "@shared/path";
 import { composeNoteText, parseNoteText } from "./editor/note-document";
 import { createSavePipeline, type SaveState } from "./editor/save-pipeline";
+import { Cmd, createMenuBridge } from "./menu/menu-bridge";
 
 interface OpenNote {
   path: string;
@@ -80,7 +81,9 @@ export default function App() {
     const engine = createEngine(host, {
       onUpdate: () => {
         if (docRef.current) pipelineRef.current?.notifyEdit();
+        refreshMenuContext();
       },
+      onSelectionChange: refreshMenuContext,
     });
     engineRef.current = engine;
     const start = () => pipelineRef.current?.setComposing(true);
@@ -95,6 +98,37 @@ export default function App() {
       host.removeEventListener("compositionend", end);
       host.removeEventListener("compositioncancel", end);
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // 菜单桥(03):整表下发 + 命令接线 + 上下文启用态刷新
+  const menuRef = useRef<ReturnType<typeof createMenuBridge> | null>(null);
+  const refreshMenuContext = useCallback(() => {
+    const menu = menuRef.current;
+    const engine = engineRef.current;
+    if (!menu) return;
+    menu.setContext({
+      docOpen: !!docRef.current,
+      canUndo: engine?.canUndo() ?? false,
+      canRedo: engine?.canRedo() ?? false,
+    });
+  }, []);
+
+  useEffect(() => {
+    const menu = createMenuBridge();
+    menuRef.current = menu;
+    menu.register(Cmd.openFolder, () => true, () => void openNote());
+    menu.register(Cmd.save, (ctx) => ctx.docOpen, () => void pipelineRef.current?.flush());
+    menu.register(Cmd.undo, (ctx) => ctx.docOpen && ctx.canUndo, () => engineRef.current?.undo());
+    menu.register(Cmd.redo, (ctx) => ctx.docOpen && ctx.canRedo, () => engineRef.current?.redo());
+    menu.register(Cmd.about, () => true, () => void window.confidant.showAbout());
+    menu.register(Cmd.quit, () => true, () => window.confidant.closeWindow());
+    menu.init();
+    refreshMenuContext();
+    return () => {
+      menuRef.current = null;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // 主进程关闭前 flush:先落盘再回执,保证无「未保存内容」态
@@ -129,18 +163,8 @@ export default function App() {
     if (path) await openPath(path);
   }, [openPath]);
 
-  // Ctrl+S(菜单栏落定前的过渡接线;03 后由原生菜单快捷键接管)
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "s") {
-        e.preventDefault();
-        void pipelineRef.current?.flush();
-      }
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, []);
-
+  // Ctrl+S 由 native 菜单 accelerator 承载(03 起;菜单项启用时按键被菜单消费,
+  // 渲染层不再自接键位——单一命令源)
   // 主进程请求打开文件(冒烟驱动/菜单打开)
   useEffect(() => {
     return window.confidant.onOpenFile((path) => void openPath(path));

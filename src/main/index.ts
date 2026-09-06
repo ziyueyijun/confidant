@@ -1,12 +1,13 @@
 // 主进程:窗口生命周期、IPC 承载与自检驱动。
 // 单窗口形态(无托盘/无状态栏);Windows 平台规则:窗口全关即退出。
 
-import { app, BrowserWindow, dialog, ipcMain } from "electron";
+import { app, BrowserWindow, dialog, ipcMain, Menu } from "electron";
 import { join } from "node:path";
 import { mkdirSync } from "node:fs";
 import { readFile } from "node:fs/promises";
-import { IPC, type ErrorInfo, type Result } from "@shared/ipc";
+import { IPC, type ErrorInfo, type MenuItemState, type MenuItemTemplate, type Result } from "@shared/ipc";
 import { readTextFile, writeTextFileAtomic } from "../../packages/files";
+import { applyMenuTemplate, getMenuItem, updateMenuItems } from "./menu";
 
 const isDev = !!process.env["ELECTRON_RENDERER_URL"];
 const smoke = process.env["CONFIDANT_SMOKE"] === "1";
@@ -140,16 +141,38 @@ async function runSelfCheck(win: BrowserWindow, notePath: string | null): Promis
         if (firstBad) return fail(`close-flush disk check: ${firstBad}`);
         console.log(`[smoke] e2e ok — autosave ${mark1}; close-flush ${mark2}`);
       } else {
+        // 菜单框架验证:菜单结构 + 启用态 + 经菜单命令通道手动保存
+        const topMenus = Menu.getApplicationMenu()?.items.map((i) => i.label) ?? [];
+        const expectTop = ["文件", "编辑", "段落", "格式", "视图", "帮助"];
+        if (topMenus.join("|") !== expectTop.join("|")) {
+          return fail(`menu structure mismatch: ${JSON.stringify(topMenus)}`);
+        }
+        const saveItem = getMenuItem("save");
+        const recentItem = getMenuItem("open-recent");
+        const aboutItem = getMenuItem("about");
+        if (!saveItem?.enabled) return fail("save menu item not enabled with doc open");
+        if (recentItem?.enabled) return fail("open-recent should stay disabled");
+        if (!aboutItem?.enabled) return fail("about should be enabled");
+        if (!saveItem.label.includes("保存")) return fail(`save label wrong: ${saveItem.label}`);
+
+        const typed2 = await typeAtEnd(win, mark2);
+        if (!typed2.ok) return fail(`second typing failed: ${JSON.stringify(typed2)}`);
+        // 模拟 native 菜单点击:同一 command 通道(菜单 accelerator 为 OS 级,不可脚本触发)
+        win.webContents.send(IPC.menuCommand, "save");
+        const outcome2 = await waitSaved(win);
+        if (outcome2 !== "saved") return fail(`menu-command save not reached (${outcome2})`);
+
         const saved = await readFile(notePath, "utf8");
         const checks = [
           saved.startsWith(fmPrefix) || "front matter head changed",
           saved.includes(mark1) || "autosave marker missing on disk",
+          saved.includes(mark2) || "menu-command saved marker missing on disk",
           saved.endsWith("\n") || "missing trailing newline",
           !saved.endsWith("\n\n") || "multiple trailing newlines",
         ];
         const firstBad = checks.find((c) => typeof c === "string");
         if (firstBad) return fail(`disk check: ${firstBad}`);
-        console.log(`[smoke] e2e ok — autosave marker: ${mark1}`);
+        console.log(`[smoke] e2e ok — autosave ${mark1}; menu-command save ${mark2}`);
       }
     } else {
       const probe = await js<{ rootChildren: number; bodyText: string; title: string }>(
@@ -253,6 +276,43 @@ function registerIpc(): void {
     } catch (err) {
       return { ok: false, error: toError(err) };
     }
+  });
+
+  const menuTarget = () => BrowserWindow.getFocusedWindow() ?? BrowserWindow.getAllWindows()[0] ?? null;
+
+  ipcMain.on(IPC.menuSetTemplate, (e, template: MenuItemTemplate[]) => {
+    // 只接受本应用窗口(单窗口形态)下发的模板
+    const win = BrowserWindow.getAllWindows()[0];
+    if (!win || e.sender !== win.webContents) return;
+    applyMenuTemplate(template, menuTarget);
+  });
+
+  ipcMain.on(IPC.menuUpdateItems, (_e, states: MenuItemState[]) => {
+    updateMenuItems(states);
+  });
+
+  ipcMain.handle(IPC.aboutDialog, async () => {
+    const win = menuTarget();
+    const opts: Electron.MessageBoxOptions = {
+      type: "info",
+      title: "关于 confidant",
+      message: "知己笔记 confidant",
+      detail: [
+        `版本 ${app.getVersion()}`,
+        `Electron ${process.versions.electron}`,
+        `Chromium ${process.versions.chrome}`,
+        `Node ${process.versions.node}`,
+      ].join("\n"),
+      buttons: ["好的"],
+      noLink: true,
+    };
+    if (win) await dialog.showMessageBox(win, opts);
+    else await dialog.showMessageBox(opts);
+  });
+
+  ipcMain.on(IPC.closeWindow, () => {
+    const win = menuTarget();
+    if (win) win.close();
   });
 }
 

@@ -55,10 +55,18 @@ export interface Engine {
   loadMarkdown(markdown: string): void;
   /** 序列化当前文档为 markdown,保证单个换行结尾、换行统一 LF。 */
   getMarkdown(): string;
-  /** 把键盘焦点移入编辑器。 */
+  /** 键盘焦点移入编辑器。 */
   focus(): void;
   /** 编辑器是否持有焦点。 */
   isFocused(): boolean;
+  /** 撤销历史可用(03 菜单启用态;空文档/未编辑为 false)。 */
+  canUndo(): boolean;
+  /** 重做历史可用。 */
+  canRedo(): boolean;
+  /** 执行撤销(编辑面,菜单命令源)。 */
+  undo(): void;
+  /** 执行重做。 */
+  redo(): void;
   /** 释放资源,host 内容清空。 */
   destroy(): void;
 }
@@ -103,6 +111,22 @@ export function createEngine(host: HTMLElement, callbacks: EngineCallbacks = {})
 
     isFocused(): boolean {
       return editor?.isFocused ?? false;
+    },
+
+    canUndo(): boolean {
+      return editor?.can().undo() ?? false;
+    },
+
+    canRedo(): boolean {
+      return editor?.can().redo() ?? false;
+    },
+
+    undo() {
+      editor?.commands.undo();
+    },
+
+    redo() {
+      editor?.commands.redo();
     },
 
     destroy() {
