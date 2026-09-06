@@ -18,6 +18,8 @@ export type MenuContext = {
   hasWorkspace: boolean;
   /** 有树内选中项(重命名/删除等按选中生效,10)。 */
   hasSelection: boolean;
+  /** 源码模式(30):WYSIWYG 专属命令(段落/格式/查找)置灰,撤销重做转发文本区。 */
+  sourceMode: boolean;
 };
 
 export type CommandRun = () => void | Promise<void>;
@@ -63,6 +65,7 @@ export const Cmd = {
   insertImage: "insert-image",
   // 视图
   toggleSidebar: "toggle-sidebar",
+  sourceMode: "source-mode",
   workspaceSearch: "workspace-search",
   themeSystem: "theme-system",
   themeLight: "theme-light",
@@ -192,6 +195,7 @@ export function buildMenuTemplate(recent: RecentItem[] = []): MenuItemTemplate[]
       label: "视图",
       submenu: [
         disabledItem(Cmd.toggleSidebar, "侧栏显示/隐藏"),
+        disabledItem(Cmd.sourceMode, "源码模式", "Ctrl+/"),
         disabledItem(Cmd.workspaceSearch, "全工作区搜索", "Ctrl+Shift+F"),
         sep(),
         {
@@ -261,6 +265,7 @@ export function createMenuBridge(): MenuBridge {
     inTable: false,
     hasWorkspace: false,
     hasSelection: false,
+    sourceMode: false,
   };
   let recentItems: RecentItem[] = [];
   const lastState = new Map<string, boolean>();

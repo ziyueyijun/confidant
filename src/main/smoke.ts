@@ -292,6 +292,42 @@ export async function runSelfCheck(win: BrowserWindow, notePath: string | null):
           return fail(`empty-line click probe: center miss; setup=${probePoints.detail} all=${JSON.stringify(clickResults)}`);
         }
         console.log(`[smoke] empty-line click probe ok (${clickResults.map((c) => `${c.tag}:${c.ok ? "hit" : "miss"}`).join(" ")})`);
+
+        // 30:源码模式竖切——进入 → 文本区含头字节 → 键入 → 字节直写落盘 → 切回
+        win.webContents.send(IPC.menuCommand, "source-mode");
+        const srcShown = await pollUntil(() => js<boolean>(`!!document.querySelector("[data-testid='source-editor']")`), 5000);
+        if (!srcShown) return fail("source mode not shown");
+        const srcValue = await js<string>(
+          `document.querySelector("[data-testid='source-editor']")?.value ?? ""`,
+        );
+        if (!srcValue.startsWith("---\ntitle: 复验\n---")) {
+          return fail(`source mode content missing front matter: ${JSON.stringify(srcValue.slice(0, 60))}`);
+        }
+        const mark3 = `源码模式标记-${Date.now()}`;
+        await js<void>(`(() => {
+          const ta = document.querySelector("[data-testid='source-editor']");
+          const setter = Object.getOwnPropertyDescriptor(window.HTMLTextAreaElement.prototype, "value")?.set;
+          setter?.call(ta, ta.value + "\\n" + ${JSON.stringify(mark3)} + "\\n");
+          ta.dispatchEvent(new Event("input", { bubbles: true }));
+        })()`);
+        const srcSaved = await pollUntil(async () => {
+          const content = await readFile(notePath, "utf8");
+          return content.includes(mark3) ? true : null;
+        }, 8000);
+        if (!srcSaved) return fail("source mode marker not saved (byte-direct)");
+        win.webContents.send(IPC.menuCommand, "source-mode");
+        const srcGone = await pollUntil(() => js<boolean>(`!document.querySelector("[data-testid='source-editor']")`), 5000);
+        if (!srcGone) return fail("source mode did not exit");
+        const wysiwygHas = await pollUntil(async () => {
+          const text = await js<string>("document.body.innerText");
+          return text.includes(mark3) ? true : null;
+        }, 5000);
+        if (!wysiwygHas) return fail("source marker missing in WYSIWYG after toggle back");
+        const finalDisk = await readFile(notePath, "utf8");
+        if (!finalDisk.startsWith("---\ntitle: 复验\n---")) {
+          return fail("front matter changed after source mode roundtrip");
+        }
+        console.log("[smoke] source mode ok (enter/save/exit)");
       }
     } else {
       const probe = await js<{ rootChildren: number; bodyText: string; title: string }>(

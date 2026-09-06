@@ -368,6 +368,27 @@ body {
   accent-color: currentColor;
 }
 
+/* 源码模式(30):全文件原始 Markdown 文本区,与 WYSIWYG 同宽约束 */
+.source-editor {
+  flex: 1;
+  min-height: 0;
+  width: 100%;
+  max-width: min(860px, 100% - 32px);
+  margin: 0 auto;
+  padding: 24px;
+  box-sizing: border-box;
+  border: none;
+  outline: none;
+  resize: none;
+  background: transparent;
+  color: var(--app-fg);
+  font-family: Consolas, "Courier New", monospace;
+  font-size: 13px;
+  line-height: 1.7;
+  white-space: pre;
+  overflow: auto;
+}
+
 /* 查找高亮(14):临时视图态,不落盘 */
 .search-hit {
   background: rgba(255, 220, 80, 0.55);

@@ -53,6 +53,11 @@ export default function App() {
   /** 引擎 UI 节拍:编辑/选区/命令后递增,驱动浮动条重算。 */
   const [, setUiTick] = useState(0);
   const [linkRequest, setLinkRequest] = useState(0);
+  /** 源码模式(30):全屏原始 Markdown 文本编辑;文本区为磁盘字节级真相源。 */
+  const [sourceMode, setSourceMode] = useState(false);
+  const sourceModeRef = useRef(false);
+  const textareaRef = useRef<HTMLTextAreaElement | null>(null);
+  const sourceSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   /** 查找面板(14/15):打开态、作用域与焦点请求。 */
   const [findOpen, setFindOpen] = useState(false);
   const [findScope, setFindScope] = useState<"file" | "workspace">("file");
@@ -121,6 +126,7 @@ export default function App() {
       inTable: engine?.isInsideTable() ?? false,
       hasWorkspace: !!workspaceRef.current,
       hasSelection: !!selectedRef.current,
+      sourceMode: sourceModeRef.current,
     });
   }, []);
 
@@ -178,14 +184,75 @@ export default function App() {
 
 
 
+  // ── 源码模式(30):文本区 = 完整文件字节(含 front matter),保存直写不经引擎 ──
+  const writeSourceText = useCallback(async (): Promise<void> => {
+    const ta = textareaRef.current;
+    const cur = docRef.current;
+    if (!ta || !cur) return;
+    if (docMissingRef.current) return; // 文件已被外部删除:不静默重建(12)
+    ownOp.markOwnOp(cur.path);
+    const res = await window.confidant.writeTextFile(cur.path, ta.value);
+    if (!res.ok) console.error("[source] save failed:", res.error);
+  }, []);
+  const scheduleSourceSave = useCallback((): void => {
+    if (sourceSaveTimer.current) clearTimeout(sourceSaveTimer.current);
+    sourceSaveTimer.current = setTimeout(() => void writeSourceText(), 800);
+  }, [writeSourceText]);
+  const enterSourceMode = useCallback((): void => {
+    const cur = docRef.current;
+    const ed = engineRef.current;
+    if (!cur || !ed) return;
+    sourceModeRef.current = true;
+    setSourceMode(true);
+    refreshMenuContext();
+  }, [refreshMenuContext]);
+  const exitSourceMode = useCallback((): void => {
+    const cur = docRef.current;
+    const ta = textareaRef.current;
+    if (!cur || !ta) return;
+    // 文本区全文 → 拆头/正文 → 引擎装载;头随解析更新;未落盘编辑由保存管线接管
+    const model = parseNoteText(ta.value);
+    docRef.current = { ...cur, head: model.head };
+    setDoc((prev) => (prev ? { ...prev, head: model.head } : prev));
+    engineRef.current?.loadMarkdown(model.bodyMd);
+    pipelineRef.current?.notifyEdit();
+    sourceModeRef.current = false;
+    setSourceMode(false);
+    refreshMenuContext();
+  }, [refreshMenuContext]);
+  const toggleSourceMode = useCallback((): void => {
+    if (sourceModeRef.current) exitSourceMode();
+    else enterSourceMode();
+  }, [enterSourceMode, exitSourceMode]);
+  const saveCurrent = useCallback(async (): Promise<void> => {
+    if (sourceModeRef.current) await writeSourceText();
+    else await pipelineRef.current?.flush();
+  }, [writeSourceText]);
+  // 文本区内容:进入时以引擎序列化填充(头字节原样 + 正文引擎规范化,即保存口径)
+  useEffect(() => {
+    if (!sourceMode) return;
+    const cur = docRef.current;
+    const ed = engineRef.current;
+    if (!cur || !ed || !textareaRef.current) return;
+    textareaRef.current.value = composeNoteText({ head: cur.head, bodyMd: ed.getMarkdown() });
+    textareaRef.current.focus();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sourceMode]);
+
   // ── 主进程回调订阅 ──
   useEffect(() => {
     return window.confidant.onFlushRequest(() => {
+      if (sourceModeRef.current) {
+        // 源码模式:flush 直写文本区原文(关窗数据保护口径不变,30)
+        const done = writeSourceText();
+        void done.finally(() => window.confidant.flushAck());
+        return;
+      }
       const p = pipelineRef.current;
       const done = p ? p.flush() : Promise.resolve();
       void done.finally(() => window.confidant.flushAck());
     });
-  }, []);
+  }, [writeSourceText]);
 
   // ── 编辑器设置同步(28):行号 → 引擎装饰;换行/行号 → host 数据属性驱动 CSS;菜单勾选态 ──
   useEffect(() => {
@@ -202,7 +269,8 @@ export default function App() {
     if (!menu) return;
     menu.setChecked(Cmd.settingsCodeWrap, settings.codeWrap);
     menu.setChecked(Cmd.settingsCodeLineNumbers, settings.codeLineNumbers);
-  }, [settings, engine]);
+    menu.setChecked(Cmd.sourceMode, sourceMode);
+  }, [settings, sourceMode, engine]);
 
   // ── 工作区外部变更处置(12):树刷新 + 当前文件删除/改名横幅 + 内容变更静默重载 ──
   const reloadCurrentFromDisk = useCallback(async () => {
@@ -210,13 +278,24 @@ export default function App() {
     if (!cur) return;
     const res = await window.confidant.readTextFile(cur.path);
     if (!res.ok) return; // 读取失败(可能刚被删):交给 unlink 事件横幅
+    if (sourceModeRef.current) {
+      // 源码模式:先把文本区内容落盘(用户编辑优先),再以磁盘刷新文本区与头
+      await writeSourceText();
+      const again = await window.confidant.readTextFile(cur.path);
+      if (!again.ok) return;
+      const m = parseNoteText(again.value);
+      if (textareaRef.current) textareaRef.current.value = again.value;
+      docRef.current = { ...cur, head: m.head };
+      setDoc((prev) => (prev ? { ...prev, head: m.head } : prev));
+      return;
+    }
     const docModel = parseNoteText(res.value);
     const next = { ...cur, head: docModel.head };
     docRef.current = next;
     setDoc(next);
     engineRef.current?.loadMarkdown(docModel.bodyMd);
     pipelineRef.current?.resetClean();
-  }, []);
+  }, [writeSourceText]);
 
   useEffect(() => {
     return window.confidant.onWorkspaceTree(({ tree: nextTree, events }) => {
@@ -282,6 +361,8 @@ export default function App() {
     setDoc(null);
     pipelineRef.current?.resetClean();
     setLoadError(null);
+    sourceModeRef.current = false; // 切工作区复位为所见即所得(30)
+    setSourceMode(false);
     document.title = `${ws.name} · confidant`;
   }, []);
 
@@ -292,6 +373,8 @@ export default function App() {
     workspaceRef.current = null;
     setWorkspace(null);
     setTree(null);
+    sourceModeRef.current = false; // 关工作区复位为所见即所得(30)
+    setSourceMode(false);
     void window.confidant.closeWorkspace();
     document.title = "confidant · 知己笔记";
   }, []);
@@ -317,6 +400,8 @@ export default function App() {
     setUiTick((t) => t + 1);
     engineRef.current?.clearSearchHighlights(); // 切换文件高亮不残留(14)
     setFindOpen(false);
+    sourceModeRef.current = false; // 切文件复位为所见即所得(30)
+    setSourceMode(false);
   }, []);
 
   const openRel = useCallback(
@@ -361,7 +446,8 @@ export default function App() {
 
   // ── 菜单桥接线(03):命令注册表 → useMenuBridgeRegistration(22) ──
   useMenuBridgeRegistration({
-    menuRef, docRef, engineRef, pipelineRef, workspaceRef, selectedRef,
+    menuRef, docRef, engineRef, pipelineRef, workspaceRef, selectedRef, sourceModeRef,
+    saveCurrent, toggleSourceMode,
     setFindOpen, setFindScope, setFindFocus, setLinkRequest, setUiTick,
     toggleSidebar, toggleCodeWrap, toggleCodeLineNumbers, insertImageViaDialog,
     applyThemeMode, openFolderViaDialog,
@@ -462,11 +548,22 @@ export default function App() {
           )}
           <div
             className="editor-scroll"
-            style={{ display: showEditorArea ? undefined : "none" }}
+            // 30:源码模式时隐藏但保持挂载(引擎 DOM 不卸载,切回即恢复)
+            style={{ display: sourceMode || !showEditorArea ? "none" : undefined }}
             data-testid="editor-scroll"
           >
             {engineHost}
           </div>
+          {/* 源码模式(30):全文件原始 Markdown 文本区,保存直写字节 */}
+          {sourceMode && doc && (
+            <textarea
+              ref={textareaRef}
+              data-testid="source-editor"
+              className="source-editor"
+              spellCheck={false}
+              onChange={scheduleSourceSave}
+            />
+          )}
           {/* 欢迎页(27 纯空态):仅当既无工作区也无文档(直开文件路径下避免覆盖编辑区,26) */}
           {!workspace && !doc && <Welcome />}
           {guidanceVisible && <EmptyWorkspaceGuidance />}

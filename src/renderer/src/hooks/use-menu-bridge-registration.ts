@@ -16,6 +16,11 @@ export interface MenuRegistrationApi {
   pipelineRef: RefObject<ReturnType<typeof createSavePipeline> | null>;
   workspaceRef: RefObject<Workspace | null>;
   selectedRef: RefObject<{ rel: string; kind: "dir" | "md" } | null>;
+  /** 源码模式(30):段落/格式/查找置灰;撤销重做转发文本区。 */
+  sourceModeRef: RefObject<boolean>;
+  /** 保存当前文档(源码模式直写文本区,否则走保存管线)。 */
+  saveCurrent: () => Promise<void>;
+  toggleSourceMode: () => void;
   setFindOpen: (v: boolean) => void;
   setFindScope: (v: "file" | "workspace") => void;
   setFindFocus: (fn: (f: number) => number) => void;
@@ -35,29 +40,50 @@ export interface MenuRegistrationApi {
 }
 
 export function useMenuBridgeRegistration(api: MenuRegistrationApi): void {
-  const { menuRef, docRef, engineRef, pipelineRef, workspaceRef, selectedRef, setFindOpen, setFindScope, setFindFocus, setLinkRequest, setUiTick, toggleSidebar, toggleCodeWrap, toggleCodeLineNumbers, insertImageViaDialog, applyThemeMode, openFolderViaDialog, doCreateNote, doDeleteEntry, setPrompt, showNotice, refreshMenuContext } = api;
+  const { menuRef, docRef, engineRef, pipelineRef, workspaceRef, selectedRef, sourceModeRef, saveCurrent, toggleSourceMode, setFindOpen, setFindScope, setFindFocus, setLinkRequest, setUiTick, toggleSidebar, toggleCodeWrap, toggleCodeLineNumbers, insertImageViaDialog, applyThemeMode, openFolderViaDialog, doCreateNote, doDeleteEntry, setPrompt, showNotice, refreshMenuContext } = api;
 
 // ── 菜单桥(03) ──
   useEffect(() => {
     const menu = createMenuBridge();
     menuRef.current = menu;
     menu.register(Cmd.openFolder, () => true, () => void openFolderViaDialog());
-    menu.register(Cmd.save, (ctx) => ctx.docOpen, () => void pipelineRef.current?.flush());
-    menu.register(Cmd.undo, (ctx) => ctx.docOpen && ctx.canUndo, () => engineRef.current?.undo());
-    menu.register(Cmd.redo, (ctx) => ctx.docOpen && ctx.canRedo, () => engineRef.current?.redo());
+    menu.register(Cmd.save, (ctx) => ctx.docOpen, () => void saveCurrent());
+    // 撤销/重做(30):源码模式下转发文本区原生撤销栈
+    const runUndoRedo = (cmd: "undo" | "redo"): void => {
+      if (sourceModeRef.current) {
+        const ta = document.querySelector("[data-testid='source-editor']") as HTMLTextAreaElement | null;
+        ta?.focus();
+        document.execCommand(cmd);
+        return;
+      }
+      if (cmd === "undo") engineRef.current?.undo();
+      else engineRef.current?.redo();
+    };
+    menu.register(
+      Cmd.undo,
+      (ctx) => ctx.docOpen && (ctx.canUndo || ctx.sourceMode),
+      () => runUndoRedo("undo"),
+    );
+    menu.register(
+      Cmd.redo,
+      (ctx) => ctx.docOpen && (ctx.canRedo || ctx.sourceMode),
+      () => runUndoRedo("redo"),
+    );
     // 查找(14/15):Ctrl+F 当前文件;Ctrl+Shift+F 全工作区
     const openFind = (scope: "file" | "workspace"): void => {
       setFindScope(scope);
       setFindOpen(true);
       setFindFocus((f) => f + 1);
     };
-    menu.register(Cmd.find, (ctx) => ctx.docOpen, () => openFind("file"));
+    menu.register(Cmd.find, (ctx) => ctx.docOpen && !ctx.sourceMode, () => openFind("file"));
     menu.register(
       Cmd.workspaceSearch,
       (ctx) => ctx.hasWorkspace,
       () => openFind("workspace"),
     );
     menu.register(Cmd.toggleSidebar, () => true, toggleSidebar);
+    // 源码模式(30):Ctrl+/ 或「视图 → 源码模式」;勾选态由 App 侧 setChecked 同步
+    menu.register(Cmd.sourceMode, (ctx) => ctx.docOpen, toggleSourceMode);
     // 设置(28):代码块换行/行号,勾选态由 App 侧经 setChecked 同步
     menu.register(Cmd.settingsCodeWrap, () => true, () => {
       toggleCodeWrap();
@@ -67,19 +93,20 @@ export function useMenuBridgeRegistration(api: MenuRegistrationApi): void {
       toggleCodeLineNumbers();
       setUiTick((t) => t + 1);
     });
-    menu.register(Cmd.insertImage, (ctx) => ctx.docOpen, () => void insertImageViaDialog());
-    // 行内格式(07):与浮动工具条同一引擎命令面
+    menu.register(Cmd.insertImage, (ctx) => ctx.docOpen && !ctx.sourceMode, () => void insertImageViaDialog());
+    // 行内格式(07):与「格式」菜单同一引擎命令面;源码模式置灰(30)
     const runFormat = (fn: (e: Engine) => boolean): void => {
       const ed = engineRef.current;
       if (!ed) return;
       fn(ed);
       setUiTick((t) => t + 1);
     };
-    menu.register(Cmd.bold, (ctx) => ctx.docOpen, () => runFormat((e) => e.toggleBold()));
-    menu.register(Cmd.italic, (ctx) => ctx.docOpen, () => runFormat((e) => e.toggleItalic()));
-    menu.register(Cmd.strike, (ctx) => ctx.docOpen, () => runFormat((e) => e.toggleStrike()));
-    menu.register(Cmd.clearFormat, (ctx) => ctx.docOpen, () => runFormat((e) => e.clearFormat()));
-    menu.register(Cmd.link, (ctx) => ctx.docOpen, () => setLinkRequest((r) => r + 1));
+    const fmtRule = (ctx: MenuContext) => ctx.docOpen && !ctx.sourceMode;
+    menu.register(Cmd.bold, fmtRule, () => runFormat((e) => e.toggleBold()));
+    menu.register(Cmd.italic, fmtRule, () => runFormat((e) => e.toggleItalic()));
+    menu.register(Cmd.strike, fmtRule, () => runFormat((e) => e.toggleStrike()));
+    menu.register(Cmd.clearFormat, fmtRule, () => runFormat((e) => e.clearFormat()));
+    menu.register(Cmd.link, fmtRule, () => setLinkRequest((r) => r + 1));
     // 导出/打印(19):当前文档渲染通道(与磁盘 mtime 无关)
     const runExport = (kind: "pdf" | "print"): void => {
       const doc = docRef.current;
@@ -107,10 +134,10 @@ export function useMenuBridgeRegistration(api: MenuRegistrationApi): void {
         }
       })();
     };
-    menu.register(Cmd.exportPdf, (ctx) => ctx.docOpen, () => runExport("pdf"));
-    menu.register(Cmd.print, (ctx) => ctx.docOpen, () => runExport("print"));
+    menu.register(Cmd.exportPdf, (ctx) => ctx.docOpen && !ctx.sourceMode, () => runExport("pdf"));
+    menu.register(Cmd.print, (ctx) => ctx.docOpen && !ctx.sourceMode, () => runExport("print"));
     // 块级段落命令(08):标题/正文/列表/引用/代码块/表格,表格内置灰
-    const blockRule = (ctx: MenuContext) => ctx.docOpen && !ctx.inTable;
+    const blockRule = (ctx: MenuContext) => ctx.docOpen && !ctx.inTable && !ctx.sourceMode;
     const runBlock = (kind: Parameters<Engine["setBlockKind"]>[0]): void => {
       const ed = engineRef.current;
       if (!ed) return;
