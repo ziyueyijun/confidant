@@ -10,7 +10,11 @@ import { TableHeader } from "@tiptap/extension-table-header";
 import { TaskList } from "@tiptap/extension-task-list";
 import { TaskItem } from "@tiptap/extension-task-item";
 import { Image } from "@tiptap/extension-image";
+import type { EditorState, Transaction } from "@tiptap/pm/state";
+import { Fragment } from "@tiptap/pm/model";
 import type { Node as PMNode } from "@tiptap/pm/model";
+import { liftListItem, sinkListItem } from "@tiptap/pm/schema-list";
+import { goToNextCell } from "@tiptap/pm/tables";
 
 /**
  * 图片显示解析器:markdown 引用(src 原样) → 渲染层可加载的 URL。
@@ -79,6 +83,45 @@ function makeEditor(
     content: markdown,
     contentType: "markdown",
     extensions: makeExtensions(resolveImageUrl),
+    editorProps: {
+      // Tab 语义(09):表格内移下一格;列表项缩进;Shift+Tab 反缩进/上一格
+      handleKeyDown(view, event) {
+        if (event.key !== "Tab") return false;
+        const { state } = view;
+        const $sel = state.selection.$from;
+        const types = new Set<string>();
+        for (let d = $sel.depth; d > 0; d--) types.add($sel.node(d).type.name);
+        const shift = event.shiftKey;
+        if (types.has("table")) {
+          if (goToNextCell(shift ? -1 : 1)(state, view.dispatch)) {
+            event.preventDefault();
+            return true;
+          }
+          return false;
+        }
+        const schema = state.schema;
+        const runListCmd = (nodeName: "listItem"): boolean => {
+          const nodeType = schema.nodes[nodeName];
+          if (!nodeType) return false;
+          const cmd = shift ? liftListItem(nodeType) : sinkListItem(nodeType);
+          if (cmd(state, view.dispatch)) {
+            event.preventDefault();
+            return true;
+          }
+          return false;
+        };
+        // 任务项缩进:extension-list 的包装与 PM sink/lift 不兼容,走结构化搬移
+        if (types.has("taskItem")) {
+          if (moveTaskItem(state, view.dispatch, shift ? "out" : "in")) {
+            event.preventDefault();
+            return true;
+          }
+          return false;
+        }
+        if (types.has("listItem")) return runListCmd("listItem");
+        return false;
+      },
+    },
   });
 }
 
@@ -175,6 +218,18 @@ export interface Engine {
   setBlockKind(kind: BlockKind): boolean;
   /** 插入空表格并把光标带入首个单元格。 */
   insertTable(rows?: number, cols?: number): boolean;
+
+  // ── 结构化交互(09) ──
+  /** 点击复选框切换任务完成态(渲染层 DOM 事件驱动;更新写盘 - [x]/[ ])。 */
+  toggleTaskCheckedAt(domEl: Element): boolean;
+  /** 按页面坐标把光标定位到单元格内(右键行/列操作前置)。 */
+  anchorCursorAtCoords(clientX: number, clientY: number): boolean;
+  /** 表格操作(光标所在行/列):增删行列与对齐。 */
+  tableOp(
+    op: "rowBefore" | "rowAfter" | "rowDelete" | "colBefore" | "colAfter" | "colDelete" | "alignLeft" | "alignCenter" | "alignRight",
+  ): boolean;
+  /** 列表项缩进(+1)/反缩进(-1)(任务列表与普通列表)。 */
+  listIndent(dir: 1 | -1): boolean;
   /** 在光标处插入图片节点(引用相对路径;自动保存由上层管线触发)。 */
   insertImage(src: string, alt?: string): boolean;
   /** 在页面坐标处插入图片(drop 落点;失败回退光标处)。 */
@@ -207,8 +262,17 @@ export function createEngine(
     ed.on("update", () => callbacks.onUpdate?.());
     ed.on("selectionUpdate", () => callbacks.onSelectionChange?.());
     ed.on("blur", () => callbacks.onBlur?.());
-    // 单击链接 → 编辑态回调(不跳转;链接节点本身不拦截,由 PM 光标行为收尾)
+    // 单击:任务勾选(09)优先,链接 → 编辑态回调(07;不跳转,16 打开)
     ed.view.dom.addEventListener("click", (ev) => {
+      const target = ev.target as Element | null;
+      if (!target) return;
+      const checkbox = target.closest("input[type='checkbox']");
+      const taskLi = checkbox ? checkbox.closest("li[data-checked]") : null;
+      if (taskLi) {
+        ev.preventDefault(); // 状态由文档 attrs 驱动渲染,不落浏览器默认勾选
+        toggleCheckedViaDom(ed, taskLi);
+        return;
+      }
       if (!callbacks.onLinkClick) return;
       const coords = ed.view.posAtCoords({ left: ev.clientX, top: ev.clientY });
       if (!coords) return;
@@ -440,6 +504,86 @@ export function createEngine(
       return ed.chain().focus().insertTable({ rows, cols, withHeaderRow: true }).run();
     },
 
+    toggleTaskCheckedAt(domEl) {
+      const ed = editor;
+      if (!ed) return false;
+      const li = domEl.closest("li[data-checked]");
+      if (!li) return false;
+      return toggleCheckedViaDom(ed, li);
+    },
+
+    anchorCursorAtCoords(clientX, clientY) {
+      const ed = editor;
+      if (!ed) return false;
+      const coords = ed.view.posAtCoords({ left: clientX, top: clientY });
+      if (!coords) return false;
+      const $p = ed.state.doc.resolve(coords.pos);
+      if (!$p.parent.isTextblock) return false;
+      return ed.chain().focus().setTextSelection({ from: coords.pos, to: coords.pos }).run();
+    },
+
+    tableOp(op) {
+      const ed = editor;
+      if (!ed) return false;
+      const cmd = ed.chain().focus();
+      switch (op) {
+        case "rowBefore":
+          return cmd.addRowBefore().run();
+        case "rowAfter":
+          return cmd.addRowAfter().run();
+        case "rowDelete":
+          return cmd.deleteRow().run();
+        case "colBefore":
+          return cmd.addColumnBefore().run();
+        case "colAfter":
+          return cmd.addColumnAfter().run();
+        case "colDelete":
+          return cmd.deleteColumn().run();
+        case "alignLeft":
+          return cmd.setCellAttribute("align", "left").run();
+        case "alignCenter":
+          return cmd.setCellAttribute("align", "center").run();
+        case "alignRight":
+          return cmd.setCellAttribute("align", "right").run();
+      }
+    },
+
+    listIndent(dir) {
+      const ed = editor;
+      if (!ed) return false;
+      const types = new Set<string>();
+      const $sel = ed.state.selection.$from;
+      for (let d = $sel.depth; d > 0; d--) types.add($sel.node(d).type.name);
+      if (types.has("taskItem")) {
+        // 官方 sink/lift 对 taskItem 包装不稳:先试 NodeSelection 路径,抛错回退手动搬移
+        for (let d = $sel.depth; d > 0; d--) {
+          if ($sel.node(d).type.name !== "taskItem") continue;
+          const itemStart = $sel.before(d);
+          try {
+            const ok = ed
+              .chain()
+              .focus()
+              .setNodeSelection(itemStart)
+              [dir === 1 ? "sinkListItem" : "liftListItem"]("taskItem")
+              .run();
+            if (ok) return true;
+          } catch {
+            // 落入手动搬移
+          }
+          return moveTaskItem(ed.state, ed.view.dispatch, dir === 1 ? "in" : "out");
+        }
+        return false;
+      }
+      if (types.has("listItem")) {
+        return ed
+          .chain()
+          .focus()
+          [dir === 1 ? "sinkListItem" : "liftListItem"]("listItem")
+          .run();
+      }
+      return false;
+    },
+
     insertImage(src, alt = "") {
       if (!editor) return false;
       return editor
@@ -547,4 +691,115 @@ function linkRangeAt(ed: Editor, pos: number): LinkInfo | null {
     break;
   }
   return { href: hit.href, from, to };
+}
+
+/** 切换任务项完成态(checkbox 点击与右键命令共用;文档 attrs 驱动渲染)。 */
+function toggleCheckedViaDom(ed: Editor, li: Element): boolean {
+  const hit = { pos: -1, checked: false };
+  ed.state.doc.descendants((node, pos) => {
+    if (hit.pos >= 0) return false;
+    if (node.type.name !== "taskItem") return true;
+    const dom = ed.view.nodeDOM(pos) as Element | null;
+    if (dom === li || (dom && dom.contains(li))) {
+      hit.pos = pos;
+      hit.checked = !!node.attrs.checked;
+      return false;
+    }
+    return true;
+  });
+  if (hit.pos < 0) return false;
+  ed.view.dispatch(ed.state.tr.setNodeMarkup(hit.pos, null, { checked: !hit.checked }));
+  return true;
+}
+
+
+
+
+/**
+ * 任务项 缩进(in)/反缩进(out)(09):整棵相关列表「节点重组」,与解析器产出的
+ * 嵌套结构同构(taskItem 内嵌 taskList)。单事务替换 → 撤销一步。
+ */
+function moveTaskItem(state: EditorState, dispatch: (tr: Transaction) => void, dir: "in" | "out"): boolean {
+  const { doc, tr } = state;
+  const $p = doc.resolve(state.selection.$from.pos);
+  const listType = state.schema.nodes.taskList;
+  if (!listType) return false;
+  const childrenOf = (n: PMNode): PMNode[] => {
+    const out: PMNode[] = [];
+    n.content.forEach((c) => out.push(c));
+    return out;
+  };
+
+  // 当前 taskItem 祖先深度与其索引
+  let itemDepth = -1;
+  for (let d = $p.depth; d > 0; d--) {
+    if ($p.node(d).type.name === "taskItem") {
+      itemDepth = d;
+      break;
+    }
+  }
+  if (itemDepth < 0) return false;
+  const listDepth = itemDepth - 1;
+  if ($p.node(listDepth).type.name !== "taskList") return false;
+  const listNode = $p.node(listDepth);
+  const listStart = $p.before(listDepth);
+  const itemIndex = $p.index(listDepth);
+  const itemNode = listNode.child(itemIndex);
+  if (!itemNode) return false;
+  const children = childrenOf(listNode);
+
+  if (dir === "in") {
+    const prev = children[itemIndex - 1];
+    if (!prev || prev.type.name !== "taskItem") return false;
+    const tailIdx = prev.childCount - 1;
+    const tail = tailIdx >= 0 ? prev.child(tailIdx) : null;
+    const hasTailList = tail !== null && tail.type.name === "taskList";
+    let prevNew: PMNode;
+    if (hasTailList && tail) {
+      const grown = tail.copy(tail.content.append(Fragment.from(itemNode)));
+      prevNew = prev.copy(prev.content.replaceChild(tailIdx, grown));
+    } else {
+      prevNew = prev.copy(prev.content.append(Fragment.from(listType.create(null, [itemNode]))));
+    }
+    const rebuilt: PMNode[] = [];
+    for (let i = 0; i < children.length; i++) {
+      if (i === itemIndex) continue; // 原项被移入 prev 尾部
+      rebuilt.push(i === itemIndex - 1 ? prevNew : children[i]!);
+    }
+    const newList = listNode.copy(Fragment.fromArray(rebuilt));
+    tr.replaceWith(listStart, listStart + listNode.nodeSize, newList);
+    dispatch(tr);
+    return true;
+  }
+
+  // 反缩进:嵌套列表的父必须是 taskItem
+  const outerItemDepth = listDepth - 1;
+  if (outerItemDepth < 1) return false;
+  if ($p.node(outerItemDepth).type.name !== "taskItem") return false;
+  const outerListDepth = outerItemDepth - 1;
+  if ($p.node(outerListDepth).type.name !== "taskList") return false;
+  const outerList = $p.node(outerListDepth);
+  const outerListStart = $p.before(outerListDepth);
+  const outerItem = $p.node(outerItemDepth);
+  const outerItemStart = $p.before(outerItemDepth);
+  // 嵌套列表(去当前项)重建
+  const tailIdxInOuter = outerItem.childCount - 1;
+  const nestedList = outerItem.child(tailIdxInOuter);
+  if (!nestedList || nestedList.type.name !== "taskList") return false;
+  const nestedChildren = childrenOf(nestedList);
+  const nestedNew = nestedList.copy(
+    Fragment.fromArray(nestedChildren.filter((c) => c !== itemNode)),
+  );
+  const outerNew = outerItem.copy(outerItem.content.replaceChild(tailIdxInOuter, nestedNew));
+  // 外层列表:outerItemNew 之后插入被移出的项
+  const outerChildren = childrenOf(outerList);
+  const rebuiltOuter: PMNode[] = [];
+  for (const c of outerChildren) {
+    if (c === outerItem) rebuiltOuter.push(outerNew, itemNode);
+    else rebuiltOuter.push(c);
+  }
+  const newOuterList = outerList.copy(Fragment.fromArray(rebuiltOuter));
+  tr.replaceWith(outerListStart, outerListStart + outerList.nodeSize, newOuterList);
+  dispatch(tr);
+  return true;
 }

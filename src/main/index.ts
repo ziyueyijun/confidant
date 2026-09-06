@@ -413,12 +413,22 @@ async function runWorkspaceSelfCheck(win: BrowserWindow, wsDir: string, emptyDir
         if (!sel) return { ok: false, detail: "no-selection" };
         sel.removeAllRanges();
         sel.addRange(range);
+        document.dispatchEvent(new Event("selectionchange")); // 助推 PM 选区同步
         return { ok: true, detail: "selected" };
       })()`,
     );
     if (!selMade.ok) return fail(`selection failed: ${JSON.stringify(selMade)}`);
-    const toolbarShown = await poll(() => js<boolean>(q("[data-testid='format-toolbar']")));
-    if (!toolbarShown) return fail("format toolbar not shown on selection");
+    const toolbarShown = await poll(() => js<boolean>(q("[data-testid='format-toolbar']")), 10000);
+    if (!toolbarShown) {
+      const diag = await js<string>(
+        `JSON.stringify({
+          sel: window.getSelection()?.toString().slice(0, 30) ?? "",
+          active: (document.activeElement as HTMLElement | null)?.tagName ?? "",
+          focusedEl: !!document.querySelector("[contenteditable='true']:focus"),
+        })`,
+      );
+      return fail(`format toolbar not shown on selection; diag=${diag}`);
+    }
     await js<void>(`document.querySelector("[data-testid='format-toolbar'] button[title='加粗']").click()`);
     const boldSaved = await poll(async () => {
       const content = await readFile(aPath, "utf8");

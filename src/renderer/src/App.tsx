@@ -176,60 +176,124 @@ export default function App() {
     const end = () => pipelineRef.current?.setComposing(false);
     const allowDrop = (e: DragEvent) => e.preventDefault(); // 允许落点坐标
 
-    // ── 图片右键操作(06):打开所在文件夹 / 复制图片 / 删除(引用+回收站) ──
+    // ── 图片/表格/任务 右键操作 ──
     const onContextMenu = async (e: MouseEvent): Promise<void> => {
       const doc = docRef.current;
       const current = engineRef.current;
       if (!doc || !current) return;
       const target = e.target as Element | null;
-      const wrapper = target?.closest(".confidant-image-node");
-      if (!wrapper) return; // 非图片:留给树/其他右键
-      e.preventDefault();
-      const raw = wrapper.getAttribute("data-src-raw") ?? "";
-      if (isRemoteSrc(raw)) {
-        await window.confidant.infoDialog("这是一张网络图片(远程图不做下载与显示)。");
-        return;
-      }
-      const abs = resolveImageAbsPath(doc.path, raw);
-      if (!abs) {
-        await window.confidant.infoDialog("图片引用无效。");
-        return;
-      }
-      if (!(await window.confidant.pathExists(abs))) {
-        // 引用悬空(文件已被外部删走):明确提示,不静默;可移除引用
+      if (!target) return;
+
+      // 图片右键(06)
+      const imgWrapper = target.closest(".confidant-image-node");
+      if (imgWrapper) {
+        e.preventDefault();
+        const raw = imgWrapper.getAttribute("data-src-raw") ?? "";
+        if (isRemoteSrc(raw)) {
+          await window.confidant.infoDialog("这是一张网络图片(远程图不做下载与显示)。");
+          return;
+        }
+        const abs = resolveImageAbsPath(doc.path, raw);
+        if (!abs) {
+          await window.confidant.infoDialog("图片引用无效。");
+          return;
+        }
+        if (!(await window.confidant.pathExists(abs))) {
+          // 引用悬空(文件已被外部删走):明确提示,不静默;可移除引用
+          const choice = await window.confidant.showContextMenu([
+            { id: "gone", label: "图片文件已不存在(可能已被外部删除)", enabled: false },
+            { id: "remove-ref", label: "移除引用" },
+          ]);
+          if (choice === "remove-ref") current.removeImageNodeAtElement(imgWrapper);
+          return;
+        }
         const choice = await window.confidant.showContextMenu([
-          { id: "gone", label: "图片文件已不存在(可能已被外部删除)", enabled: false },
-          { id: "remove-ref", label: "移除引用" },
+          { id: "open", label: "打开所在文件夹" },
+          { id: "copy", label: "复制图片" },
+          { id: "remove", label: "删除" },
         ]);
-        if (choice === "remove-ref") current.removeImageNodeAtElement(wrapper);
+        if (choice === "open") {
+          await window.confidant.showItemInFolder(abs);
+        } else if (choice === "copy") {
+          const r = await window.confidant.copyImageToClipboard(abs);
+          if (!r.ok) {
+            await window.confidant.infoDialog(`复制图片失败:${r.error.message}`);
+          }
+        } else if (choice === "remove") {
+          const yes = await window.confidant.confirmDialog(
+            "删除这张图片及其文件?将移入回收站",
+          );
+          if (!yes) return;
+          const refRemoved = current.removeImageNodeAtElement(imgWrapper); // 引用移除 → 自动保存
+          const tr = await window.confidant.trashItem(abs);
+          if (!tr.ok) {
+            await window.confidant.infoDialog(
+              refRemoved
+                ? `图片文件未能移入回收站:${tr.error.message}(引用已从文档移除)。`
+                : `图片文件未能移入回收站:${tr.error.message}`,
+            );
+          }
+        }
         return;
       }
-      const choice = await window.confidant.showContextMenu([
-        { id: "open", label: "打开所在文件夹" },
-        { id: "copy", label: "复制图片" },
-        { id: "remove", label: "删除" },
-      ]);
-      if (choice === "open") {
-        await window.confidant.showItemInFolder(abs);
-      } else if (choice === "copy") {
-        const r = await window.confidant.copyImageToClipboard(abs);
-        if (!r.ok) {
-          await window.confidant.infoDialog(`复制图片失败:${r.error.message}`);
+
+      // 表格右键(09):光标定位到该格后执行行列/对齐操作
+      const cell = target.closest("td, th");
+      if (cell && docRef.current && engineRef.current) {
+        e.preventDefault();
+        await engineRef.current.anchorCursorAtCoords(e.clientX, e.clientY);
+        const choice = await window.confidant.showContextMenu([
+          { id: "row-before", label: "在上方插入行" },
+          { id: "row-after", label: "在下方插入行" },
+          { id: "col-before", label: "在左侧插入列" },
+          { id: "col-after", label: "在右侧插入列" },
+          { id: "sep1", type: "separator" },
+          { id: "row-delete", label: "删除本行" },
+          { id: "col-delete", label: "删除本列" },
+          {
+            id: "menu-align",
+            type: "submenu",
+            label: "对齐",
+            submenu: [
+              { id: "align-left", label: "左对齐" },
+              { id: "align-center", label: "居中" },
+              { id: "align-right", label: "右对齐" },
+            ],
+          },
+        ]);
+        const ops: Record<string, Parameters<typeof current.tableOp>[0]> = {
+          "row-before": "rowBefore",
+          "row-after": "rowAfter",
+          "row-delete": "rowDelete",
+          "col-before": "colBefore",
+          "col-after": "colAfter",
+          "col-delete": "colDelete",
+          "align-left": "alignLeft",
+          "align-center": "alignCenter",
+          "align-right": "alignRight",
+        };
+        const op = choice ? ops[choice] : undefined;
+        if (op) {
+          current.tableOp(op);
+          setUiTick((t) => t + 1);
         }
-      } else if (choice === "remove") {
-        const yes = await window.confidant.confirmDialog(
-          "删除这张图片及其文件?将移入回收站",
-        );
-        if (!yes) return;
-        const refRemoved = current.removeImageNodeAtElement(wrapper); // 引用移除 → 自动保存
-        const tr = await window.confidant.trashItem(abs);
-        if (!tr.ok) {
-          await window.confidant.infoDialog(
-            refRemoved
-              ? `图片文件未能移入回收站:${tr.error.message}(引用已从文档移除)。`
-              : `图片文件未能移入回收站:${tr.error.message}`,
-          );
-        }
+        return;
+      }
+
+      // 任务列表右键(09):勾选切换与缩进/反缩进
+      const taskLi = target.closest("li[data-checked]");
+      if (taskLi) {
+        e.preventDefault();
+        const choice = await window.confidant.showContextMenu([
+          { id: "task-toggle", label: "切换完成状态" },
+          { id: "sep2", type: "separator" },
+          { id: "task-indent", label: "缩进" },
+          { id: "task-outdent", label: "反缩进" },
+        ]);
+        if (choice === "task-toggle") current.toggleTaskCheckedAt(taskLi);
+        else if (choice === "task-indent") current.listIndent(1);
+        else if (choice === "task-outdent") current.listIndent(-1);
+        return;
       }
     };
 
