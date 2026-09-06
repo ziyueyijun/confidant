@@ -24,6 +24,7 @@
 - [范围裁决标准](issues/03-scope-criteria.md):判据表机制(非打分)+「Typora 有」不作理由 + 默认出举证进 + 统一裁决清单表留痕(进/延后/出+成本档 S/M/L+一句依据)+ 与三原则相抵一票否决。适用三件套外候选与已进项内形态选择。
 - [工作区与文件树形态](issues/05-workspace-and-file-tree.md):单文件夹工作区、无标签页单击切换、文件夹在前名称升序+展开记忆;右键+快捷键文件操作(删除进回收站,删文件夹确认);树显文件夹+仅 .md 文件,外部变更自动监听;欢迎页+最近列表入口;侧栏可收可拖、当前文件高亮;空态引导。多根/标签页/多选批量/拖入打开=延后。
 - [Typora 功能面候选清单](issues/12-typora-candidate-catalog.md):以官方文档站(2026-09-06 采集,1.14.9)整理 130 条功能面候选入库(7 组、每条带来源),作各仲裁票候选源;已在范围/已划出均就地标注。清单见 docs/research/typora-candidate-catalog.md。
+- [编辑引擎原型验证](issues/06-engine-prototype.md):两候选语义级保真 6/6 成立、字节级均不成立(CRLF/风格规范化不可配置);TipTap 需显式注册 Image(否则静默丢图链);真 IME/表格手感未验并入 07。证据见 docs/research/engine-prototype-findings.md;原型归档于分支 prototype/engine-prototype-06。
 
 ## Not yet specified
 
