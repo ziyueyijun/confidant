@@ -1,7 +1,7 @@
 # 外观与主题仲裁
 
 Type: grilling
-Status: open
+Status: claimed
 
 ## Question
 
