@@ -1,7 +1,7 @@
 // 应用视图层(04 形态):欢迎页 → 工作区(文件树侧栏 + 所见即所得编辑)。
 // 保存语义经 save-pipeline(02);命令源与 native 菜单经 menu-bridge(03)。
 
-import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { DragEvent as ReactDragEvent, MouseEvent as ReactMouseEvent } from "react";
 import { createEngine, type Engine } from "../../../packages/engine";
 import { basename } from "@shared/path";
@@ -13,54 +13,26 @@ import { isRemoteSrc, resolveImageAbsPath, resolveImageSourceUrl } from "./edito
 import { classifyLink } from "./editor/link-target";
 import { sanitizePasteHtml } from "./editor/html-sanitize";
 import { Cmd, createMenuBridge, type MenuContext } from "./menu/menu-bridge";
+import {
+  createOwnOpGuard,
+  describeWriteError,
+  EMPTY_SAVE_STATE,
+  showFileOpError,
+  toThrownError,
+} from "./session/ops-shared";
 import { Sidebar } from "./components/Sidebar";
 import { FormatOverlay } from "./components/FormatOverlay";
 import { TextPrompt } from "./components/TextPrompt";
 import { SearchPanel } from "./components/SearchPanel";
+import { TopBar } from "./components/TopBar";
+import { Welcome } from "./components/Welcome";
+import { ChangeNoticeToast, DocMissingBanner } from "./components/OverlayBanners";
+import { EmptyWorkspaceGuidance, NotePickHint } from "./components/EmptyStates";
 import { countMdInTree, dirAncestorsOf, relPathOf, wsJoin, type Workspace } from "./workspace/workspace";
+import type { OpenNote } from "./session/types";
+import { useAppTheme } from "./hooks/use-app-theme";
+import { useSidebarLayout } from "./hooks/use-sidebar-layout";
 
-interface OpenNote {
-  path: string;
-  name: string;
-  head: string | null;
-}
-
-function describeWriteError(error: { code: string; message: string } | null): string | null {
-  if (!error) return null;
-  switch (error.code) {
-    case "ENOENT":
-      return "文件不存在或已被移动,无法保存。";
-    case "EACCES":
-    case "EPERM":
-    case "EBUSY":
-      return "无法写入:文件可能被占用或只读。请检查后重试。";
-    default:
-      return `保存失败:${error.message}`;
-  }
-}
-
-function toThrownError(res: { ok: false; error: { code: string; message: string } }): Error {
-  return Object.assign(new Error(res.error.message), { code: res.error.code });
-}
-
-const EMPTY_SAVE_STATE: SaveState = {
-  dirty: false,
-  saving: false,
-  savedAt: null,
-  error: null,
-};
-
-const EMPTY_WORKSPACE_GUIDANCE =
-  "这个文件夹还没有笔记:右键左侧空白处可以新建,也可以把 .md 文件放进这个文件夹。";
-
-const btnSmall: CSSProperties = {
-  padding: "3px 12px",
-  fontSize: 13,
-  borderRadius: 6,
-  border: "1px solid var(--border)",
-  background: "var(--surface)",
-  cursor: "pointer",
-};
 
 export default function App() {
   const hostRef = useRef<HTMLDivElement>(null);
@@ -101,21 +73,8 @@ export default function App() {
   /** 正在编辑文件被外部删除(12:不静默重建,提供恢复/放弃)。 */
   const [docMissing, setDocMissing] = useState(false);
   const docMissingRef = useRef(false);
-  /** 自身文件操作产生的路径(其 watcher 回声不当作外部删除);时间盒抑制。 */
-  const ownOpPathsRef = useRef<Map<string, number>>(new Map());
-  /** 登记自身写/操作;1.5s 内的同名 watcher 回声视为自我回声,不触发外部处置。 */
-  const markOwnOp = useCallback((absPath: string) => {
-    const m = ownOpPathsRef.current;
-    const now = Date.now();
-    for (const [k, v] of m) {
-      if (now - v > 2000) m.delete(k);
-    }
-    m.set(absPath.replace(/\\/g, "/").toLowerCase(), now);
-  }, []);
-  const isOwnOpRecent = useCallback((absPath: string): boolean => {
-    const ts = ownOpPathsRef.current.get(absPath.replace(/\\/g, "/").toLowerCase());
-    return ts !== undefined && Date.now() - ts < 2000;
-  }, []);
+  /** 自身文件操作产生的路径(其 watcher 回声不当作外部删除);时间盒抑制(12)。 */
+  const ownOp = useMemo(() => createOwnOpGuard(), []);
   const promptValidate = (v: string): string | null => {
     if (!v.trim()) return "名称不能为空";
     if (/[\\/:*?"<>|]/.test(v)) return "名称不能包含 \\ / : * ? \" < > | 字符";
@@ -125,44 +84,10 @@ export default function App() {
   const [workspace, setWorkspace] = useState<Workspace | null>(null);
   const [tree, setTree] = useState<TreeEntry[] | null>(null);
   const [expanded, setExpanded] = useState<ReadonlySet<string>>(new Set());
-  const [sidebar, setSidebar] = useState({ visible: true, width: 260 });
 
-  // ── 外观(18):跟随系统 / 浅色 / 深色(持久化,菜单勾选同源) ──
-  const [themeMode, setThemeMode] = useState<"system" | "light" | "dark">("system");
-  useEffect(() => {
-    void (async () => {
-      const saved = (await window.confidant.stateGet("theme")) as
-        | "system"
-        | "light"
-        | "dark"
-        | null;
-      setThemeMode(saved === "light" || saved === "dark" ? saved : "system");
-    })();
-  }, []);
-  useEffect(() => {
-    const mq = window.matchMedia("(prefers-color-scheme: dark)");
-    const apply = (): void => {
-      const effective =
-        themeMode === "system" ? (mq.matches ? "dark" : "light") : themeMode;
-      document.documentElement.dataset.theme = effective;
-      const menu = menuRef.current;
-      if (menu) {
-        menu.setChecked(Cmd.themeSystem, themeMode === "system");
-        menu.setChecked(Cmd.themeLight, themeMode === "light");
-        menu.setChecked(Cmd.themeDark, themeMode === "dark");
-      }
-    };
-    apply();
-    if (themeMode === "system") {
-      mq.addEventListener("change", apply);
-      return () => mq.removeEventListener("change", apply);
-    }
-    return undefined;
-  }, [themeMode]);
-  const applyThemeMode = useCallback((mode: "system" | "light" | "dark") => {
-    setThemeMode(mode);
-    window.confidant.stateSet("theme", mode);
-  }, []);
+  // ── 外观(18)与侧栏布局(04):独立域抽为 hook(22) ──
+  const { applyThemeMode } = useAppTheme(menuRef);
+  const { sidebar, setWidth: setSidebarWidth, toggleSidebar, commitSidebar } = useSidebarLayout();
 
   // ── 保存管线(02) ──
   useEffect(() => {
@@ -173,7 +98,7 @@ export default function App() {
           const engine = engineRef.current;
           if (!current || !engine) return;
           if (docMissingRef.current) return; // 文件已被外部删除:不静默重建(12)
-          markOwnOp(current.path); // 自身写盘回声抑制(1.5s 内 watcher 同名事件)
+          ownOp.markOwnOp(current.path); // 自身写盘回声抑制(1.5s 内 watcher 同名事件)
           const res = await window.confidant.writeTextFile(
             current.path,
             composeNoteText({ head: current.head, bodyMd: engine.getMarkdown() }),
@@ -660,7 +585,7 @@ export default function App() {
       const norm = (p: string): string => p.replace(/\\/g, "/");
       const curPath = norm(cur.path);
       for (const ev of events) {
-        if (isOwnOpRecent(ev.path)) continue;
+        if (ownOp.isOwnOpRecent(ev.path)) continue;
         if (norm(ev.path).toLowerCase() !== curPath.toLowerCase()) continue;
         if (ev.type === "unlink") {
           // 外部删除/改名:提示条(恢复重建/放弃),不静默重建
@@ -702,7 +627,7 @@ export default function App() {
     if (!res.ok) {
       docMissingRef.current = true;
       setDocMissing(true);
-      showOpError(res, "恢复重建失败");
+      showFileOpError(res, "恢复重建失败");
     } else {
       pipelineRef.current?.resetClean();
     }
@@ -726,22 +651,6 @@ export default function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-
-  // ── 持久化布局状态启动载入 ──
-  useEffect(() => {
-    void (async () => {
-      const stored = (await window.confidant.stateGet("sidebar")) as {
-        visible?: boolean;
-        width?: number;
-      } | null;
-      if (stored && typeof stored === "object") {
-        setSidebar((prev) => ({
-          visible: typeof stored.visible === "boolean" ? stored.visible : prev.visible,
-          width: typeof stored.width === "number" ? stored.width : prev.width,
-        }));
-      }
-    })();
-  }, []);
 
   // 树展开记忆:按工作区载入;切换工作区时恢复对应展开集合
   useEffect(() => {
@@ -842,25 +751,6 @@ export default function App() {
   );
 
   // ═══ 文件操作(10):新建/新建文件夹/重命名/删除 + 变更通知条(单步撤销) ═══
-  const errText = (code: string | undefined, fallback: string): string => {
-    switch (code) {
-      case "EEXIST":
-        return "同名文件或文件夹已存在,操作未执行。";
-      case "EINVAL":
-        return "名称包含非法字符,操作未执行。";
-      case "ECYCLE":
-        return "不能把文件夹移入自身或它的子文件夹。";
-      case "EPERM":
-      case "EACCES":
-      case "EBUSY":
-        return "没有权限或文件被占用,操作失败。";
-      default:
-        return fallback;
-    }
-  };
-  const showOpError = (r: { ok: false; error: { code: string; message: string } }, what: string): void => {
-    void window.confidant.infoDialog(errText(r.error.code, `${what}:${r.error.message}`));
-  };
 
   const noticeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const showNotice = useCallback(
@@ -927,11 +817,11 @@ export default function App() {
         );
         if (!ok) return;
       }
-      markOwnOp(abs);
+      ownOp.markOwnOp(abs);
       const tr = await window.confidant.trashItem(abs);
       if (!tr.ok) {
         // 回声抑制时间盒自过期,无需主动删除
-        showOpError(tr, "删除失败");
+        showFileOpError(tr, "删除失败");
         return;
       }
       // 删除正在编辑的文件:清空编辑区(编辑内容已随删除确认作废,不残留指向旧路径的保存)
@@ -957,11 +847,11 @@ export default function App() {
       if (!ws) return;
       const abs = wsJoin(ws.root, rel);
       const kind = selectedRef.current?.kind === "dir" ? "dir" : "md";
-      markOwnOp(abs);
+      ownOp.markOwnOp(abs);
       const r = await window.confidant.renamePath(abs, newName);
       if (!r.ok) {
         // 回声抑制时间盒自过期,无需主动删除
-        showOpError(r, "重命名失败");
+        showFileOpError(r, "重命名失败");
         return;
       }
       relocateDocIfNeeded(abs, r.value.path);
@@ -970,7 +860,7 @@ export default function App() {
         void (async () => {
           const back = await window.confidant.renamePath(r.value.path, rel.split("/").pop()!);
           if (back.ok) relocateDocIfNeeded(r.value.path, oldAbs);
-          else showOpError(back, "撤销失败");
+          else showFileOpError(back, "撤销失败");
         })();
       });
     },
@@ -987,11 +877,11 @@ export default function App() {
       const parentRel = rel.split("/").slice(0, -1).join("/");
       if (parentRel.toLowerCase() === targetDirRel.toLowerCase()) return; // 同目录无操作
       const targetAbs = targetDirRel === "" ? ws.root : wsJoin(ws.root, targetDirRel);
-      markOwnOp(abs);
+      ownOp.markOwnOp(abs);
       const r = await window.confidant.movePath(abs, targetAbs);
       if (!r.ok) {
         // 回声抑制时间盒自过期,无需主动删除
-        showOpError(r, "移动失败");
+        showFileOpError(r, "移动失败");
         return;
       }
       relocateDocIfNeeded(abs, r.value.path);
@@ -1001,7 +891,7 @@ export default function App() {
         void (async () => {
           const back = await window.confidant.movePath(to, from.replace(/[\\/][^\\/]*$/, ""));
           if (back.ok) relocateDocIfNeeded(to, from);
-          else showOpError(back, "撤销失败");
+          else showFileOpError(back, "撤销失败");
         })();
       });
     },
@@ -1016,7 +906,7 @@ export default function App() {
       const dirAbs = dirRel === "" ? ws.root : wsJoin(ws.root, dirRel);
       const r = await window.confidant.newNoteIn(dirAbs);
       if (!r.ok) {
-        showOpError(r, "新建失败");
+        showFileOpError(r, "新建失败");
         return;
       }
       await openPath(r.value.path);
@@ -1031,7 +921,7 @@ export default function App() {
       if (!ws) return;
       const dirAbs = dirRel === "" ? ws.root : wsJoin(ws.root, dirRel);
       const r = await window.confidant.newFolderIn(dirAbs, name);
-      if (!r.ok) showOpError(r, "新建失败");
+      if (!r.ok) showFileOpError(r, "新建失败");
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [],
@@ -1195,18 +1085,6 @@ export default function App() {
     [persistExpanded],
   );
 
-  const toggleSidebar = useCallback(() => {
-    setSidebar((prev) => {
-      const next = { ...prev, visible: !prev.visible };
-      window.confidant.stateSet("sidebar", next);
-      return next;
-    });
-  }, []);
-
-  const commitSidebar = useCallback((s: { visible: boolean; width: number }) => {
-    window.confidant.stateSet("sidebar", s);
-  }, []);
-
   // ── 最近打开(13):欢迎页列表 + 菜单动态子项同一数据源 ──
   const [recentFolders, setRecentFolders] = useState<Array<{ path: string; name: string }>>([]);
   useEffect(() => {
@@ -1307,58 +1185,17 @@ export default function App() {
   return (
     <div style={{ height: "100%", position: "relative", display: "flex", flexDirection: "column" }}
     >
-      <header
-        style={{
-          display: "flex",
-          alignItems: "center",
-          gap: 10,
-          padding: "4px 12px",
-          borderBottom: "1px solid var(--shell-border, var(--border))",
-          background: "var(--shell-bg, var(--panel))",
-          fontSize: 13,
-          flexShrink: 0,
-        }}
-      >
-        {workspace && (
-          <button
-            type="button"
-            data-testid="sidebar-toggle"
-            title={sidebar.visible ? "收起侧栏" : "显示侧栏"}
-            onClick={toggleSidebar}
-            style={{
-              border: "none",
-              background: "transparent",
-              cursor: "pointer",
-              fontSize: 14,
-              padding: "2px 6px",
-              color: "inherit",
-            }}
-          >
-            {sidebar.visible ? "◀" : "▶"}
-          </button>
-        )}
-        {doc && <strong style={{ fontSize: 14 }}>{doc.name}</strong>}
-        {!doc && workspace && (
-          <strong style={{ fontSize: 14, fontWeight: 500, color: "var(--muted)" }}>{workspace.name}</strong>
-        )}
-        {!workspace && <strong style={{ fontSize: 14 }}>知己笔记</strong>}
-        {doc && <span style={{ color: errorText ? "var(--danger)" : "var(--muted)" }}>{statusText}</span>}
-        {errorText && (
-          <span data-testid="load-error" style={{ color: "var(--danger)" }}>
-            {errorText}
-          </span>
-        )}
-        <span style={{ flex: 1 }} />
-        {doc && (
-          <button
-            type="button"
-            onClick={() => void pipelineRef.current?.flush()}
-            disabled={!saveState.dirty || saveState.saving}
-          >
-            保存
-          </button>
-        )}
-      </header>
+      <TopBar
+        workspace={workspace}
+        doc={doc}
+        sidebarVisible={sidebar.visible}
+        onToggleSidebar={toggleSidebar}
+        statusText={statusText}
+        errorText={errorText}
+        dirty={saveState.dirty}
+        saving={saveState.saving}
+        onSave={() => void pipelineRef.current?.flush()}
+      />
       <div style={{ display: "flex", flex: 1, minHeight: 0 }}>
         {workspace && sidebar.visible && (
           <Sidebar
@@ -1369,7 +1206,7 @@ export default function App() {
             width={sidebar.width}
             onToggleDir={toggleDir}
             onOpenFile={openRel}
-            onWidthChange={(width) => setSidebar((p) => ({ ...p, width }))}
+            onWidthChange={setSidebarWidth}
             onWidthDragEnd={() => commitSidebar(sidebar)}
             onRowContext={(e, entry) => void onTreeRowContext(e, entry)}
             onEmptyContext={(e) => void onTreeEmptyContext(e)}
@@ -1405,108 +1242,14 @@ export default function App() {
             {engineHost}
           </div>
           {!workspace && (
-            <div
-              style={{
-                position: "absolute",
-                inset: 0,
-                display: "flex",
-                flexDirection: "column",
-                alignItems: "center",
-                justifyContent: "center",
-                gap: 12,
-                background: "var(--color-background, #fff)",
-              }}
-            >
-              <h1 style={{ margin: 0, fontSize: 28, fontWeight: 600 }}>知己笔记</h1>
-              <p style={{ margin: 0, color: "var(--muted)" }}>
-                confidant · 像写字板一样,直接写在你的文件夹里
-              </p>
-              <button
-                type="button"
-                onClick={() => void openFolderViaDialog()}
-                style={{
-                  marginTop: 8,
-                  padding: "10px 22px",
-                  fontSize: 15,
-                  borderRadius: 6,
-                  border: "1px solid #b8b8b8",
-                  cursor: "pointer",
-                  background: "#f5f5f5",
-                }}
-              >
-                打开文件夹
-              </button>
-              {recentFolders.length > 0 && (
-                <div
-                  data-testid="welcome-recents"
-                  style={{ marginTop: 22, width: 320, maxHeight: 220, overflowY: "auto" }}
-                >
-                  <div style={{ fontSize: 12, color: "var(--muted)", marginBottom: 6 }}>最近打开</div>
-                  {recentFolders.map((r) => (
-                    <button
-                      key={r.path}
-                      type="button"
-                      title={r.path}
-                      onClick={() => void openWorkspace(r.path)}
-                      style={{
-                        display: "block",
-                        width: "100%",
-                        textAlign: "left",
-                        padding: "6px 8px",
-                        border: "none",
-                        background: "transparent",
-                        cursor: "pointer",
-                        fontSize: 13,
-                        color: "inherit",
-                        borderRadius: 4,
-                      }}
-                    >
-                      {r.name}
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
+            <Welcome
+              recentFolders={recentFolders}
+              onOpenFolder={() => void openFolderViaDialog()}
+              onOpenRecent={(p) => void openWorkspace(p)}
+            />
           )}
-          {guidanceVisible && (
-            <div
-              data-testid="empty-workspace-guidance"
-              style={{
-                position: "absolute",
-                inset: 0,
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                padding: 24,
-              }}
-            >
-              <p
-                style={{
-                  maxWidth: 420,
-                  textAlign: "center",
-                  lineHeight: 1.8,
-                  color: "var(--muted)",
-                  fontSize: 14,
-                }}
-              >
-                {EMPTY_WORKSPACE_GUIDANCE}
-              </p>
-            </div>
-          )}
-          {!doc && workspace && mdCount > 0 && (
-            <div
-              style={{
-                position: "absolute",
-                inset: 0,
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                pointerEvents: "none",
-              }}
-            >
-              <p style={{ color: "var(--border)", fontSize: 14 }}>从左侧选择一个笔记开始书写</p>
-            </div>
-          )}
+          {guidanceVisible && <EmptyWorkspaceGuidance />}
+          {!doc && workspace && mdCount > 0 && <NotePickHint />}
         </div>
       </div>
       {/* 浮动格式工具条与链接编辑(07) */}
@@ -1539,100 +1282,25 @@ export default function App() {
       )}
       {/* 文件被外部删除横幅(12) */}
       {docMissing && doc && (
-        <div
-          data-testid="doc-missing-banner"
-          style={{
-            position: "fixed",
-            left: "50%",
-            transform: "translateX(-50%)",
-            top: 44,
-            zIndex: 55,
-            display: "flex",
-            alignItems: "center",
-            gap: 10,
-            padding: "7px 14px",
-            background: "#fdf1e7",
-            border: "1px solid #e8b98a",
-            borderRadius: 8,
-            fontSize: 13,
-          }}
-        >
-          <span>文件已被删除</span>
-          <button type="button" style={btnSmall} onClick={() => void recoverDeletedDoc()}>
-            恢复重建
-          </button>
-          <button type="button" style={btnSmall} onClick={abandonDeletedDoc}>
-            放弃
-          </button>
-        </div>
+        <DocMissingBanner
+          onRecover={() => void recoverDeletedDoc()}
+          onAbandon={abandonDeletedDoc}
+        />
       )}
       {/* 变更通知条(10/11:单步撤销) */}
       {notice && (
-        <div
-          data-testid="change-notice"
-          style={{
-            position: "fixed",
-            left: "50%",
-            transform: "translateX(-50%)",
-            bottom: 18,
-            zIndex: 56,
-            display: "flex",
-            alignItems: "center",
-            gap: 12,
-            padding: "8px 16px",
-            background: "rgba(20,20,20,.92)",
-            color: "var(--surface)",
-            borderRadius: 8,
-            fontSize: 13,
+        <ChangeNoticeToast
+          notice={notice}
+          onUndo={() => {
+            notice.undo?.();
+            dismissNotice();
           }}
-        >
-          <span>{notice.label}</span>
-          {notice.undo && (
-            <button
-              type="button"
-              style={{
-                border: "none",
-                background: "transparent",
-                color: "#9ec9f5",
-                cursor: "pointer",
-                fontSize: 13,
-              }}
-              onClick={() => {
-                notice.undo?.();
-                dismissNotice();
-              }}
-            >
-              撤销
-            </button>
-          )}
-          {notice.action && (
-            <button
-              type="button"
-              data-testid="notice-action"
-              style={{
-                border: "none",
-                background: "transparent",
-                color: "#9ec9f5",
-                cursor: "pointer",
-                fontSize: 13,
-              }}
-              onClick={() => {
-                notice.action?.run();
-                dismissNotice();
-              }}
-            >
-              {notice.action.label}
-            </button>
-          )}
-          <button
-            type="button"
-            aria-label="关闭"
-            style={{ border: "none", background: "transparent", color: "var(--muted)", cursor: "pointer" }}
-            onClick={dismissNotice}
-          >
-            ✕
-          </button>
-        </div>
+          onAction={() => {
+            notice.action?.run();
+            dismissNotice();
+          }}
+          onDismiss={dismissNotice}
+        />
       )}
       {/* 输入对话框(重命名/新建文件夹,10) */}
       {prompt?.type === "rename" && (
