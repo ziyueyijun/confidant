@@ -32,6 +32,8 @@ import { countMdInTree, dirAncestorsOf, relPathOf, wsJoin, type Workspace } from
 import type { OpenNote } from "./session/types";
 import { useAppTheme } from "./hooks/use-app-theme";
 import { useSidebarLayout } from "./hooks/use-sidebar-layout";
+import { useTreeExpansion } from "./hooks/use-tree-expansion";
+import { useDocMissing } from "./hooks/use-doc-missing";
 
 
 export default function App() {
@@ -71,8 +73,15 @@ export default function App() {
     action?: { label: string; run: () => void };
   } | null>(null);
   /** 正在编辑文件被外部删除(12:不静默重建,提供恢复/放弃)。 */
-  const [docMissing, setDocMissing] = useState(false);
-  const docMissingRef = useRef(false);
+  const {
+    docMissing,
+    docMissingRef,
+    markMissing,
+    clearMissing,
+    openMissingNoteBanner,
+    recoverDeletedDoc,
+    abandonDeletedDoc,
+  } = useDocMissing({ docRef, engineRef, pipelineRef, setDoc, showError: showFileOpError });
   /** 自身文件操作产生的路径(其 watcher 回声不当作外部删除);时间盒抑制(12)。 */
   const ownOp = useMemo(() => createOwnOpGuard(), []);
   const promptValidate = (v: string): string | null => {
@@ -83,7 +92,9 @@ export default function App() {
 
   const [workspace, setWorkspace] = useState<Workspace | null>(null);
   const [tree, setTree] = useState<TreeEntry[] | null>(null);
-  const [expanded, setExpanded] = useState<ReadonlySet<string>>(new Set());
+
+  // ── 树展开集合(04/13):按工作区记忆 + 当前文档自动展开,toggle 即持久化(22) ──
+  const { expanded, toggleDir } = useTreeExpansion(workspace, doc);
 
   // ── 外观(18)与侧栏布局(04):独立域抽为 hook(22) ──
   const { applyThemeMode } = useAppTheme(menuRef);
@@ -589,8 +600,7 @@ export default function App() {
         if (norm(ev.path).toLowerCase() !== curPath.toLowerCase()) continue;
         if (ev.type === "unlink") {
           // 外部删除/改名:提示条(恢复重建/放弃),不静默重建
-          docMissingRef.current = true;
-          setDocMissing(true);
+          markMissing();
         } else if (ev.type === "change") {
           // 内容被外部修改:不弹窗;无本地未保存输入时重载为磁盘内容
           if (!pipelineRef.current?.isDirty()) void reloadCurrentFromDisk();
@@ -600,46 +610,7 @@ export default function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  /** 缺文件打开 → 12 横幅语义(恢复重建/放弃;不静默)。 */
-  const openMissingNoteBanner = useCallback((absPath: string) => {
-    const name = absPath.replace(/[\\/]+$/, "").split(/[\\/]/).pop() ?? "笔记";
-    const stub: OpenNote = { path: absPath, name, head: null };
-    docRef.current = stub;
-    setDoc(stub);
-    engineRef.current?.loadMarkdown("");
-    pipelineRef.current?.resetClean();
-    docMissingRef.current = true;
-    setDocMissing(true);
-    document.title = `${name} · confidant`;
-  }, []);
-
-  // 横幅动作
-  const recoverDeletedDoc = useCallback(async () => {
-    const cur = docRef.current;
-    if (!cur) return;
-    docMissingRef.current = false;
-    setDocMissing(false);
-    // 原路径重建并写回当前编辑器内容(救回键入)
-    const res = await window.confidant.writeTextFile(
-      cur.path,
-      composeNoteText({ head: cur.head, bodyMd: engineRef.current?.getMarkdown() ?? "" }),
-    );
-    if (!res.ok) {
-      docMissingRef.current = true;
-      setDocMissing(true);
-      showFileOpError(res, "恢复重建失败");
-    } else {
-      pipelineRef.current?.resetClean();
-    }
-  }, []);
-  const abandonDeletedDoc = useCallback(() => {
-    docRef.current = null;
-    setDoc(null);
-    pipelineRef.current?.resetClean();
-    docMissingRef.current = false;
-    setDocMissing(false);
-    document.title = "confidant · 知己笔记";
-  }, []);
+  // 外部删除处置(12)与缺文件横幅逻辑归 useDocMissing(22):openMissingNoteBanner/recover/abandon。
 
   useEffect(() => {
     return window.confidant.onOpenFile((path) => void openPath(path));
@@ -652,30 +623,7 @@ export default function App() {
   }, []);
 
 
-  // 树展开记忆:按工作区载入;切换工作区时恢复对应展开集合
-  useEffect(() => {
-    if (!workspace) return;
-    void (async () => {
-      const map = (await window.confidant.stateGet("expanded")) as
-        | Record<string, string[]>
-        | null;
-      const rels = map?.[workspace.root] ?? [];
-      setExpanded(new Set(rels));
-    })();
-  }, [workspace]);
-
-  const persistExpanded = useCallback(
-    (rels: string[]) => {
-      const ws = workspaceRef.current;
-      if (!ws) return;
-      void (async () => {
-        const map = ((await window.confidant.stateGet("expanded")) as Record<string, string[]> | null) ?? {};
-        map[ws.root] = rels;
-        window.confidant.stateSet("expanded", map);
-      })();
-    },
-    [],
-  );
+  // 树展开记忆相关逻辑在 useTreeExpansion(22);工作区切换记忆随 workspace 恢复。
 
   // ── 工作区 ──
   const openFolderViaDialog = useCallback(async () => {
@@ -829,8 +777,7 @@ export default function App() {
         docRef.current = null;
         setDoc(null);
         pipelineRef.current?.resetClean();
-        docMissingRef.current = false;
-        setDocMissing(false);
+        clearMissing();
         document.title = "confidant · 知己笔记";
       }
       setSelected(null);
@@ -1051,39 +998,7 @@ export default function App() {
     if (landed) engine.insertImage(landed.fileName, "");
   }, []);
 
-  // 当前文件自动展开定位(父目录折叠时自动展开,写回记忆)
-  useEffect(() => {
-    const ws = workspace;
-    if (!ws || !doc) return;
-    const rel = relPathOf(ws.root, doc.path);
-    if (!rel) return;
-    const dirParts = rel.split("/");
-    if (dirParts.length <= 1) return;
-    const dirRel = dirParts.slice(0, -1).join("/");
-    const needed = dirAncestorsOf(dirRel);
-    setExpanded((prev) => {
-      const missing = needed.filter((p) => !prev.has(p));
-      if (missing.length === 0) return prev;
-      const nextSet = new Set(prev);
-      for (const p of missing) nextSet.add(p);
-      return nextSet;
-    });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [workspace, doc]);
-
-  // 展开集合变更 → 持久化(去抖由 stateSet 主进程侧兜底;此处直接整体写)
-  const toggleDir = useCallback(
-    (relPath: string) => {
-      setExpanded((prev) => {
-        const next = new Set(prev);
-        if (next.has(relPath)) next.delete(relPath);
-        else next.add(relPath);
-        persistExpanded([...next]);
-        return next;
-      });
-    },
-    [persistExpanded],
-  );
+  // 当前文件自动展开与 toggle 持久化归 useTreeExpansion(22)。
 
   // ── 最近打开(13):欢迎页列表 + 菜单动态子项同一数据源 ──
   const [recentFolders, setRecentFolders] = useState<Array<{ path: string; name: string }>>([]);
