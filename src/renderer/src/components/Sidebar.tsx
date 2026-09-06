@@ -1,6 +1,6 @@
 // 侧栏(文件树 + 搜索占位 + 工作区名);宽度拖拽与折叠由父组件持有状态。
 
-import { useRef, type PointerEvent } from "react";
+import { useRef, type DragEvent as ReactDragEvent, type MouseEvent as ReactMouseEvent, type PointerEvent } from "react";
 import type { TreeEntry } from "@shared/ipc";
 import { FileTree } from "./FileTree";
 
@@ -14,6 +14,12 @@ export interface SidebarProps {
   onOpenFile: (relPath: string) => void;
   onWidthChange: (width: number) => void;
   onWidthDragEnd: () => void;
+  /** 行右键(树行)→ 调用方处理(10)。 */
+  onRowContext?: (e: ReactMouseEvent, entry: TreeEntry) => void;
+  /** 树空白区右键(10 空态引导可达)。 */
+  onEmptyContext?: (e: ReactMouseEvent) => void;
+  onDragStartEntry?: (e: ReactDragEvent, entry: TreeEntry) => void;
+  onDropEntry?: (e: ReactDragEvent, entry: TreeEntry) => void;
 }
 
 const MIN_WIDTH = 180;
@@ -29,6 +35,10 @@ export function Sidebar({
   onOpenFile,
   onWidthChange,
   onWidthDragEnd,
+  onRowContext,
+  onEmptyContext,
+  onDragStartEntry,
+  onDropEntry,
 }: SidebarProps) {
   const dragState = useRef<{ startX: number; startW: number } | null>(null);
 
@@ -95,7 +105,16 @@ export function Sidebar({
           }}
         />
       </div>
-      <div style={{ flex: 1, overflowY: "auto", padding: "0 8px 8px 4px" }}>
+      <div
+        style={{ flex: 1, overflowY: "auto", padding: "0 8px 8px 4px" }}
+        data-testid="tree-area"
+        onContextMenu={(e) => {
+          // 树行自身已 stopPropagation;到达此处即空白区
+          if (!(e.target as Element).closest('[role="treeitem"]')) {
+            onEmptyContext?.(e);
+          }
+        }}
+      >
         {tree ? (
           <FileTree
             tree={tree}
@@ -103,6 +122,9 @@ export function Sidebar({
             activeRel={activeRel}
             onToggleDir={onToggleDir}
             onOpenFile={onOpenFile}
+            onRowContext={onRowContext}
+            onDragStart={onDragStartEntry}
+            onDropOn={onDropEntry}
           />
         ) : (
           <div style={{ padding: 8, color: "#999", fontSize: 13 }}>正在扫描…</div>

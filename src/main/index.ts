@@ -12,13 +12,17 @@ import {
   nativeImage,
   shell,
 } from "electron";
-import { join } from "node:path";
+import { basename, join } from "node:path";
 import { mkdirSync } from "node:fs";
 import { access, readFile } from "node:fs/promises";
 import { IPC, type ErrorInfo, type MenuItemState, type MenuItemTemplate, type Result } from "@shared/ipc";
 import {
+  createNoteFile,
   extForImageMime,
+  makeFolder,
+  moveInto,
   readTextFile,
+  renameEntry,
   saveImageBytes,
   saveImageCopy,
   writeTextFileAtomic,
@@ -28,6 +32,7 @@ import { applyMenuTemplate, getMenuItem, popupContextMenu, updateMenuItems } fro
 import { registerImageScheme, installImageProtocolHandler } from "./asset-protocol";
 import {
   currentWorkspaceRoot,
+  rescanNow,
   startWorkspaceWatch,
   stopWorkspaceWatch,
 } from "./workspace";
@@ -512,6 +517,122 @@ async function runWorkspaceSelfCheck(win: BrowserWindow, wsDir: string, emptyDir
     const restored = await poll(() => js<boolean>(q("[data-testid='sidebar']")));
     if (!restored) return fail("sidebar did not restore");
 
+    // 5) 文件操作(10):菜单「新建笔记」→ 落盘并打开;「新建文件夹」→ 输入框建目录
+    win.webContents.send(IPC.menuCommand, "new-note");
+    const nnRow = await poll(async () => {
+      const has = await js<boolean>(q("[data-rel='未命名笔记.md']"));
+      if (!has) return null;
+      const content = await readFile(join(wsDir, "未命名笔记.md"), "utf8");
+      return content.length >= 0 ? true : null;
+    });
+    if (!nnRow) return fail("new-note via menu failed");
+    const nnOpen = await poll(async () => {
+      const headerName = await js<string>(
+        `document.querySelector("header strong")?.textContent ?? ""`,
+      );
+      return headerName === "未命名笔记.md" ? true : null;
+    }, 12000);
+    if (!nnOpen) {
+      const diag = await js<string>(
+        `JSON.stringify({
+          header: document.querySelector("header strong")?.textContent ?? "",
+          body: document.body.innerText.slice(0, 150),
+          title: document.title,
+        })`,
+      );
+      return fail(`new note not opened in editor; diag=${diag}`);
+    }
+
+    win.webContents.send(IPC.menuCommand, "new-folder");
+    const promptShown = await poll(() => js<boolean>(q("[data-testid='text-prompt']")));
+    if (!promptShown) return fail("new-folder prompt not shown");
+    await js<void>(`(() => {
+      const input = document.querySelector("[data-testid='text-prompt'] input");
+      const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, "value")?.set;
+      setter?.call(input, "归档夹");
+      input.dispatchEvent(new Event("input", { bubbles: true }));
+    })()`);
+    await js<void>(`document.querySelector("[data-testid='prompt-ok']").click()`);
+    const folderRow = await poll(async () => {
+      const has = await js<boolean>(q("[data-rel='归档夹']"));
+      return has ? true : null;
+    });
+    if (!folderRow) return fail("new folder did not appear in tree");
+
+    // 5.5) 树内拖拽移动(11):b.md → 归档夹;通知条撤销还原
+    await js<void>(`document.querySelector("[data-rel='归档夹']").click()`); // 展开目标
+    const dragOk = await js<{ ok: boolean; detail: string }>(
+      `(async () => {
+        const src = document.querySelector("[data-rel='笔记文件夹/b.md']");
+        const dst = document.querySelector("[data-rel='归档夹']");
+        if (!src || !dst) return { ok: false, detail: "missing rows" };
+        const dt = new DataTransfer();
+        const start = new DragEvent("dragstart", { bubbles: true, cancelable: true, dataTransfer: dt });
+        src.dispatchEvent(start);
+        const over = new DragEvent("dragover", { bubbles: true, cancelable: true, dataTransfer: dt });
+        dst.dispatchEvent(over);
+        const drop = new DragEvent("drop", { bubbles: true, cancelable: true, dataTransfer: dt });
+        dst.dispatchEvent(drop);
+        return { ok: true, detail: "dispatched" };
+      })()`,
+    );
+    if (!dragOk.ok) return fail(`drag dispatch failed: ${JSON.stringify(dragOk)}`);
+    const movedRow = await poll(async () => {
+      const has = await js<boolean>(q("[data-rel='归档夹/b.md']"));
+      return has ? true : null;
+    });
+    if (!movedRow) return fail("b.md not shown under 归档夹 after drag");
+    const noticeShown = await poll(() =>
+      js<boolean>(`document.body.innerText.includes("已移动 — 撤销")`),
+    );
+    if (!noticeShown) return fail("move notice not shown");
+    await js<void>(`[...document.querySelectorAll("[data-testid='change-notice'] button")]
+      .find((b) => b.textContent?.includes("撤销"))?.click()`);
+    const movedBack = await poll(async () => {
+      const has = await js<boolean>(q("[data-rel='笔记文件夹/b.md']"));
+      return has ? true : null;
+    });
+    if (!movedBack) return fail("undo of move did not restore b.md");
+
+    // 6) 外部删除当前文件(12):横幅出现;不自动重建;「放弃」清空编辑态
+    await js<void>(`document.querySelector("[data-rel='a.md']").click()`);
+    const aOpen = await poll(async () => {
+      const headerName = await js<string>(
+        `document.querySelector("header strong")?.textContent ?? ""`,
+      );
+      return headerName === "a.md" ? true : null;
+    });
+    if (!aOpen) return fail("a.md reopen failed");
+    await delay(800);
+    const { unlink } = await import("node:fs/promises");
+    await unlink(aPath);
+    const banner = await poll(() => js<boolean>(q("[data-testid='doc-missing-banner']")));
+    if (!banner) return fail("external-delete banner not shown");
+    if (!(await js<boolean>(`document.body.innerText.includes("文件已被删除")`))) {
+      return fail("banner copy missing");
+    }
+    await delay(1600);
+    const recreated = await poll(
+      async () => {
+        try {
+          await readFile(aPath, "utf8");
+          return false; // 文件存在 → 被静默重建,失败
+        } catch {
+          return true; // 不存在,符合「不静默重建」
+        }
+      },
+      2500,
+    );
+    if (!recreated) return fail("file was silently recreated");
+    await js<void>(`[...document.querySelectorAll("[data-testid='doc-missing-banner'] button")]
+      .find((b) => b.textContent?.includes("放弃"))?.click()`);
+    const cleared = await poll(async () => {
+      const editorGone = await js<boolean>(
+        `document.querySelector("[data-testid='editor-scroll']")?.style.display === 'none'`,
+      );
+      return editorGone ? true : null;
+    });
+    if (!cleared) return fail("abandon did not clear editor");
     if (issues.length) return fail("renderer console issues present");
     console.log("[smoke] workspace e2e ok");
   } catch (err) {
@@ -655,8 +776,8 @@ function registerIpc(): void {
   ipcMain.handle(IPC.workspaceOpen, async (e, path: string): Promise<Result<TreeEntry[]>> => {
     const wc = e.sender;
     try {
-      const tree = await startWorkspaceWatch(path, (next) => {
-        if (!wc.isDestroyed()) wc.send(IPC.workspaceTreeUpdated, next);
+      const tree = await startWorkspaceWatch(path, (update) => {
+        if (!wc.isDestroyed()) wc.send(IPC.workspaceTreeUpdated, update);
       });
       await pushRecentFolder(path);
       await updateLastSession({ workspace: path, file: null });
@@ -801,6 +922,49 @@ function registerIpc(): void {
       return true;
     } catch {
       return false;
+    }
+  });
+
+  // ── 文件操作(10/11) ──
+  ipcMain.handle(IPC.fsNewNote, async (_e, dirAbs: string): Promise<Result<{ path: string }>> => {
+    try {
+      const path = await createNoteFile(dirAbs);
+      await rescanNow();
+      return { ok: true, value: { path } };
+    } catch (err) {
+      return { ok: false, error: toError(err) };
+    }
+  });
+
+  ipcMain.handle(IPC.fsNewFolder, async (_e, dirAbs: string, name: string): Promise<Result<void>> => {
+    try {
+      await makeFolder(dirAbs, name);
+      await rescanNow();
+      return { ok: true, value: undefined };
+    } catch (err) {
+      return { ok: false, error: toError(err) };
+    }
+  });
+
+  ipcMain.handle(IPC.fsRenamePath, async (_e, path: string, newName: string): Promise<Result<{ path: string }>> => {
+    try {
+      const next = await renameEntry(path, newName);
+      await rescanNow();
+      return { ok: true, value: { path: next } };
+    } catch (err) {
+      return { ok: false, error: toError(err) };
+    }
+  });
+
+  ipcMain.handle(IPC.fsMovePath, async (_e, path: string, targetDir: string, newName?: string): Promise<Result<{ path: string }>> => {
+    try {
+      const next = newName
+        ? await moveInto(path, targetDir, newName)
+        : await moveInto(path, targetDir, basename(path));
+      await rescanNow();
+      return { ok: true, value: { path: next } };
+    } catch (err) {
+      return { ok: false, error: toError(err) };
     }
   });
 }

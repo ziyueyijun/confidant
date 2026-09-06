@@ -1,7 +1,8 @@
 // 应用视图层(04 形态):欢迎页 → 工作区(文件树侧栏 + 所见即所得编辑)。
 // 保存语义经 save-pipeline(02);命令源与 native 菜单经 menu-bridge(03)。
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
+import type { DragEvent as ReactDragEvent, MouseEvent as ReactMouseEvent } from "react";
 import { createEngine, type Engine } from "../../../packages/engine";
 import { basename } from "@shared/path";
 import type { TreeEntry } from "@shared/ipc";
@@ -12,6 +13,7 @@ import { isRemoteSrc, resolveImageAbsPath, resolveImageSourceUrl } from "./edito
 import { Cmd, createMenuBridge, type MenuContext } from "./menu/menu-bridge";
 import { Sidebar } from "./components/Sidebar";
 import { FormatOverlay } from "./components/FormatOverlay";
+import { TextPrompt } from "./components/TextPrompt";
 import { countMdInTree, dirAncestorsOf, relPathOf, wsJoin, type Workspace } from "./workspace/workspace";
 
 interface OpenNote {
@@ -48,6 +50,15 @@ const EMPTY_SAVE_STATE: SaveState = {
 const EMPTY_WORKSPACE_GUIDANCE =
   "这个文件夹还没有笔记:右键左侧空白处可以新建,也可以把 .md 文件放进这个文件夹。";
 
+const btnSmall: CSSProperties = {
+  padding: "3px 12px",
+  fontSize: 13,
+  borderRadius: 6,
+  border: "1px solid #c5c5c5",
+  background: "#fff",
+  cursor: "pointer",
+};
+
 export default function App() {
   const hostRef = useRef<HTMLDivElement>(null);
   const engineRef = useRef<Engine | null>(null);
@@ -64,6 +75,28 @@ export default function App() {
   const [linkRequest, setLinkRequest] = useState(0);
   const [engine, setEngine] = useState<Engine | null>(null);
 
+  // ── 文件操作(10/11/12) ──
+  /** 树内选中项(重命名/删除等菜单命令的对象;右键/点击行设置)。 */
+  const selectedRef = useRef<{ rel: string; kind: "dir" | "md" } | null>(null);
+  const [selected, setSelected] = useState<{ rel: string; kind: "dir" | "md" } | null>(null);
+  const [prompt, setPrompt] = useState<
+    | { type: "rename"; rel: string; name: string }
+    | { type: "new-folder"; dirRel: string }
+    | null
+  >(null);
+  /** 变更通知条(单步撤销;最近一次操作)。 */
+  const [notice, setNotice] = useState<{ id: number; label: string; undo: () => void } | null>(null);
+  /** 正在编辑文件被外部删除(12:不静默重建,提供恢复/放弃)。 */
+  const [docMissing, setDocMissing] = useState(false);
+  const docMissingRef = useRef(false);
+  /** 自身文件操作产生的路径(其 watcher 回声不当作外部删除)。 */
+  const ownOpPathsRef = useRef<Set<string>>(new Set());
+  const promptValidate = (v: string): string | null => {
+    if (!v.trim()) return "名称不能为空";
+    if (/[\\/:*?"<>|]/.test(v)) return "名称不能包含 \\ / : * ? \" < > | 字符";
+    return null;
+  };
+
   const [workspace, setWorkspace] = useState<Workspace | null>(null);
   const [tree, setTree] = useState<TreeEntry[] | null>(null);
   const [expanded, setExpanded] = useState<ReadonlySet<string>>(new Set());
@@ -77,6 +110,7 @@ export default function App() {
           const current = docRef.current;
           const engine = engineRef.current;
           if (!current || !engine) return;
+          if (docMissingRef.current) return; // 文件已被外部删除:不静默重建(12)
           const res = await window.confidant.writeTextFile(
             current.path,
             composeNoteText({ head: current.head, bodyMd: engine.getMarkdown() }),
@@ -329,6 +363,8 @@ export default function App() {
       canUndo: engine?.canUndo() ?? false,
       canRedo: engine?.canRedo() ?? false,
       inTable: engine?.isInsideTable() ?? false,
+      hasWorkspace: !!workspaceRef.current,
+      hasSelection: !!selectedRef.current,
     });
   }, []);
 
@@ -381,6 +417,38 @@ export default function App() {
     });
     menu.register(Cmd.about, () => true, () => void window.confidant.showAbout());
     menu.register(Cmd.quit, () => true, () => window.confidant.closeWindow());
+    // 文件操作命令(10):文件菜单(工作区/选中态驱动)
+    const wsRule = (ctx: MenuContext) => ctx.hasWorkspace;
+    const selRule = (ctx: MenuContext) => ctx.hasWorkspace && ctx.hasSelection;
+    const treeSelectedAbs = (): { abs: string; rel: string; kind: "dir" | "md" } | null => {
+      const ws = workspaceRef.current;
+      const sel = selectedRef.current;
+      if (!ws || !sel) return null;
+      return { abs: wsJoin(ws.root, sel.rel), rel: sel.rel, kind: sel.kind };
+    };
+    menu.register(Cmd.newNote, wsRule, () => {
+      const ws = workspaceRef.current;
+      const sel = selectedRef.current;
+      if (!ws) return;
+      const dirRel = sel && sel.kind === "dir" ? sel.rel : "";
+      void doCreateNote(dirRel);
+    });
+    menu.register(Cmd.newFolder, wsRule, () => {
+      const sel = selectedRef.current;
+      const dirRel = sel && sel.kind === "dir" ? sel.rel : "";
+      setPrompt({ type: "new-folder", dirRel });
+    });
+    menu.register(Cmd.rename, selRule, () => {
+      const sel = selectedRef.current;
+      const ws = workspaceRef.current;
+      if (!sel || !ws) return;
+      setPrompt({ type: "rename", rel: sel.rel, name: sel.rel.split("/").pop()! });
+    });
+    menu.register(Cmd.delete, selRule, () => {
+      const t = treeSelectedAbs();
+      if (t) void doDeleteEntry({ relPath: t.rel, kind: t.kind });
+    });
+    void refreshMenuContext;
     menu.init();
     refreshMenuContext();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -395,8 +463,69 @@ export default function App() {
     });
   }, []);
 
+  // ── 工作区外部变更处置(12):树刷新 + 当前文件删除/改名横幅 + 内容变更静默重载 ──
+  const reloadCurrentFromDisk = useCallback(async () => {
+    const cur = docRef.current;
+    if (!cur) return;
+    const res = await window.confidant.readTextFile(cur.path);
+    if (!res.ok) return; // 读取失败(可能刚被删):交给 unlink 事件横幅
+    const docModel = parseNoteText(res.value);
+    const next = { ...cur, head: docModel.head };
+    docRef.current = next;
+    setDoc(next);
+    engineRef.current?.loadMarkdown(docModel.bodyMd);
+    pipelineRef.current?.resetClean();
+  }, []);
+
   useEffect(() => {
-    return window.confidant.onWorkspaceTree((next) => setTree(next));
+    return window.confidant.onWorkspaceTree(({ tree: nextTree, events }) => {
+      setTree(nextTree);
+      const cur = docRef.current;
+      if (!cur) return;
+      const norm = (p: string): string => p.replace(/\\/g, "/");
+      const curPath = norm(cur.path);
+      for (const ev of events) {
+        if (ownOpPathsRef.current.has(ev.path)) continue;
+        if (norm(ev.path).toLowerCase() !== curPath.toLowerCase()) continue;
+        if (ev.type === "unlink") {
+          // 外部删除/改名:提示条(恢复重建/放弃),不静默重建
+          docMissingRef.current = true;
+          setDocMissing(true);
+        } else if (ev.type === "change") {
+          // 内容被外部修改:不弹窗;无本地未保存输入时重载为磁盘内容
+          if (!pipelineRef.current?.isDirty()) void reloadCurrentFromDisk();
+        }
+      }
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // 横幅动作
+  const recoverDeletedDoc = useCallback(async () => {
+    const cur = docRef.current;
+    if (!cur) return;
+    docMissingRef.current = false;
+    setDocMissing(false);
+    // 原路径重建并写回当前编辑器内容(救回键入)
+    const res = await window.confidant.writeTextFile(
+      cur.path,
+      composeNoteText({ head: cur.head, bodyMd: engineRef.current?.getMarkdown() ?? "" }),
+    );
+    if (!res.ok) {
+      docMissingRef.current = true;
+      setDocMissing(true);
+      showOpError(res, "恢复重建失败");
+    } else {
+      pipelineRef.current?.resetClean();
+    }
+  }, []);
+  const abandonDeletedDoc = useCallback(() => {
+    docRef.current = null;
+    setDoc(null);
+    pipelineRef.current?.resetClean();
+    docMissingRef.current = false;
+    setDocMissing(false);
+    document.title = "confidant · 知己笔记";
   }, []);
 
   useEffect(() => {
@@ -520,6 +649,270 @@ export default function App() {
     },
     [openPath],
   );
+
+  // ═══ 文件操作(10):新建/新建文件夹/重命名/删除 + 变更通知条(单步撤销) ═══
+  const errText = (code: string | undefined, fallback: string): string => {
+    switch (code) {
+      case "EEXIST":
+        return "同名文件或文件夹已存在,操作未执行。";
+      case "EINVAL":
+        return "名称包含非法字符,操作未执行。";
+      case "ECYCLE":
+        return "不能把文件夹移入自身或它的子文件夹。";
+      case "EPERM":
+      case "EACCES":
+      case "EBUSY":
+        return "没有权限或文件被占用,操作失败。";
+      default:
+        return fallback;
+    }
+  };
+  const showOpError = (r: { ok: false; error: { code: string; message: string } }, what: string): void => {
+    void window.confidant.infoDialog(errText(r.error.code, `${what}:${r.error.message}`));
+  };
+
+  const noticeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const pushNotice = useCallback((label: string, undo: () => void) => {
+    setNotice({ id: Date.now(), label, undo });
+    if (noticeTimer.current) clearTimeout(noticeTimer.current);
+    noticeTimer.current = setTimeout(() => setNotice(null), 8000);
+  }, []);
+  const dismissNotice = useCallback(() => {
+    if (noticeTimer.current) clearTimeout(noticeTimer.current);
+    setNotice(null);
+  }, []);
+
+  /** 相对路径 → 绝对目录(选中文件夹自身;文件为父目录;'' = 根)。 */
+  const absDirFor = useCallback((rel: string | null, kind?: "dir" | "md"): string | null => {
+    const ws = workspaceRef.current;
+    if (!ws) return null;
+    const dirRel = !rel || rel === "" ? "" : kind === "dir" ? rel : rel.split("/").slice(0, -1).join("/");
+    return wsJoin(ws.root, dirRel);
+  }, []);
+
+  /** 当前文档路径若在 moved 树内则随移动更新。 */
+  const relocateDocIfNeeded = useCallback((fromAbs: string, toAbs: string) => {
+    const cur = docRef.current;
+    if (!cur) return;
+    const f = fromAbs.replace(/\\/g, "/");
+    const t = toAbs.replace(/\\/g, "/");
+    const c = cur.path.replace(/\\/g, "/");
+    if (c.toLowerCase() === f.toLowerCase()) {
+      const next = { ...cur, path: t };
+      docRef.current = next;
+      setDoc(next);
+      document.title = `${next.name} · confidant`;
+      window.confidant.noteOpened(t);
+    } else if (c.toLowerCase().startsWith(f.toLowerCase() + "/")) {
+      const next = { ...cur, path: t + c.slice(f.length) };
+      docRef.current = next;
+      setDoc(next);
+      window.confidant.noteOpened(next.path);
+    }
+  }, []);
+
+  const doDeleteEntry = useCallback(
+    async (entry: { relPath: string; kind: "dir" | "md" }) => {
+      const ws = workspaceRef.current;
+      if (!ws) return;
+      const rel = entry.relPath;
+      const abs = wsJoin(ws.root, rel);
+      const cur = docRef.current;
+      if (cur && cur.path.toLowerCase() === abs.toLowerCase()) {
+        const ok = await window.confidant.confirmDialog(
+          "正在编辑的文件将被删除并移入回收站。继续?",
+        );
+        if (!ok) return;
+      } else if (entry.kind === "dir") {
+        const ok = await window.confidant.confirmDialog(
+          "删除文件夹及其中的全部笔记?文件将移入回收站",
+        );
+        if (!ok) return;
+      }
+      ownOpPathsRef.current.add(abs);
+      const tr = await window.confidant.trashItem(abs);
+      if (!tr.ok) {
+        ownOpPathsRef.current.delete(abs);
+        showOpError(tr, "删除失败");
+        return;
+      }
+      // 删除正在编辑的文件:清空编辑区(编辑内容已随删除确认作废,不残留指向旧路径的保存)
+      if (cur && cur.path.toLowerCase() === abs.toLowerCase()) {
+        docRef.current = null;
+        setDoc(null);
+        pipelineRef.current?.resetClean();
+        docMissingRef.current = false;
+        setDocMissing(false);
+        document.title = "confidant · 知己笔记";
+      }
+      setSelected(null);
+      selectedRef.current = null;
+      refreshMenuContext();
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [],
+  );
+
+  const doRenameEntry = useCallback(
+    async (rel: string, newName: string) => {
+      const ws = workspaceRef.current;
+      if (!ws) return;
+      const abs = wsJoin(ws.root, rel);
+      const kind = selectedRef.current?.kind === "dir" ? "dir" : "md";
+      ownOpPathsRef.current.add(abs);
+      const r = await window.confidant.renamePath(abs, newName);
+      if (!r.ok) {
+        ownOpPathsRef.current.delete(abs);
+        showOpError(r, "重命名失败");
+        return;
+      }
+      relocateDocIfNeeded(abs, r.value.path);
+      const oldAbs = abs;
+      pushNotice(`已重命名 — 撤销`, () => {
+        void (async () => {
+          const back = await window.confidant.renamePath(r.value.path, rel.split("/").pop()!);
+          if (back.ok) relocateDocIfNeeded(r.value.path, oldAbs);
+          else showOpError(back, "撤销失败");
+        })();
+      });
+      void kind;
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [],
+  );
+
+  const doMoveEntry = useCallback(
+    async (rel: string, targetRel: string) => {
+      const ws = workspaceRef.current;
+      if (!ws || rel === "") return;
+      const abs = wsJoin(ws.root, rel);
+      const targetDirRel = targetRel === "" ? "" : targetRel;
+      const parentRel = rel.split("/").slice(0, -1).join("/");
+      if (parentRel.toLowerCase() === targetDirRel.toLowerCase()) return; // 同目录无操作
+      const targetAbs = targetDirRel === "" ? ws.root : wsJoin(ws.root, targetDirRel);
+      ownOpPathsRef.current.add(abs);
+      const r = await window.confidant.movePath(abs, targetAbs);
+      if (!r.ok) {
+        ownOpPathsRef.current.delete(abs);
+        showOpError(r, "移动失败");
+        return;
+      }
+      relocateDocIfNeeded(abs, r.value.path);
+      const from = abs;
+      const to = r.value.path;
+      pushNotice(`已移动 — 撤销`, () => {
+        void (async () => {
+          const back = await window.confidant.movePath(to, from.replace(/[\\/][^\\/]*$/, ""));
+          if (back.ok) relocateDocIfNeeded(to, from);
+          else showOpError(back, "撤销失败");
+        })();
+      });
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [],
+  );
+
+  const doCreateNote = useCallback(
+    async (dirRel: string) => {
+      const ws = workspaceRef.current;
+      if (!ws) return;
+      const dirAbs = dirRel === "" ? ws.root : wsJoin(ws.root, dirRel);
+      const r = await window.confidant.newNoteIn(dirAbs);
+      if (!r.ok) {
+        showOpError(r, "新建失败");
+        return;
+      }
+      await openPath(r.value.path);
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [],
+  );
+
+  const doCreateFolder = useCallback(
+    async (dirRel: string, name: string) => {
+      const ws = workspaceRef.current;
+      if (!ws) return;
+      const dirAbs = dirRel === "" ? ws.root : wsJoin(ws.root, dirRel);
+      const r = await window.confidant.newFolderIn(dirAbs, name);
+      if (!r.ok) showOpError(r, "新建失败");
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [],
+  );
+
+  // 树行右键菜单(文件/文件夹;空区右键由 Sidebar 回调)
+  const onTreeRowContext = useCallback(
+    async (e: ReactMouseEvent, entry: TreeEntry) => {
+      e.preventDefault();
+      e.stopPropagation();
+      const ws = workspaceRef.current;
+      if (!ws) return;
+      selectedRef.current = { rel: entry.relPath, kind: entry.kind };
+      setSelected({ rel: entry.relPath, kind: entry.kind });
+      refreshMenuContext();
+      const choice = await window.confidant.showContextMenu(
+        entry.kind === "dir"
+          ? [
+              { id: "new-note", label: "新建笔记" },
+              { id: "new-folder", label: "新建文件夹" },
+              { id: "sep", type: "separator" },
+              { id: "rename", label: "重命名" },
+              { id: "delete", label: "删除" },
+            ]
+          : [
+              { id: "open", label: "打开" },
+              { id: "rename", label: "重命名" },
+              { id: "delete", label: "删除" },
+            ],
+      );
+      if (!choice) return;
+      if (choice === "new-note") void doCreateNote(entry.relPath);
+      else if (choice === "new-folder") setPrompt({ type: "new-folder", dirRel: entry.relPath });
+      else if (choice === "rename") {
+        setPrompt({ type: "rename", rel: entry.relPath, name: entry.name });
+      } else if (choice === "delete") void doDeleteEntry(entry);
+      else if (choice === "open") void openRel(entry.relPath);
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [],
+  );
+
+  const onTreeEmptyContext = useCallback(
+    async (e: ReactMouseEvent) => {
+      const ws = workspaceRef.current;
+      if (!ws) return;
+      e.preventDefault();
+      const choice = await window.confidant.showContextMenu([
+        { id: "new-note", label: "新建笔记" },
+        { id: "new-folder", label: "新建文件夹" },
+      ]);
+      if (choice === "new-note") void doCreateNote("");
+      else if (choice === "new-folder") setPrompt({ type: "new-folder", dirRel: "" });
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [],
+  );
+
+  // 拖拽(11):记录源 rel;放下时移入目标目录/根
+  const onDragStartEntry = useCallback((e: ReactDragEvent, entry: TreeEntry) => {
+    e.dataTransfer.setData("application/x-confidant-entry", entry.relPath);
+    e.dataTransfer.effectAllowed = "move";
+  }, []);
+  const onDropEntry = useCallback(
+    (e: ReactDragEvent, target: TreeEntry) => {
+      e.preventDefault();
+      const srcRel = e.dataTransfer.getData("application/x-confidant-entry");
+      if (!srcRel) return;
+      if (srcRel === target.relPath) return;
+      if (target.kind !== "dir") return;
+      void doMoveEntry(srcRel, target.relPath);
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [],
+  );
+
+  // 菜单「文件」命令(10)与「视图→侧栏」状态在 menu effect 内注册;
+  // 此处给 menu 使用的引用已就绪(workspaceRef/selectedRef)。
 
   // 「插入图片…」:选文件 → 复制落盘到笔记同目录 → 光标处插入相对引用
   const insertImageViaDialog = useCallback(async () => {
@@ -672,6 +1065,10 @@ export default function App() {
             onOpenFile={openRel}
             onWidthChange={(width) => setSidebar((p) => ({ ...p, width }))}
             onWidthDragEnd={() => commitSidebar(sidebar)}
+            onRowContext={(e, entry) => void onTreeRowContext(e, entry)}
+            onEmptyContext={(e) => void onTreeEmptyContext(e)}
+            onDragStartEntry={onDragStartEntry}
+            onDropEntry={onDropEntry}
           />
         )}
         <div
@@ -772,6 +1169,112 @@ export default function App() {
       </div>
       {/* 浮动格式工具条与链接编辑(07) */}
       <FormatOverlay engine={engine} tick={uiTick} openLinkRequest={linkRequest} />
+      {/* 文件被外部删除横幅(12) */}
+      {docMissing && doc && (
+        <div
+          data-testid="doc-missing-banner"
+          style={{
+            position: "fixed",
+            left: "50%",
+            transform: "translateX(-50%)",
+            top: 44,
+            zIndex: 55,
+            display: "flex",
+            alignItems: "center",
+            gap: 10,
+            padding: "7px 14px",
+            background: "#fdf1e7",
+            border: "1px solid #e8b98a",
+            borderRadius: 8,
+            fontSize: 13,
+          }}
+        >
+          <span>文件已被删除</span>
+          <button type="button" style={btnSmall} onClick={() => void recoverDeletedDoc()}>
+            恢复重建
+          </button>
+          <button type="button" style={btnSmall} onClick={abandonDeletedDoc}>
+            放弃
+          </button>
+        </div>
+      )}
+      {/* 变更通知条(10/11:单步撤销) */}
+      {notice && (
+        <div
+          data-testid="change-notice"
+          style={{
+            position: "fixed",
+            left: "50%",
+            transform: "translateX(-50%)",
+            bottom: 18,
+            zIndex: 56,
+            display: "flex",
+            alignItems: "center",
+            gap: 12,
+            padding: "8px 16px",
+            background: "rgba(40,40,40,.92)",
+            color: "#fff",
+            borderRadius: 8,
+            fontSize: 13,
+          }}
+        >
+          <span>{notice.label}</span>
+          <button
+            type="button"
+            style={{
+              border: "none",
+              background: "transparent",
+              color: "#9ec9f5",
+              cursor: "pointer",
+              fontSize: 13,
+            }}
+            onClick={() => {
+              notice.undo();
+              dismissNotice();
+            }}
+          >
+            撤销
+          </button>
+          <button
+            type="button"
+            aria-label="关闭"
+            style={{ border: "none", background: "transparent", color: "#aaa", cursor: "pointer" }}
+            onClick={dismissNotice}
+          >
+            ✕
+          </button>
+        </div>
+      )}
+      {/* 输入对话框(重命名/新建文件夹,10) */}
+      {prompt?.type === "rename" && (
+        <TextPrompt
+          title="重命名"
+          initial={prompt.name}
+          okLabel="重命名"
+          validate={promptValidate}
+          onSubmit={(v) => {
+            if (v === prompt.name) {
+              setPrompt(null);
+              return;
+            }
+            void doRenameEntry(prompt.rel, v);
+            setPrompt(null);
+          }}
+          onCancel={() => setPrompt(null)}
+        />
+      )}
+      {prompt?.type === "new-folder" && (
+        <TextPrompt
+          title="新建文件夹"
+          okLabel="创建"
+          validate={promptValidate}
+          onSubmit={(v) => {
+            void doCreateFolder(prompt.dirRel, v);
+            setPrompt(null);
+          }}
+          onCancel={() => setPrompt(null)}
+        />
+      )}
     </div>
   );
 }

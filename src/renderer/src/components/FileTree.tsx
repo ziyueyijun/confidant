@@ -1,7 +1,13 @@
 // 文件树(规格 §8 树形态;数据来自主进程扫描/监听,渲染层只做展示与展开状态)。
 // 排序/过滤由扫描层完成;本组件处理:层级缩进、展开折叠、当前文件高亮(相对路径)。
 
-import { memo } from "react";
+import {
+  memo,
+  type CSSProperties,
+  type DragEvent as ReactDragEvent,
+  type MouseEvent as ReactMouseEvent,
+  type ReactNode,
+} from "react";
 import { ChevronRight, FileText, Folder, FolderOpen } from "lucide-react";
 import type { TreeEntry } from "@shared/ipc";
 
@@ -13,6 +19,11 @@ export interface FileTreeProps {
   activeRel: string | null;
   onToggleDir: (relPath: string) => void;
   onOpenFile: (relPath: string) => void;
+  /** 行右键(上下文操作;e.preventDefault 由调用方处理)。 */
+  onRowContext?: (e: ReactMouseEvent, entry: TreeEntry) => void;
+  /** 拖拽相关(11)。 */
+  onDragStart?: (e: ReactDragEvent, entry: TreeEntry) => void;
+  onDropOn?: (e: ReactDragEvent, entry: TreeEntry) => void;
 }
 
 export const FileTree = memo(function FileTree({
@@ -21,13 +32,16 @@ export const FileTree = memo(function FileTree({
   activeRel,
   onToggleDir,
   onOpenFile,
+  onRowContext,
+  onDragStart,
+  onDropOn,
 }: FileTreeProps) {
-  const renderLevel = (entries: TreeEntry[], depth: number): React.ReactNode =>
+  const renderLevel = (entries: TreeEntry[], depth: number): ReactNode =>
     entries.map((entry) => {
       const isDir = entry.kind === "dir";
       const isOpen = isDir && expanded.has(entry.relPath);
       const active = !isDir && activeRel !== null && entry.relPath === activeRel;
-      const style: React.CSSProperties = {
+      const style: CSSProperties = {
         display: "flex",
         alignItems: "center",
         gap: 4,
@@ -45,6 +59,22 @@ export const FileTree = memo(function FileTree({
         whiteSpace: "nowrap",
         overflow: "hidden",
       };
+      const commonHandlers = {
+        onContextMenu: (e: ReactMouseEvent) => onRowContext?.(e, entry),
+        onDragStart: (e: ReactDragEvent) => onDragStart?.(e, entry),
+        onDragOver: (e: ReactDragEvent) => {
+          if (entry.kind === "dir") {
+            e.preventDefault();
+            e.dataTransfer.dropEffect = "move";
+          }
+        },
+        onDrop: (e: ReactDragEvent) => {
+          if (entry.kind === "dir") {
+            e.stopPropagation();
+            onDropOn?.(e, entry);
+          }
+        },
+      };
       return (
         <div key={entry.relPath} style={{ paddingLeft: depth * 14 }}>
           {isDir ? (
@@ -52,9 +82,11 @@ export const FileTree = memo(function FileTree({
               type="button"
               role="treeitem"
               aria-expanded={isOpen}
+              draggable={!!onDragStart}
               data-rel={entry.relPath}
               title={entry.relPath}
               style={style}
+              {...commonHandlers}
               onClick={() => onToggleDir(entry.relPath)}
             >
               <ChevronRight
@@ -76,9 +108,11 @@ export const FileTree = memo(function FileTree({
             <button
               type="button"
               role="treeitem"
+              draggable={!!onDragStart}
               data-rel={entry.relPath}
               title={entry.relPath}
               style={style}
+              {...commonHandlers}
               onClick={() => onOpenFile(entry.relPath)}
             >
               <span style={{ width: 13, flexShrink: 0 }} />
@@ -94,7 +128,16 @@ export const FileTree = memo(function FileTree({
     });
 
   return (
-    <div role="tree" data-testid="file-tree" style={{ userSelect: "none" }}>
+    <div
+      role="tree"
+      data-testid="file-tree"
+      style={{ userSelect: "none" }}
+      onDragOver={(e) => {
+        // 允许拖到空白区 → 移动进工作区根
+        if (e.dataTransfer?.types.includes("application/x-confidant-entry")) e.preventDefault();
+      }}
+      onDrop={(e) => onDropOn?.(e, { name: "", relPath: "", kind: "dir" } as TreeEntry)}
+    >
       {renderLevel(tree, 0)}
     </div>
   );

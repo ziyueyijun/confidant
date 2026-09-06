@@ -60,7 +60,28 @@ export const IPC = {
   infoDialog: "dialog:info",
   /** 路径是否存在(悬空引用判定)。 */
   pathExists: "fs:path-exists",
+  /** 新建笔记文件(重名序号防撞),返回新路径。 */
+  fsNewNote: "fs:new-note",
+  /** 新建文件夹(冲突/非法拒绝)。 */
+  fsNewFolder: "fs:new-folder",
+  /** 重命名文件/文件夹,返回新路径。 */
+  fsRenamePath: "fs:rename-path",
+  /** 移动(含改名)文件/文件夹,返回新路径。 */
+  fsMovePath: "fs:move-path",
 } as const;
+
+/** 外部变更原始事件(工作区监听批次内;树推送时一并携带,12 消费)。 */
+export interface WorkspaceFsEvent {
+  type: "add" | "unlink" | "change" | "addDir" | "unlinkDir";
+  /** 绝对路径(目录事件亦同)。 */
+  path: string;
+}
+
+/** 工作区树更新负载。 */
+export interface WorkspaceTreeUpdate {
+  tree: TreeEntry[];
+  events: WorkspaceFsEvent[];
+}
 
 export interface ErrorInfo {
   code: string;
@@ -119,7 +140,15 @@ export interface ConfidantApi {
   /** 关闭当前工作区监听。 */
   closeWorkspace(): void;
   /** 订阅工作区树更新(外部变更重扫;整树替换)。返回退订函数。 */
-  onWorkspaceTree(cb: (tree: TreeEntry[]) => void): () => void;
+  onWorkspaceTree(cb: (update: WorkspaceTreeUpdate) => void): () => void;
+  /** 新建笔记文件于 dirAbs(自动序号防撞)。 */
+  newNoteIn(dirAbs: string): Promise<Result<{ path: string }>>;
+  /** 新建文件夹。 */
+  newFolderIn(dirAbs: string, name: string): Promise<Result<void>>;
+  /** 重命名文件/文件夹(新名不含路径)。 */
+  renamePath(path: string, newName: string): Promise<Result<{ path: string }>>;
+  /** 移动文件/文件夹进目录(可带新名)。 */
+  movePath(path: string, targetDir: string, newName?: string): Promise<Result<{ path: string }>>;
   /** 上报「某文件已成为当前文档」(主进程记录会话恢复数据)。 */
   noteOpened(path: string): void;
   /** 读取持久状态片段(不存在返回 null)。 */

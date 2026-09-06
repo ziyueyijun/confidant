@@ -1,15 +1,17 @@
 // 工作区主进程侧:监听(外部增删改原位即时反映,规格 §8)+ 变更后重扫广播。
-// 变更事件去抖 250ms 后整体重扫(树小,重扫成本低且与磁盘无二义),经
-// IPC 事件推送整树;搜索(15)与外部变更处置(12)在此之上演进。
+// 变更事件去抖 250ms 后整体重扫(树小,重扫成本低且与磁盘无二义),连同批次原始
+// 事件一起推送(12 外部变更处置消费);搜索(15)在此之上演进。
 
 import { watch, type FSWatcher } from "chokidar";
 import { scanWorkspaceTree, type TreeEntry } from "../../packages/files";
+import type { WorkspaceFsEvent, WorkspaceTreeUpdate } from "@shared/ipc";
 
 let currentRoot: string | null = null;
 let currentWatcher: FSWatcher | null = null;
 let rescanTimer: ReturnType<typeof setTimeout> | null = null;
 let changedSinceScan = false;
-let broadcast: ((tree: TreeEntry[]) => void) | null = null;
+let eventBatch: WorkspaceFsEvent[] = [];
+let broadcast: ((update: WorkspaceTreeUpdate) => void) | null = null;
 
 export function currentWorkspaceRoot(): string | null {
   return currentRoot;
@@ -17,9 +19,11 @@ export function currentWorkspaceRoot(): string | null {
 
 async function doRescan(rootAbs: string): Promise<void> {
   changedSinceScan = false;
+  const batch = eventBatch;
+  eventBatch = [];
   try {
     const tree = await scanWorkspaceTree(rootAbs);
-    broadcast?.(tree);
+    broadcast?.({ tree, events: batch });
   } catch (err) {
     console.error("[workspace] rescan failed:", err);
   }
@@ -37,11 +41,16 @@ function scheduleRescan(rootAbs: string): void {
 /** 打开工作区:起监听并返回初始整树;切换先停旧。 */
 export async function startWorkspaceWatch(
   rootAbs: string,
-  onTree: (tree: TreeEntry[]) => void,
+  onUpdate: (update: WorkspaceTreeUpdate) => void,
 ): Promise<TreeEntry[]> {
   await stopWorkspaceWatch();
   currentRoot = rootAbs;
-  broadcast = onTree;
+  broadcast = onUpdate;
+
+  const push = (type: WorkspaceFsEvent["type"]) => (path: string): void => {
+    eventBatch.push({ type, path });
+    scheduleRescan(rootAbs);
+  };
 
   currentWatcher = watch(rootAbs, {
     ignoreInitial: true,
@@ -54,11 +63,11 @@ export async function startWorkspaceWatch(
     },
   });
   currentWatcher
-    .on("add", () => scheduleRescan(rootAbs))
-    .on("change", () => scheduleRescan(rootAbs))
-    .on("unlink", () => scheduleRescan(rootAbs))
-    .on("addDir", () => scheduleRescan(rootAbs))
-    .on("unlinkDir", () => scheduleRescan(rootAbs))
+    .on("add", push("add"))
+    .on("change", push("change"))
+    .on("unlink", push("unlink"))
+    .on("addDir", push("addDir"))
+    .on("unlinkDir", push("unlinkDir"))
     .on("error", (err) => console.error("[workspace] watcher error:", err));
 
   const tree = await scanWorkspaceTree(rootAbs);
@@ -71,6 +80,7 @@ export async function stopWorkspaceWatch(): Promise<void> {
     rescanTimer = null;
   }
   changedSinceScan = false;
+  eventBatch = [];
   if (currentWatcher) {
     await currentWatcher.close();
     currentWatcher = null;

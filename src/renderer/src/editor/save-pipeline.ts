@@ -27,6 +27,8 @@ export interface SavePipeline {
   setComposing(composing: boolean): void;
   /** 手动保存(Ctrl+S/按钮):取消待写计时并立即写盘;无脏不写。 */
   flush(): Promise<void>;
+  /** 是否有未落盘内容(外部内容变更处置判定,12)。 */
+  isDirty(): boolean;
   /** 换文件/清空会话:清脏、取消计时。 */
   resetClean(): void;
   dispose(): void;
@@ -141,6 +143,10 @@ export function createSavePipeline(
       if (disposed) return;
       clearTimer();
       await runFlush();
+    },
+
+    isDirty() {
+      return dirty;
     },
 
     resetClean() {

@@ -14,6 +14,10 @@ export type MenuContext = {
   canRedo: boolean;
   /** 选区/光标在表格内(块级段落命令置灰;表格交互走右键,规格 9.6)。 */
   inTable: boolean;
+  /** 有工作区(文件操作命令前提,10)。 */
+  hasWorkspace: boolean;
+  /** 有树内选中项(重命名/删除等按选中生效,10)。 */
+  hasSelection: boolean;
 };
 
 export type CommandRun = () => void | Promise<void>;
@@ -22,11 +26,14 @@ export type CommandRun = () => void | Promise<void>;
 export const Cmd = {
   // 文件
   newNote: "new-note",
+  newFolder: "new-folder",
   openFolder: "open-folder",
   openRecent: "open-recent",
   save: "save",
   exportPdf: "export-pdf",
   print: "print",
+  rename: "rename",
+  delete: "delete",
   quit: "quit",
   // 编辑
   undo: "undo",
@@ -82,10 +89,14 @@ export function buildMenuTemplate(): MenuItemTemplate[] {
       label: "文件",
       submenu: [
         disabledItem(Cmd.newNote, "新建笔记"),
+        disabledItem(Cmd.newFolder, "新建文件夹"),
         disabledItem(Cmd.openFolder, "打开文件夹"),
         disabledItem(Cmd.openRecent, "最近打开"),
         sep(),
         disabledItem(Cmd.save, "保存", "Ctrl+S"),
+        sep(),
+        disabledItem(Cmd.rename, "重命名"),
+        disabledItem(Cmd.delete, "删除"),
         sep(),
         disabledItem(Cmd.exportPdf, "导出 PDF"),
         disabledItem(Cmd.print, "打印"),
@@ -190,7 +201,14 @@ export interface MenuBridge {
 
 export function createMenuBridge(): MenuBridge {
   const handlers = new Map<CommandId, { rule: EnabledRule; run: CommandRun }>();
-  let context: MenuContext = { docOpen: false, canUndo: false, canRedo: false, inTable: false };
+  let context: MenuContext = {
+    docOpen: false,
+    canUndo: false,
+    canRedo: false,
+    inTable: false,
+    hasWorkspace: false,
+    hasSelection: false,
+  };
   const lastState = new Map<string, boolean>();
   let unsubCommand: (() => void) | null = null;
 

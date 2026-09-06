@@ -16,5 +16,15 @@ export {
   saveImageCopy,
 } from "./lib/image-save";
 
+export {
+  nextAvailableName,
+  makeFolder,
+  createNoteFile,
+  assertMoveAllowed,
+  moveInto,
+  renameEntry,
+  describeOpError,
+} from "./lib/ops";
+
 export { scanWorkspaceTree, compareTreeEntries, isHiddenName, countMarkdown, collectMarkdownPaths } from "./lib/tree";
 export type { TreeEntry, TreeEntryKind } from "./lib/tree";

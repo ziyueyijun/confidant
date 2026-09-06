@@ -7,8 +7,9 @@ import {
   type MenuItemState,
   type MenuItemTemplate,
   type Result,
+  type TreeEntry,
+  type WorkspaceTreeUpdate,
 } from "@shared/ipc";
-import type { TreeEntry } from "../../packages/files";
 
 const api: ConfidantApi = {
   openNoteDialog: () => ipcRenderer.invoke(IPC.openNoteDialog) as Promise<string | null>,
@@ -77,13 +78,25 @@ const api: ConfidantApi = {
     void ipcRenderer.invoke(IPC.workspaceClose);
   },
 
-  onWorkspaceTree: (cb: (tree: TreeEntry[]) => void) => {
-    const listener = (_e: unknown, tree: TreeEntry[]) => cb(tree);
+  onWorkspaceTree: (cb: (update: WorkspaceTreeUpdate) => void) => {
+    const listener = (_e: unknown, update: WorkspaceTreeUpdate) => cb(update);
     ipcRenderer.on(IPC.workspaceTreeUpdated, listener);
     return () => {
       ipcRenderer.removeListener(IPC.workspaceTreeUpdated, listener);
     };
   },
+
+  newNoteIn: (dirAbs: string) =>
+    ipcRenderer.invoke(IPC.fsNewNote, dirAbs) as Promise<Result<{ path: string }>>,
+
+  newFolderIn: (dirAbs: string, name: string) =>
+    ipcRenderer.invoke(IPC.fsNewFolder, dirAbs, name) as Promise<Result<void>>,
+
+  renamePath: (path: string, newName: string) =>
+    ipcRenderer.invoke(IPC.fsRenamePath, path, newName) as Promise<Result<{ path: string }>>,
+
+  movePath: (path: string, targetDir: string, newName?: string) =>
+    ipcRenderer.invoke(IPC.fsMovePath, path, targetDir, newName) as Promise<Result<{ path: string }>>,
 
   noteOpened: (path: string) => {
     ipcRenderer.send(IPC.fileOpened, path);
