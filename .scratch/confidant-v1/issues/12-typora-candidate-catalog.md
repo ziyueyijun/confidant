@@ -1,7 +1,7 @@
 # Typora 功能面候选清单
 
 Type: research
-Status: claimed
+Status: resolved
 
 ## Question
 
@@ -17,4 +17,9 @@ Status: claimed
 
 ## 决议
 
-(由 research 子代理执行并记录;产出 Markdown 清单入库,本票 Answer 给路径。)
+由 research 子代理在分支 `research/typora-candidate-catalog` 执行完毕;结论与清单见下。
+
+## Answer
+
+- 要点:以 typora.io 官网与 support.typora.io 官方文档站(约 70 页原文,2026-09-06 采集,版本快照 Typora 1.14.9/文档最新 1.14)为唯一一手来源,整理出 Typora 完整功能面候选清单,共 **130 条**、分 7 组(编辑内容 45 / 导航与辅助 10 / 外观与主题 14 / 文件与树 22 / 图片 11 / 导出 17 / 其他 11),每条含一句话行为与来源链接。
+- 清单文件:`docs/research/typora-candidate-catalog.md`(仓库 research 惯例位置)。
