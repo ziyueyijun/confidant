@@ -279,7 +279,11 @@ export interface Engine {
   /** 列表项缩进(+1)/反缩进(-1)(任务列表与普通列表)。 */
   listIndent(dir: 1 | -1): boolean;
   /** 在光标处插入图片节点(引用相对路径;自动保存由上层管线触发)。 */
-  insertImage(src: string, alt?: string): boolean;  /** 在页面坐标处插入图片(drop 落点;失败回退光标处)。 */
+  insertImage(src: string, alt?: string): boolean;
+  /** 光标处插入纯文本(不解析 Markdown 语法;粘贴纯文本语义,17)。 */
+  insertPlainText(text: string): boolean;
+  /** 光标处插入已清洗 HTML(白名单经 schema 吸收;富文本粘贴语义,17)。 */
+  insertHtml(html: string): boolean;  /** 在页面坐标处插入图片(drop 落点;失败回退光标处)。 */
   insertImageAtCoords(clientX: number, clientY: number, src: string, alt?: string): boolean;
   /**
    * 删除图片节点(06 右键「删除」:引用移除走自动保存,图片文件由主进程入回收站)。
@@ -722,6 +726,22 @@ export function createEngine(
         .focus()
         .insertContent({ type: "image", attrs: { src, alt } })
         .run();
+    },
+
+    insertPlainText(text) {
+      const ed = editor;
+      if (!ed) return false;
+      return ed
+        .chain()
+        .focus()
+        .insertContent({ type: "text", text })
+        .run();
+    },
+
+    insertHtml(html) {
+      const ed = editor;
+      if (!ed) return false;
+      return ed.chain().focus().insertContent(html, { contentType: "html" }).run();
     },
 
     insertImageAtCoords(clientX, clientY, src, alt = "") {

@@ -140,3 +140,28 @@ describe("链接(07 编辑面)", () => {
     engine.destroy();
   });
 });
+
+describe("粘贴语义(17)", () => {
+  it("insertPlainText:Markdown 语法文本原样成字(不解析成格式)", () => {
+    const engine = makeEngine("前\n");
+    engine.focus();
+    engine.setSelection(2, 2);
+    expect(engine.insertPlainText("- 事项\n# 标题\n**粗**")).toBe(true);
+    const out = engine.getMarkdown();
+    expect(out).toContain("- 事项");
+    expect(out).not.toContain("## "); // 未形成标题结构(字面 # 原样)
+    engine.destroy();
+  });
+
+  it("insertHtml:结构语义保留(标题/列表/粗体),脚本不入文档", () => {
+    const engine = makeEngine("前\n");
+    engine.focus();
+    engine.setSelection(2, 2);
+    const ok = engine.insertHtml("<h2>小节</h2><ul><li><b>粗</b>项</li></ul>");
+    expect(ok).toBe(true);
+    const out = engine.getMarkdown();
+    expect(out).toContain("## 小节");
+    expect(out).toContain("- **粗**项");
+    engine.destroy();
+  });
+});

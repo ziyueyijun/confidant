@@ -11,6 +11,7 @@ import { createSavePipeline, type SaveState } from "./editor/save-pipeline";
 import { landClipboardImage, landImageFile, looksLikeImageFile } from "./editor/image-insert";
 import { isRemoteSrc, resolveImageAbsPath, resolveImageSourceUrl } from "./editor/image-source";
 import { classifyLink } from "./editor/link-target";
+import { sanitizePasteHtml } from "./editor/html-sanitize";
 import { Cmd, createMenuBridge, type MenuContext } from "./menu/menu-bridge";
 import { Sidebar } from "./components/Sidebar";
 import { FormatOverlay } from "./components/FormatOverlay";
@@ -168,29 +169,71 @@ export default function App() {
     engineRef.current = engine;
     setEngine(engine);
 
-    // 粘贴:剪贴板位图(截图)→ 落盘(位图优先;文件路径分支归 17)
+    // 粘贴分流(05 位图 / 17 富文本与纯文本语义)
     const onPaste = (e: ClipboardEvent) => {
       const doc = docRef.current;
       const current = engineRef.current;
       if (!doc || !current) return;
-      const items = e.clipboardData?.items ?? [];
-      const imageItem = [...items].find((it) => it.kind === "file" && it.type.startsWith("image/"));
-      if (!imageItem) return;
-      e.preventDefault();
-      const file = imageItem.getAsFile();
-      if (!file) return;
-      void (async () => {
-        try {
-          const landed = await landClipboardImage({
-            notePath: doc.path,
-            mime: file.type || "image/png",
-            bytes: new Uint8Array(await file.arrayBuffer()),
-          });
-          if (landed) current.insertImage(landed.fileName, "");
-        } catch (err) {
-          console.error("[image] paste insert failed:", err);
+      const items = [...(e.clipboardData?.items ?? [])];
+      // 1) 剪贴板位图优先(截图;含文件路径并存时位图优先,规格 9.2)
+      const imageItem = items.find((it) => it.kind === "file" && it.type.startsWith("image/"));
+      if (imageItem) {
+        e.preventDefault();
+        const file = imageItem.getAsFile();
+        if (!file) return;
+        void (async () => {
+          try {
+            const landed = await landClipboardImage({
+              notePath: doc.path,
+              mime: file.type || "image/png",
+              bytes: new Uint8Array(await file.arrayBuffer()),
+            });
+            if (landed) current.insertImage(landed.fileName, "");
+          } catch (err) {
+            console.error("[image] paste insert failed:", err);
+          }
+        })();
+        return;
+      }
+      // 2) 文件路径(资源管理器复制):图片扩展名走落盘;非图片插指向文件的链接文本
+      const fileItem = items.find((it) => it.kind === "file");
+      if (fileItem) {
+        const file = fileItem.getAsFile();
+        if (!file) return;
+        e.preventDefault();
+        const sourcePath = window.confidant.pathForFile(file);
+        if (!sourcePath) {
+          console.error("[paste] cannot resolve file path");
+          return;
         }
-      })();
+        if (looksLikeImageFile(file)) {
+          void (async () => {
+            const landed = await landImageFile({ notePath: doc.path, sourcePath });
+            if (landed) current.insertImage(landed.fileName, "");
+          })();
+          return;
+        }
+        // 插入链接文本(不复制文件):以笔记目录为基准的相对路径更稳,跨盘则用绝对路径
+        const base = basename(sourcePath);
+        const escapeHtml = (s: string): string =>
+          s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+        const pathForLink = sourcePath.replace(/\\/g, "/");
+        current.insertHtml(`<a href="${escapeHtml(pathForLink)}">${escapeHtml(base)}</a>`);
+        return;
+      }
+      // 3) 富文本来源:净化后按 schema 吸收(结构保留,样式级降级)
+      const html = e.clipboardData?.getData("text/html");
+      if (html && html.trim() !== "") {
+        e.preventDefault();
+        current.insertHtml(sanitizePasteHtml(html));
+        return;
+      }
+      // 4) 纯文本来源:原样插入,不把 Markdown 语法文本解析成格式(规格 9.2)
+      const plain = e.clipboardData?.getData("text/plain");
+      if (plain != null) {
+        e.preventDefault();
+        current.insertPlainText(plain);
+      }
     };
 
     // 拖入:图片文件(资源管理器)→ 复制落盘(沿用源扩展名)→ 按落点插入
