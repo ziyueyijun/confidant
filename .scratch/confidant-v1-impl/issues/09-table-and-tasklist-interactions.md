@@ -21,7 +21,7 @@
 
 - 提交:feat(09)(分支 impl/confidant-v1)。
 
-- 表格:右键(光标定位到格 → native 菜单)在上方/下方插入行、左侧/右侧插入列、删除本行/本列、对齐(左/中/右 → GFM 冒号分隔线,往返验证);Tab 移下一格(Shift+Tab 上一格,goToNextCell);表尾 Enter 加行为 PM 表格默认语义(头行行尾 Enter 也在单元格内加行)。
+- 表格:右键(光标定位到格 → native 菜单)在上方/下方插入行、左侧/右侧插入列、删除本行/本列、对齐(左/中/右 → GFM 冒号分隔线,往返验证);Tab 移下一格(Shift+Tab 上一格,goToNextCell);表尾(末行)回车加行:自定义键盘语义(handleKeyDown:光标在最后一行时 addRowAfter 并把光标带入新行同列单元格),单测覆盖末行/非末行两种路径。
 
 - 任务列表:复选框点击切换完成态(引擎 DOM 委托:preventDefault 浏览器默认勾选,状态由文档 attrs 驱动重渲;写盘 - [x]/[ ] 往返);缩进 Tab / 反缩进 Shift+Tab,右键同步提供(勾选/缩进/反缩进)。
 

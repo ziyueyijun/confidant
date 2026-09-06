@@ -101,8 +101,21 @@ export default function App() {
   /** 正在编辑文件被外部删除(12:不静默重建,提供恢复/放弃)。 */
   const [docMissing, setDocMissing] = useState(false);
   const docMissingRef = useRef(false);
-  /** 自身文件操作产生的路径(其 watcher 回声不当作外部删除)。 */
-  const ownOpPathsRef = useRef<Set<string>>(new Set());
+  /** 自身文件操作产生的路径(其 watcher 回声不当作外部删除);时间盒抑制。 */
+  const ownOpPathsRef = useRef<Map<string, number>>(new Map());
+  /** 登记自身写/操作;1.5s 内的同名 watcher 回声视为自我回声,不触发外部处置。 */
+  const markOwnOp = useCallback((absPath: string) => {
+    const m = ownOpPathsRef.current;
+    const now = Date.now();
+    for (const [k, v] of m) {
+      if (now - v > 2000) m.delete(k);
+    }
+    m.set(absPath.replace(/\\/g, "/").toLowerCase(), now);
+  }, []);
+  const isOwnOpRecent = useCallback((absPath: string): boolean => {
+    const ts = ownOpPathsRef.current.get(absPath.replace(/\\/g, "/").toLowerCase());
+    return ts !== undefined && Date.now() - ts < 2000;
+  }, []);
   const promptValidate = (v: string): string | null => {
     if (!v.trim()) return "名称不能为空";
     if (/[\\/:*?"<>|]/.test(v)) return "名称不能包含 \\ / : * ? \" < > | 字符";
@@ -160,6 +173,7 @@ export default function App() {
           const engine = engineRef.current;
           if (!current || !engine) return;
           if (docMissingRef.current) return; // 文件已被外部删除:不静默重建(12)
+          markOwnOp(current.path); // 自身写盘回声抑制(1.5s 内 watcher 同名事件)
           const res = await window.confidant.writeTextFile(
             current.path,
             composeNoteText({ head: current.head, bodyMd: engine.getMarkdown() }),
@@ -610,7 +624,6 @@ export default function App() {
       const t = treeSelectedAbs();
       if (t) void doDeleteEntry({ relPath: t.rel, kind: t.kind });
     });
-    void refreshMenuContext;
     menu.init();
     refreshMenuContext();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -647,7 +660,7 @@ export default function App() {
       const norm = (p: string): string => p.replace(/\\/g, "/");
       const curPath = norm(cur.path);
       for (const ev of events) {
-        if (ownOpPathsRef.current.has(ev.path)) continue;
+        if (isOwnOpRecent(ev.path)) continue;
         if (norm(ev.path).toLowerCase() !== curPath.toLowerCase()) continue;
         if (ev.type === "unlink") {
           // 外部删除/改名:提示条(恢复重建/放弃),不静默重建
@@ -660,6 +673,19 @@ export default function App() {
       }
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  /** 缺文件打开 → 12 横幅语义(恢复重建/放弃;不静默)。 */
+  const openMissingNoteBanner = useCallback((absPath: string) => {
+    const name = absPath.replace(/[\\/]+$/, "").split(/[\\/]/).pop() ?? "笔记";
+    const stub: OpenNote = { path: absPath, name, head: null };
+    docRef.current = stub;
+    setDoc(stub);
+    engineRef.current?.loadMarkdown("");
+    pipelineRef.current?.resetClean();
+    docMissingRef.current = true;
+    setDocMissing(true);
+    document.title = `${name} · confidant`;
   }, []);
 
   // 横幅动作
@@ -901,10 +927,10 @@ export default function App() {
         );
         if (!ok) return;
       }
-      ownOpPathsRef.current.add(abs);
+      markOwnOp(abs);
       const tr = await window.confidant.trashItem(abs);
       if (!tr.ok) {
-        ownOpPathsRef.current.delete(abs);
+        // 回声抑制时间盒自过期,无需主动删除
         showOpError(tr, "删除失败");
         return;
       }
@@ -931,10 +957,10 @@ export default function App() {
       if (!ws) return;
       const abs = wsJoin(ws.root, rel);
       const kind = selectedRef.current?.kind === "dir" ? "dir" : "md";
-      ownOpPathsRef.current.add(abs);
+      markOwnOp(abs);
       const r = await window.confidant.renamePath(abs, newName);
       if (!r.ok) {
-        ownOpPathsRef.current.delete(abs);
+        // 回声抑制时间盒自过期,无需主动删除
         showOpError(r, "重命名失败");
         return;
       }
@@ -947,7 +973,6 @@ export default function App() {
           else showOpError(back, "撤销失败");
         })();
       });
-      void kind;
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [],
@@ -962,10 +987,10 @@ export default function App() {
       const parentRel = rel.split("/").slice(0, -1).join("/");
       if (parentRel.toLowerCase() === targetDirRel.toLowerCase()) return; // 同目录无操作
       const targetAbs = targetDirRel === "" ? ws.root : wsJoin(ws.root, targetDirRel);
-      ownOpPathsRef.current.add(abs);
+      markOwnOp(abs);
       const r = await window.confidant.movePath(abs, targetAbs);
       if (!r.ok) {
-        ownOpPathsRef.current.delete(abs);
+        // 回声抑制时间盒自过期,无需主动删除
         showOpError(r, "移动失败");
         return;
       }
@@ -1099,7 +1124,12 @@ export default function App() {
         if (target.hrefPath) await window.confidant.showItemInFolder(target.hrefPath);
         return;
       }
-      // note:切换/打开文件,再按锚点定位
+      // note:目标已被外部删除 → 12 横幅语义(不静默;可恢复重建/放弃)
+      if (target.abs && !(await window.confidant.pathExists(target.abs))) {
+        openMissingNoteBanner(target.abs);
+        return;
+      }
+      // 切换/打开文件,再按锚点定位
       const cur = docRef.current;
       const sameFile = cur && cur.path.toLowerCase() === (target.abs ?? "").toLowerCase();
       const jump = (): void => {
@@ -1223,15 +1253,7 @@ export default function App() {
       const fileRes = await window.confidant.readTextFile(last.file);
       if (!fileRes.ok) {
         // 最后文件已不存在:按 12 处置(横幅,不静默)
-        const name = last.file.replace(/[\\/]+$/, "").split(/[\\/]/).pop() ?? "笔记";
-        const stub: OpenNote = { path: last.file, name, head: null };
-        docRef.current = stub;
-        setDoc(stub);
-        engineRef.current?.loadMarkdown("");
-        pipelineRef.current?.resetClean();
-        docMissingRef.current = true;
-        setDocMissing(true);
-        document.title = `${name} · confidant`;
+        openMissingNoteBanner(last.file);
         return;
       }
       await openPath(last.file);

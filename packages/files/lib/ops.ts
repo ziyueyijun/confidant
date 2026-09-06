@@ -2,6 +2,7 @@
 // 重名防撞命名、移动/改名合法性(环/冲突)、占位冲突检测。删除走回收站(主进程 shell)。
 
 import { mkdir, rename as fsRename, access } from "node:fs/promises";
+import { writeTextFileAtomic } from "./atomic-write";
 import { dirname, join } from "node:path";
 
 async function exists(path: string): Promise<boolean> {
@@ -40,7 +41,6 @@ export async function createNoteFile(dirAbs: string, stem = "未命名笔记"): 
   const name = await nextAvailableName(dirAbs, stem);
   const target = join(dirAbs, name);
   // 原子写空文档(单换行,与引擎空文档序列化一致)
-  const { writeTextFileAtomic } = await import("./atomic-write");
   await writeTextFileAtomic(target, "\n");
   return target;
 }

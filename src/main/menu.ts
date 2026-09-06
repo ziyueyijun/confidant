@@ -39,11 +39,11 @@ export function applyMenuTemplate(
   };
   current = Menu.buildFromTemplate(template.map((t) => toConstructorOptions(t, sendCommand)));
   byId.clear();
-  const index = (items: MenuItem[], depth = 0): void => {
+  const index = (items: MenuItem[]): void => {
     for (const it of items) {
       if (it.id) byId.set(it.id, it);
       const sub = it.submenu;
-      if (sub) index(sub.items, depth + 1);
+      if (sub) index(sub.items);
     }
   };
   index(current.items);

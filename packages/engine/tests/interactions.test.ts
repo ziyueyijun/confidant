@@ -138,3 +138,43 @@ describe("表格交互", () => {
     engine.destroy();
   });
 });
+
+describe("表格 Enter 加行(09)", () => {
+  const T2 = "| a | b |\n| --- | --- |\n| c | d |\n";
+  it("末行回车:新行出现且输入落在新行同列格", () => {
+    const { engine, host } = makeEngine(T2);
+    // 光标移到末行末格 'd' 内结尾
+    const at = findPos(engine, "d");
+    engine.setSelection(at + 1, at + 1);
+    const editable = host.querySelector("[contenteditable='true']") as HTMLElement;
+    editable.dispatchEvent(
+      new KeyboardEvent("keydown", { key: "Enter", bubbles: true, cancelable: true }),
+    );
+    const out1 = engine.getMarkdown();
+    const rows1 = out1.split("\n").filter((l) => l.trim().startsWith("|")).length;
+    expect(rows1).toBe(4); // 表头+分隔线+原数据+新增
+    // 新行同列格应可输入(光标已移入)
+    expect(engine.insertPlainText("Z")).toBe(true);
+    const out2 = engine.getMarkdown();
+    const lines = out2.split("\n").filter((l) => l.includes("Z"));
+    expect(lines.length).toBeGreaterThan(0);
+    expect(lines[0]).toContain("| Z");
+    engine.destroy();
+  });
+
+  it("非末行回车不进新行(表头行回车仍留在表内,行数不变)", () => {
+    const { engine, host } = makeEngine(T2);
+    const at = findPos(engine, "a"); // 表头行(非末行)
+    engine.setSelection(at + 1, at + 1);
+    const editable = host.querySelector("[contenteditable='true']") as HTMLElement;
+    editable.dispatchEvent(
+      new KeyboardEvent("keydown", { key: "Enter", bubbles: true, cancelable: true }),
+    );
+    const rows = engine
+      .getMarkdown()
+      .split("\n")
+      .filter((l) => l.trim().startsWith("|")).length;
+    expect(rows).toBe(3);
+    engine.destroy();
+  });
+});

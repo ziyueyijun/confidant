@@ -13,10 +13,11 @@ import { TaskList } from "@tiptap/extension-task-list";
 import { TaskItem } from "@tiptap/extension-task-item";
 import { Image } from "@tiptap/extension-image";
 import type { EditorState, Transaction } from "@tiptap/pm/state";
+import { TextSelection } from "@tiptap/pm/state";
 import { Fragment } from "@tiptap/pm/model";
 import type { Node as PMNode } from "@tiptap/pm/model";
 import { liftListItem, sinkListItem } from "@tiptap/pm/schema-list";
-import { goToNextCell } from "@tiptap/pm/tables";
+import { addRowAfter as addRowAfterCmd, goToNextCell } from "@tiptap/pm/tables";
 
 /**
  * 图片显示解析器:markdown 引用(src 原样) → 渲染层可加载的 URL。
@@ -121,13 +122,65 @@ function makeEditor(
     extensions: makeExtensions(resolveImageUrl),
     editorProps: {
       // Tab 语义(09):表格内移下一格;列表项缩进;Shift+Tab 反缩进/上一格
+      // Enter 语义(09):表格最后一行回车 → 加行并把光标带入新行同列单元格
       handleKeyDown(view, event) {
-        if (event.key !== "Tab") return false;
         const { state } = view;
         const $sel = state.selection.$from;
         const types = new Set<string>();
         for (let d = $sel.depth; d > 0; d--) types.add($sel.node(d).type.name);
         const shift = event.shiftKey;
+
+        if (event.key === "Enter" && !shift && types.has("table")) {
+          let tableDepth = -1;
+          for (let d = $sel.depth; d > 0; d--) {
+            if ($sel.node(d).type.name === "table") {
+              tableDepth = d;
+              break;
+            }
+          }
+          if (tableDepth >= 0) {
+            const rowIndex = $sel.index(tableDepth);
+            const totalRows = $sel.node(tableDepth).childCount;
+            if (rowIndex === totalRows - 1 && addRowAfterCmd(state, view.dispatch)) {
+              const doc = view.state.doc;
+              const $p2 = view.state.selection.$from;
+              let t2 = -1;
+              for (let d = $p2.depth; d > 0; d--) {
+                if ($p2.node(d).type.name === "table") {
+                  t2 = d;
+                  break;
+                }
+              }
+              if (t2 < 0) return false;
+              const table = $p2.node(t2);
+              const rows = table.childCount;
+              const prevRow = rows >= 2 ? table.child(rows - 2) : null;
+              const colBefore = Math.min(
+                $p2.index(t2 + 1),
+                prevRow ? prevRow.childCount - 1 : 0,
+              );
+              // 新行 = 末行(加行后);定位同列单元格并取空段光标
+              let rowAbs = $p2.before(t2) + 1; // 首行起点(表开 char 之后)
+              for (let i = 0; i < rows - 1; i++) rowAbs += table.child(i)!.nodeSize;
+              const lastRow = table.child(rows - 1)!;
+              let cellAbs = rowAbs + 1;
+              for (let i = 0; i < colBefore; i++) {
+                const c = lastRow.child(i);
+                if (c) cellAbs += c.nodeSize;
+              }
+              const paraStart = cellAbs + 1; // 空单元格段落始于开格 char 后
+              const caret = paraStart + 1;
+              const pos = Math.max(1, Math.min(caret, doc.content.size));
+              view.dispatch(
+                view.state.tr.setSelection(TextSelection.create(doc, pos, pos)),
+              );
+              event.preventDefault();
+              return true;
+            }
+          }
+        }
+
+        if (event.key !== "Tab") return false;
         if (types.has("table")) {
           if (goToNextCell(shift ? -1 : 1)(state, view.dispatch)) {
             event.preventDefault();
@@ -561,7 +614,7 @@ export function createEngine(
           behavior: "smooth",
         });
       }
-      ed.chain().focus().setTextSelection({ from, to: Math.max(from, to - 0) }).run();
+      ed.chain().focus().setTextSelection({ from, to }).run();
     },
 
     findHeadingAnchor(title) {

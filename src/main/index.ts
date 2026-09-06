@@ -371,6 +371,21 @@ async function runWorkspaceSelfCheck(win: BrowserWindow, wsDir: string, emptyDir
     if (!diskA.includes(mark1)) return fail("workspace note marker missing on disk");
     if (!diskA.startsWith("---\ntitle: a")) return fail("a.md front matter changed");
 
+    // 2.5) 撤销跨自动保存(09/08 复核):保存后撤销/重做历史不被自身写盘回声清空
+    win.webContents.send(IPC.menuCommand, "undo");
+    const undone = await poll(async () => {
+      const text = await js<string>("document.body.innerText");
+      return text.includes(mark1) ? null : true;
+    });
+    if (!undone) return fail("undo after autosave did not revert typing (history wiped?)");
+    win.webContents.send(IPC.menuCommand, "redo");
+    const redone = await poll(async () => {
+      const text = await js<string>("document.body.innerText");
+      return text.includes(mark1) ? true : null;
+    });
+    if (!redone) return fail("redo after undo failed");
+    await waitSaved(win);
+
     // 2.5) 粘贴位图(截图通道)→ 落盘同目录 → 相对引用写入并自动保存
     const pasteOk = await js<boolean>(
       `(() => {
