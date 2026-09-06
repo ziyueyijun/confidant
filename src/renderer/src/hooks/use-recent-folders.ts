@@ -1,4 +1,4 @@
-// 最近打开(13):欢迎页列表 + 文件菜单「最近打开」动态子项,同一数据源。
+// 最近打开(13/27):「文件 → 最近打开」菜单动态子项数据源(27:欢迎页不再陈列)。
 // 从 App.tsx 拆分(22)。
 import { useEffect, useState, type RefObject } from "react";
 import type { MenuBridge } from "../menu/menu-bridge";
@@ -6,7 +6,7 @@ import type { MenuBridge } from "../menu/menu-bridge";
 export function useRecentFolders(api: {
   menuRef: RefObject<MenuBridge | null>;
   openWorkspace: (root: string) => Promise<void>;
-}): Array<{ path: string; name: string }> {
+}): void {
   const { menuRef, openWorkspace } = api;
 
 // ── 最近打开(13):欢迎页列表 + 菜单动态子项同一数据源 ──
@@ -29,5 +29,4 @@ export function useRecentFolders(api: {
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [recentFolders, openWorkspace]);
-  return recentFolders;
 }

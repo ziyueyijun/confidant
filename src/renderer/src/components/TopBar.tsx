@@ -40,24 +40,23 @@ export function TopBar({
         flexShrink: 0,
       }}
     >
-      {workspace && (
-        <button
-          type="button"
-          data-testid="sidebar-toggle"
-          title={sidebarVisible ? "收起侧栏" : "显示侧栏"}
-          onClick={onToggleSidebar}
-          style={{
-            border: "none",
-            background: "transparent",
-            cursor: "pointer",
-            fontSize: 14,
-            padding: "2px 6px",
-            color: "inherit",
-          }}
-        >
-          {sidebarVisible ? "◀" : "▶"}
-        </button>
-      )}
+      {/* 27:无工作区时开关也可点(空态侧栏由 App 渲染) */}
+      <button
+        type="button"
+        data-testid="sidebar-toggle"
+        title={sidebarVisible ? "收起侧栏" : "显示侧栏"}
+        onClick={onToggleSidebar}
+        style={{
+          border: "none",
+          background: "transparent",
+          cursor: "pointer",
+          fontSize: 14,
+          padding: "2px 6px",
+          color: "inherit",
+        }}
+      >
+        {sidebarVisible ? "◀" : "▶"}
+      </button>
       {doc && <strong style={{ fontSize: 14 }}>{doc.name}</strong>}
       {!doc && workspace && (
         <strong style={{ fontSize: 14, fontWeight: 500, color: "var(--muted)" }}>{workspace.name}</strong>

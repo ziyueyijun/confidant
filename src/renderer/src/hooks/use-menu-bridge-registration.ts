@@ -55,7 +55,7 @@ export function useMenuBridgeRegistration(api: MenuRegistrationApi): void {
       (ctx) => ctx.hasWorkspace,
       () => openFind("workspace"),
     );
-    menu.register(Cmd.toggleSidebar, () => !!workspaceRef.current, toggleSidebar);
+    menu.register(Cmd.toggleSidebar, () => true, toggleSidebar);
     menu.register(Cmd.insertImage, (ctx) => ctx.docOpen, () => void insertImageViaDialog());
     // 行内格式(07):与浮动工具条同一引擎命令面
     const runFormat = (fn: (e: Engine) => boolean): void => {

@@ -154,3 +154,47 @@ export function Sidebar({
     </div>
   );
 }
+
+/** 无工作区时的侧栏空态框体(27):框体与宽度记忆仍在,提示打开入口。 */
+export function SidebarEmpty({ width }: { width: number }) {
+  return (
+    <div
+      data-testid="sidebar"
+      style={{
+        width,
+        minWidth: 0,
+        display: "flex",
+        flexDirection: "column",
+        borderRight: "1px solid var(--shell-border, var(--border))",
+        background: "var(--shell-bg, var(--panel))",
+        position: "relative",
+        flexShrink: 0,
+      }}
+    >
+      <div
+        style={{
+          flex: 1,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          padding: 16,
+        }}
+      >
+        <p
+          data-testid="sidebar-empty"
+          style={{
+            margin: 0,
+            fontSize: 13,
+            color: "var(--muted)",
+            textAlign: "center",
+            lineHeight: 1.8,
+          }}
+        >
+          尚未打开工作区
+          <br />
+          请在「文件」菜单打开文件夹
+        </p>
+      </div>
+    </div>
+  );
+}

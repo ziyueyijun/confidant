@@ -306,6 +306,16 @@ export async function runSelfCheck(win: BrowserWindow, notePath: string | null):
         return fail("welcome view not rendered");
       }
       if (!probe.bodyText.includes("最懂你的笔记软件")) return fail("welcome subtitle missing");
+      // 27:无工作区时侧栏空态框体默认显示,开关可点、可隐可还原
+      const emptyInit = await pollUntil(() => js<boolean>(`!!document.querySelector("[data-testid='sidebar-empty']")`), 5000);
+      if (!emptyInit) return fail("sidebar empty state not shown without workspace");
+      await js<void>(`document.querySelector("[data-testid='sidebar-toggle']").click()`);
+      const emptyGone = await pollUntil(() => js<boolean>(`!document.querySelector("[data-testid='sidebar-empty']")`), 5000);
+      if (!emptyGone) return fail("sidebar empty state did not hide on toggle");
+      await js<void>(`document.querySelector("[data-testid='sidebar-toggle']").click()`);
+      const emptyBack = await pollUntil(() => js<boolean>(`!!document.querySelector("[data-testid='sidebar-empty']")`), 5000);
+      if (!emptyBack) return fail("sidebar empty state did not restore on toggle");
+      console.log("[smoke] sidebar empty-state toggle ok");
     }
     if (issues.length) return fail("renderer console issues present");
     if (!failed) console.log("[smoke] ok");
@@ -903,7 +913,15 @@ export async function runWorkspaceSelfCheck(win: BrowserWindow, wsDir: string, e
     if (issues.length) return fail("renderer console issues present");
     console.log("[smoke] workspace e2e ok");
   } catch (err) {
-    await fail(`workspace self-check threw: ${String(err)}`);
+    const diag = await js<string>(
+      `JSON.stringify({
+        header: document.querySelector("header strong")?.textContent ?? "",
+        rels: [...document.querySelectorAll("[data-rel]")].map((el) => el.getAttribute("data-rel")),
+        sidebar: !!document.querySelector("[data-testid='sidebar']"),
+        body: document.body.innerText.slice(0, 200),
+      })`,
+    ).catch(() => "no-page");
+    await fail(`workspace self-check threw: ${String(err)}; diag=${diag}`);
   } finally {
     if (failed) process.exitCode = 1;
     try {

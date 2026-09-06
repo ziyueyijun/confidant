@@ -51,7 +51,7 @@ export function PrintHost() {
   return (
     <div
       style={{
-        maxWidth: 820,
+        maxWidth: 860,
         margin: "0 auto",
         padding: "36px 48px 48px",
         fontFamily:

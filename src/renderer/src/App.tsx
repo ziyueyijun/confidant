@@ -16,7 +16,7 @@ import {
   showFileOpError,
   toThrownError,
 } from "./session/ops-shared";
-import { Sidebar } from "./components/Sidebar";
+import { Sidebar, SidebarEmpty } from "./components/Sidebar";
 import { FormatOverlay } from "./components/FormatOverlay";
 import { TextPrompt } from "./components/TextPrompt";
 import { SearchPanel } from "./components/SearchPanel";
@@ -348,8 +348,8 @@ export default function App() {
 
   // 当前文件自动展开与 toggle 持久化归 useTreeExpansion(22)。
 
-  // ── 最近打开(13):欢迎页 + 菜单动态子项同一数据源 → useRecentFolders(22) ──
-  const recentFolders = useRecentFolders({ menuRef, openWorkspace });
+  // ── 最近打开(13/27):「文件 → 最近打开」菜单动态子项数据源(欢迎页不再陈列) ──
+  useRecentFolders({ menuRef, openWorkspace });
 
   // ── 启动恢复(13) → useStartupRecovery(22) ──
   useStartupRecovery(workspace, doc, { openWorkspace, openPath, openMissingNoteBanner, setLoadError });
@@ -397,29 +397,33 @@ export default function App() {
         onSave={() => void pipelineRef.current?.flush()}
       />
       <div style={{ display: "flex", flex: 1, minHeight: 0 }}>
-        {workspace && sidebar.visible && (
-          <Sidebar
-            workspaceName={workspace.name}
-            tree={tree}
-            expanded={expanded}
-            activeRel={activeRel}
-            width={sidebar.width}
-            onToggleDir={toggleDir}
-            onOpenFile={openRel}
-            onWidthChange={setSidebarWidth}
-            onWidthDragEnd={() => commitSidebar(sidebar)}
-            onRowContext={(e, entry) => void onTreeRowContext(e, entry)}
-            onEmptyContext={(e) => void onTreeEmptyContext(e)}
-            onDragStartEntry={onDragStartEntry}
-            onDropEntry={onDropEntry}
-            onSearchBoxClick={() => {
-              if (!docRef.current) return;
-              setFindScope("file");
-              setFindOpen(true);
-              setFindFocus((f) => f + 1);
-            }}
-          />
-        )}
+        {sidebar.visible &&
+          (workspace ? (
+            <Sidebar
+              workspaceName={workspace.name}
+              tree={tree}
+              expanded={expanded}
+              activeRel={activeRel}
+              width={sidebar.width}
+              onToggleDir={toggleDir}
+              onOpenFile={openRel}
+              onWidthChange={setSidebarWidth}
+              onWidthDragEnd={() => commitSidebar(sidebar)}
+              onRowContext={(e, entry) => void onTreeRowContext(e, entry)}
+              onEmptyContext={(e) => void onTreeEmptyContext(e)}
+              onDragStartEntry={onDragStartEntry}
+              onDropEntry={onDropEntry}
+              onSearchBoxClick={() => {
+                if (!docRef.current) return;
+                setFindScope("file");
+                setFindOpen(true);
+                setFindFocus((f) => f + 1);
+              }}
+            />
+          ) : (
+            // 27:无工作区时侧栏以空态框体呈现(开关可点、宽度记忆保持)
+            <SidebarEmpty width={sidebar.width} />
+          ))}
         <div
           style={{
             flex: 1,
@@ -441,13 +445,8 @@ export default function App() {
           >
             {engineHost}
           </div>
-          {/* 欢迎页:仅当既无工作区也无文档(直开文件路径下避免覆盖编辑区,26) */}
-          {!workspace && !doc && (
-            <Welcome
-              recentFolders={recentFolders}
-              onOpenRecent={(p) => void openWorkspace(p)}
-            />
-          )}
+          {/* 欢迎页(27 纯空态):仅当既无工作区也无文档(直开文件路径下避免覆盖编辑区,26) */}
+          {!workspace && !doc && <Welcome />}
           {guidanceVisible && <EmptyWorkspaceGuidance />}
           {!doc && workspace && mdCount > 0 && <NotePickHint />}
         </div>
