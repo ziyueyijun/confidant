@@ -6,7 +6,7 @@
 
 ## Notes
 
-- 领域:本地优先、所见即所得 Markdown 桌面编辑器(Electron + React + Vite + TypeScript,Windows 为首验环境);数据即磁盘上普通的本地 `.md` 文件。参照基线:Typora。产品三原则(见 PRODUCT.md):本地优先、所见即所得、大众可用。
+- 领域:本地优先、所见即所得 Markdown 桌面编辑器(Electron + React + Vite + TypeScript + shadcn/ui,Windows 为首验环境);数据即磁盘上普通的本地 `.md` 文件。参照基线:Typora。产品三原则(见 PRODUCT.md):本地优先、所见即所得、大众可用。
 - 语言:地图、票、决议均用中文;代码标识符、路径、slugs 保留英文。
 - 仓库现状:无产品代码,仅有工程骨架(`packages/example` 占位)。功能包一律为 deep module,边界规则见 `packages/README.md`(入口点/私有实现/禁止 barrel)。
 - 证据纪律:仓库没有任何用户调研、竞品、原型证据;票的结论不得凭空编造证据,涉及用户侧主张需标注来源或由 grilling 现场确认。

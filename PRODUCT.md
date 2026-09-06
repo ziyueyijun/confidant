@@ -8,8 +8,8 @@ web
 
 ## Stack
 
-Electron + React + Vite + TypeScript(用户确认)。UI 渲染于桌面窗口,可直接读写本地文件系统。
-开发与首验环境为 Windows 11;打包目标 OS 范围(仅 Windows,还是含 macOS)未确认。
+Electron + React + Vite + TypeScript + shadcn/ui(用户确认;shadcn/ui 于 2026-09-06 补认,基于 Tailwind + Radix 的组件体系)。UI 渲染于桌面窗口,可直接读写本地文件系统。
+开发与首验环境为 Windows 11;打包目标 OS:仅 Windows(Windows 10/11,决议见 .scratch/confidant-v1/issues/01-platform-range.md);Linux 与 macOS 不在首版范围。
 
 ## Users
 
