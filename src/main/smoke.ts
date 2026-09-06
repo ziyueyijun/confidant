@@ -517,23 +517,16 @@ export async function runWorkspaceSelfCheck(win: BrowserWindow, wsDir: string, e
       })()`,
     );
     if (!selMade.ok) return fail(`selection failed: ${JSON.stringify(selMade)}`);
-    const toolbarShown = await poll(() => js<boolean>(q("[data-testid='format-toolbar']")), 10000);
-    if (!toolbarShown) {
-      const diag = await js<string>(
-        `JSON.stringify({
-          sel: window.getSelection()?.toString().slice(0, 30) ?? "",
-          active: document.activeElement?.tagName ?? "",
-          focusedEl: !!document.querySelector("[contenteditable='true']:focus"),
-        })`,
-      );
-      return fail(`format toolbar not shown on selection; diag=${diag}`);
-    }
-    await js<void>(`document.querySelector("[data-testid='format-toolbar'] button[title='加粗']").click()`);
+    // 29:浮动工具条已移除——选中文字不再出现 format-toolbar
+    const toolbarGone = await poll(() => js<boolean>(`!document.querySelector("[data-testid='format-toolbar']")`), 5000);
+    if (!toolbarGone) return fail("format toolbar should be removed (29)");
+    // 加粗改走菜单命令通道(与「格式」菜单同一引擎命令面)
+    win.webContents.send(IPC.menuCommand, "bold");
     const boldSaved = await poll(async () => {
       const content = await readFile(aPath, "utf8");
       return content.includes("**正文 a。**") ? true : null;
     });
-    if (!boldSaved) return fail("bold not persisted via toolbar (autosave)");
+    if (!boldSaved) return fail("bold not persisted via menu (autosave)");
 
     // 2.8) 段落菜单命令(08):菜单通道 → 标题2 → 正文还原 → 插入表格 → 撤销
     win.webContents.send(IPC.menuCommand, "heading-2");
@@ -566,6 +559,69 @@ export async function runWorkspaceSelfCheck(win: BrowserWindow, wsDir: string, e
       return !content.includes("| --- | --- |") ? true : null;
     });
     if (!tableUndone) return fail("undo of table insert not applied/persisted");
+
+    // 2.8b) 链接面板(29):Ctrl+K → 面板 → 填地址 → 提交落盘;光标移入链接 → 再开 → 改地址
+    await js<void>(`(() => {
+      const el = document.querySelector('[contenteditable="true"]');
+      el.focus();
+      const range = document.createRange();
+      range.selectNodeContents(el);
+      range.collapse(false);
+      const sel = window.getSelection();
+      sel?.removeAllRanges();
+      sel?.addRange(range);
+    })()`);
+    win.webContents.send(IPC.menuCommand, "link");
+    const linkPanelShown = await poll(() => js<boolean>(q("[data-testid='link-panel']")));
+    if (!linkPanelShown) return fail("link panel not shown via menu");
+    await js<void>(`(() => {
+      const input = document.querySelector("[data-testid='link-href-input']");
+      const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, "value")?.set;
+      setter?.call(input, "https://example.com");
+      input.dispatchEvent(new Event("input", { bubbles: true }));
+    })()`);
+    await js<void>(`document.querySelector("[data-testid='link-commit']").click()`);
+    const linkSaved = await poll(async () => {
+      const content = await readFile(aPath, "utf8");
+      return content.includes("[https://example.com](https://example.com)") ? true : null;
+    });
+    if (!linkSaved) return fail("link insert not persisted via panel");
+    // 编辑态:DOM 选中链接文本 → Ctrl+K → 预填(编辑态) → 改地址 → 提交
+    await js<void>(`(() => {
+      const a = document.querySelector(".editor-prose a[href]");
+      if (!a) return;
+      a.focus();
+      const tn = [...a.childNodes].find((n) => n.nodeType === Node.TEXT_NODE);
+      if (!tn) return;
+      const range = document.createRange();
+      range.setStart(tn, 0);
+      range.setEnd(tn, (tn.textContent ?? "").length);
+      const sel = window.getSelection();
+      sel?.removeAllRanges();
+      sel?.addRange(range);
+      document.dispatchEvent(new Event("selectionchange"));
+    })()`);
+    win.webContents.send(IPC.menuCommand, "link");
+    const panelEdit = await poll(() => js<boolean>(q("[data-testid='link-text-input']")));
+    if (!panelEdit) return fail("link panel not in edit mode on link caret");
+    await js<void>(`(() => {
+      const input = document.querySelector("[data-testid='link-href-input']");
+      const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, "value")?.set;
+      setter?.call(input, "https://example.org");
+      input.dispatchEvent(new Event("input", { bubbles: true }));
+    })()`);
+    await js<void>(`document.querySelector("[data-testid='link-commit']").click()`);
+    const linkEdited = await poll(async () => {
+      const content = await readFile(aPath, "utf8");
+      return content.includes("(https://example.org)") && !content.includes("(https://example.com)")
+        ? true
+        : null;
+    });
+    if (!linkEdited) {
+      const tail = (await readFile(aPath, "utf8")).slice(-260);
+      return fail(`link edit not persisted via panel; diskTail=${JSON.stringify(tail)}`);
+    }
+    console.log("[smoke] link panel ok (insert/edit)");
 
     // 3) 外部新增 .md → 树即时出现;点击打开编辑保存
     const externalName = `外部新增-${Date.now()}.md`;

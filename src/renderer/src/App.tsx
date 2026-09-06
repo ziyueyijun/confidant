@@ -17,7 +17,7 @@ import {
   toThrownError,
 } from "./session/ops-shared";
 import { Sidebar, SidebarEmpty } from "./components/Sidebar";
-import { FormatOverlay } from "./components/FormatOverlay";
+import { LinkPanel } from "./components/LinkPanel";
 import { TextPrompt } from "./components/TextPrompt";
 import { SearchPanel } from "./components/SearchPanel";
 import { TopBar } from "./components/TopBar";
@@ -51,7 +51,7 @@ export default function App() {
   const [saveState, setSaveState] = useState<SaveState>(EMPTY_SAVE_STATE);
   const [loadError, setLoadError] = useState<string | null>(null);
   /** 引擎 UI 节拍:编辑/选区/命令后递增,驱动浮动条重算。 */
-  const [uiTick, setUiTick] = useState(0);
+  const [, setUiTick] = useState(0);
   const [linkRequest, setLinkRequest] = useState(0);
   /** 查找面板(14/15):打开态、作用域与焦点请求。 */
   const [findOpen, setFindOpen] = useState(false);
@@ -473,8 +473,8 @@ export default function App() {
           {!doc && workspace && mdCount > 0 && <NotePickHint />}
         </div>
       </div>
-      {/* 浮动格式工具条与链接编辑(07) */}
-      <FormatOverlay engine={engine} tick={uiTick} openLinkRequest={linkRequest} />
+      {/* 链接面板(29):格式 → 链接 / Ctrl+K;原浮动工具条已移除 */}
+      <LinkPanel engine={engine} openLinkRequest={linkRequest} />
       {/* 代码块复制按钮(28):悬停编辑区代码块时浮现 */}
       <CodeBlockActions />
       {/* 查找面板(14/15) */}
