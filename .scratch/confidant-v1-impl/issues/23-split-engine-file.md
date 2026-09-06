@@ -10,11 +10,14 @@
 
 **Status:** ready-for-agent
 
-- [ ] `npm run typecheck` 通过;`npm test` 全量绿(矩阵为回归网,重点 packages/engine/tests)。
-- [ ] `npm run lint:boundaries` 0 违规。
-- [ ] engine.ts 收敛到装配层规模(行数留档);各私有模块职责与工单归属注释。
-- [ ] 新发现的跨层重复登记至 24 票清单(如有)。
+- [x] `npm run typecheck` 通过;`npm test` 全量绿(135;重点 packages/engine 往返/结构矩阵)。
+- [x] `npm run lint:boundaries` 0 违规(107 modules / 192 dependencies)。
+- [x] engine.ts 1009 → 631 行;各私有模块头注释标工单归属。
+- [x] finalizeMarkdown 与渲染层尾换行兜底重复 → 记入 24(已清偿,单一实现归 engine)。
 
 ## 实现记录(23)
 
-- 提交:`refactor(23): …`。
+- 提交:`refactor(23): engine.ts 拆分…`(aef1cf9)。
+- 拆分落点(同包 lib/ 私有模块):`search-highlight.ts`(14 高亮插件 + SEARCH_KEY)、`extensions.ts`(显式清单工厂 + ImageUrlResolver + Image NodeView)、`keyboard.ts`(makeEditor:Tab/表格末行回车/任务缩进键)、`link-range.ts`(linkRangeAt + LinkInfo 类型,engine 转发导出)、`task-list-ops.ts`(toggleCheckedViaDom/moveTaskItem)。
+- createEngine 仍为桥封装主体(~490 行)——命令方法多直接 chain 调用,进一步域拆分收益低且风险高,留档建议:后续清理票可把纯 chain 方法再分组,当前不做(矩阵与 smoke/E2E 已复验行为)。
+- 验证:135 单测、boundaries、重打包后 smoke + E2E 竖切全过。

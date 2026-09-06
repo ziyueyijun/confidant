@@ -14,11 +14,14 @@
 
 **Status:** ready-for-agent
 
-- [ ] `npm run typecheck` / `npm test`(涉及矩阵:front matter、roundtrip、image-save、tree、note-document、html-sanitize 相关全绿)。
-- [ ] `npm run lint:boundaries` 0 违规(shared 新导出与各层引用方向合规)。
-- [ ] 全仓无重复实现残留:上收项各只剩一处定义(检索复核:IMG_EXT_RE/noteStemOf/countMd/trailing-newline 各命中唯一)。
-- [ ] SearchPanel 树刷新行为回归(单测或 smoke 抽样)。
+- [x] `npm run typecheck` / `npm test`(135)(涉及矩阵:front matter、roundtrip、image-save、tree、note-document、html-sanitize 相关全绿)。
+- [x] `npm run lint:boundaries` 0 违规。
+- [x] 全仓无重复实现残留:检索复核 IMAGE_EXT_RE / noteStemOf / countMarkdown / finalizeMarkdown 各只剩单一定义(余者为 import/再导出/别名)。
+- [x] SearchPanel 树刷新行为回归:树节拍改为 state,treeTick 进 effect 依赖(修复 ref 变更不触发重跑);行为经 smoke/E2E 抽样。
 
 ## 实现记录(24)
 
-- 提交:`refactor(24): …`。
+- 提交:`refactor(24): 跨层重复上收…`(492301b)。
+- 上收落点:图片扩展名正则 ×3(主进程 asset-protocol/渲染 image-source/image-insert)→ @shared/path 单一 `IMAGE_EXT_RE`;noteStemOf/noteDirOf(renderer 自写 + files/image-save)→ @shared/path(files index 改再导出,主进程侧语义切换为 shared 近似 win32 dirname,已在测试覆盖);countMarkdown/countMdInTree → @shared/tree 单一实现(files index 与 workspace 均再导出,既有调用面不变);尾换行兜底 → engine.finalizeMarkdown 导出,note-document 旧名别名保留(测试/调用面不变)。
+- SearchPanel:treeTickRef 自增改 treeTick state(树广播即重跑工作区搜索,原 ref 方案不触发 effect)。
+- 验证:135 单测、boundaries 0 违规、重打包 smoke + E2E 通过。
