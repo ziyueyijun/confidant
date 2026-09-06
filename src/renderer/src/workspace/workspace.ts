@@ -31,12 +31,5 @@ export function dirAncestorsOf(relPath: string): string[] {
   return out;
 }
 
-/** 树内 .md 计数(空态引导判定;渲染层自用,不引 files 运行时)。 */
-export function countMdInTree(entries: TreeEntry[]): number {
-  let n = 0;
-  for (const e of entries) {
-    if (e.kind === "md") n++;
-    if (e.children) n += countMdInTree(e.children);
-  }
-  return n;
-}
+
+export { countMarkdown as countMdInTree } from "@shared/tree";

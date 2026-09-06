@@ -98,16 +98,6 @@ export async function scanWorkspaceTree(rootAbs: string): Promise<TreeEntry[]> {
   return walkDir(rootAbs, "", new Set<string>());
 }
 
-/** 树中是否至少有一个 .md(空态引导判定)。 */
-export function countMarkdown(entries: TreeEntry[]): number {
-  let n = 0;
-  for (const e of entries) {
-    if (e.kind === "md") n++;
-    if (e.children) n += countMarkdown(e.children);
-  }
-  return n;
-}
-
 /** 收集树中全部 .md 相对路径(搜索/文件列表消费)。 */
 export function collectMarkdownPaths(entries: TreeEntry[], out: string[] = []): string[] {
   for (const e of entries) {

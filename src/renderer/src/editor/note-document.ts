@@ -1,7 +1,7 @@
 // 笔记文档模型:front matter 头 + 正文 markdown 的解析与回拼(渲染层)。
 // 纯函数;拆/拼语义来自 packages/engine 的 splitFrontMatter。
 
-import { splitFrontMatter } from "../../../../packages/engine";
+import { finalizeMarkdown, splitFrontMatter } from "../../../../packages/engine";
 
 export interface NoteDocument {
   /** front matter 原始块(无则 null);字节原样,回拼不触碰。 */
@@ -16,12 +16,10 @@ export function parseNoteText(text: string): NoteDocument {
   return { head, bodyMd: body };
 }
 
-/** 保证正文以单个换行结尾(TipTap 序列化丢文末换行的兜底,规格 §4.2)。 */
-export function ensureSingleTrailingNewline(md: string): string {
-  return md.replace(/\n+$/, "") + "\n";
-}
-
 /** 回拼保存文本:head 原样 + 规范化正文;整体以单个换行结尾。 */
 export function composeNoteText(doc: NoteDocument): string {
-  return (doc.head ?? "") + ensureSingleTrailingNewline(doc.bodyMd);
+  return (doc.head ?? "") + finalizeMarkdown(doc.bodyMd);
 }
+
+/** 单一实现已上收 packages/engine.finalizeMarkdown(24);旧名别名保留。 */
+export { finalizeMarkdown as ensureSingleTrailingNewline };

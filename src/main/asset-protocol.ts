@@ -5,9 +5,9 @@
 import { protocol } from "electron";
 import { net } from "electron";
 import { pathToFileURL } from "node:url";
+import { IMAGE_EXT_RE } from "@shared/path";
 
 const SCHEME = "confidant-img";
-const IMG_EXT_RE = /\.(png|jpe?g|gif|webp|bmp|svg)$/i;
 
 /** app ready 前注册(privileged:standard/secure,使 URL 形态常规)。 */
 export function registerImageScheme(): void {
@@ -25,7 +25,7 @@ export function installImageProtocolHandler(): void {
     if (!/^[A-Za-z]:[\\/]/.test(raw) && !raw.startsWith("//")) {
       return new Response("invalid path", { status: 400 });
     }
-    if (!IMG_EXT_RE.test(raw)) {
+    if (!IMAGE_EXT_RE.test(raw)) {
       return new Response("not an image", { status: 400 });
     }
     try {

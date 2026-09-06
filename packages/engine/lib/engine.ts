@@ -10,7 +10,7 @@ import type { LinkInfo } from "./link-range";
 import { moveTaskItem, toggleCheckedViaDom } from "./task-list-ops";
 import { makeEditor } from "./keyboard";
 
-function finalizeMarkdown(md: string): string {
+export function finalizeMarkdown(md: string): string {
   return md.replace(/\n+$/, "") + "\n";
 }
 

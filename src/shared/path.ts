@@ -83,3 +83,17 @@ export function extname(p: string): string {
   if (idx <= 0) return "";
   return base.slice(idx).toLowerCase();
 }
+
+/** 常见本地图片扩展名(06 渲染/主进程资产协议共用;另见 image-source 的协议放行)。 */
+export const IMAGE_EXT_RE = /.(png|jpe?g|gif|webp|bmp|svg)$/i;
+
+/** 落盘目录(笔记同目录;dirname 别名,05/06 同目录语义)。 */
+export function noteDirOf(notePath: string): string {
+  return dirname(notePath);
+}
+
+/** 笔记裸名去 .md 扩展(05 命名 `{笔记名}-{时间戳}.ext` 用)。 */
+export function noteStemOf(notePath: string): string {
+  const base = norm(notePath).split("/").pop() ?? "";
+  return base.replace(/.md$/i, "");
+}

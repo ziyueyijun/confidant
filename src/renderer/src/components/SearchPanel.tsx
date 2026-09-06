@@ -33,7 +33,8 @@ export function SearchPanel({
   const [wsHits, setWsHits] = useState<WorkspaceSearchFileHit[]>([]);
   const [wsSearching, setWsSearching] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
-  const treeTickRef = useRef(0);
+  /** 树刷新节拍(工作区搜索重跑;state 而非 ref——ref 变化不触发 effect 重跑,24)。 */
+  const [treeTick, setTreeTick] = useState(0);
 
   useEffect(() => {
     if (focusRequest > 0) inputRef.current?.focus();
@@ -62,12 +63,12 @@ export function SearchPanel({
       });
     }, 180);
     return () => clearTimeout(timer);
-  }, [query, scope, workspaceRoot, treeTickRef.current]);
+  }, [query, scope, workspaceRoot, treeTick]);
 
   useEffect(() => {
     if (scope !== "workspace") return;
     return window.confidant.onWorkspaceTree(() => {
-      treeTickRef.current += 1;
+      setTreeTick((t) => t + 1);
     });
   }, [scope]);
 

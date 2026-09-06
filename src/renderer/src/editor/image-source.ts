@@ -1,12 +1,11 @@
 // 图片引用解析(06;与 05 落盘同一目录语义):
 // markdown 引用文本 → 渲染 URL / 本地绝对路径。远程图不请求(网络图裁决为出)。
 
-import { dirname, isAbsolute, resolveRelative } from "@shared/path";
+import { dirname, IMAGE_EXT_RE, isAbsolute, resolveRelative } from "@shared/path";
 
 const SCHEME_RE = /^[a-z][a-z0-9+.-]*:/i;
 /** Windows 盘符(D:\ 或 D:/)不是 URL scheme。 */
 const DRIVE_RE = /^[A-Za-z]:[\\/]/;
-const IMG_EXT_RE = /\.(png|jpe?g|gif|webp|bmp|svg)$/i;
 
 function isRemote(srcRaw: string): boolean {
   return SCHEME_RE.test(srcRaw) && !DRIVE_RE.test(srcRaw);
@@ -23,7 +22,7 @@ export function resolveImageSourceUrl(notePath: string, srcRaw: string): string 
   const abs = isAbsolute(srcRaw) ? srcRaw.replace(/\\/g, "/") : resolveRelative(baseDir, srcRaw);
   if (!abs) return null;
   if (!/^[A-Za-z]:/.test(abs) && !abs.startsWith("//")) return null;
-  if (!IMG_EXT_RE.test(abs)) return null;
+  if (!IMAGE_EXT_RE.test(abs)) return null;
   return `confidant-img://asset/${encodeURIComponent(abs)}`;
 }
 

@@ -4,6 +4,7 @@
 
 import { access, copyFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
+import { noteDirOf, noteStemOf } from "@shared/path";
 import { writeBinaryFileAtomic } from "./atomic-write";
 
 const EXT_RE = /^\.[a-z0-9]+$/i;
@@ -86,12 +87,3 @@ export async function saveImageCopy(params: {
 }
 
 /** 断言图片落盘目录 = 笔记所在目录(供调用方校验后调用以上落盘)。 */
-export function noteStemOf(notePath: string): string {
-  const base = notePath.replace(/\\/g, "/").split("/").pop() ?? "";
-  return base.replace(/\.md$/i, "");
-}
-
-/** 落盘目录(笔记同目录;带路径的 note 一并给 dir)。 */
-export function noteDirOf(notePath: string): string {
-  return dirname(notePath);
-}

@@ -5,7 +5,7 @@
 //   - front matter 拆分/回拼工具(原始字节保留,规格 §4.3)。
 // 本包不感知 React、不感知文件系统、不感知 UI 壳。
 
-export { createEngine } from "./lib/engine";
+export { createEngine, finalizeMarkdown } from "./lib/engine";
 export type {
   Engine,
   EngineCallbacks,
