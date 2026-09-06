@@ -1,7 +1,7 @@
 # 编辑引擎原型验证
 
 Type: prototype
-Status: open
+Status: claimed
 
 ## Question
 
