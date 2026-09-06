@@ -1,7 +1,7 @@
 # 首版用户画像
 
 Type: grilling
-Status: open
+Status: claimed
 
 ## Question
 
