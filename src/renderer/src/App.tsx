@@ -62,6 +62,9 @@ export default function App() {
   const [findOpen, setFindOpen] = useState(false);
   const [findScope, setFindScope] = useState<"file" | "workspace">("file");
   const [findFocus, setFindFocus] = useState(0);
+  /** 编辑区焦点环(31/修):仅键盘(Tab)进入时显示——Blink 对 contenteditable
+      的 :focus-visible 恒真(鼠标点击也匹配),纯 CSS 无法区分输入设备。 */
+  const [focusViaKeyboard, setFocusViaKeyboard] = useState(false);
 
   /** 正在编辑文件被外部删除(12:不静默重建,提供恢复/放弃)。 */
   const {
@@ -465,7 +468,26 @@ export default function App() {
   // 空态/计数
   const mdCount = useMemo(() => (tree ? countMdInTree(tree) : 0), [tree]);
 
-  const engineHost = <div ref={hostRef} className="editor-prose" data-testid="editor-prose" />;
+  // Tab 键按下即标记键盘焦点(document 捕获;按键后焦点才落入编辑区,
+  // host 自身捕获不到外部按键)。鼠标按下/失焦均清除标记。
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent): void => {
+      if (e.key === "Tab") setFocusViaKeyboard(true);
+    };
+    document.addEventListener("keydown", onKey, true);
+    return () => document.removeEventListener("keydown", onKey, true);
+  }, []);
+
+  const engineHost = (
+    <div
+      ref={hostRef}
+      className="editor-prose"
+      data-testid="editor-prose"
+      data-keyboard-focus={focusViaKeyboard}
+      onMouseDownCapture={() => setFocusViaKeyboard(false)}
+      onBlur={() => setFocusViaKeyboard(false)}
+    />
+  );
 
   const activeRel = useMemo(
     () => (workspace && doc ? relPathOf(workspace.root, doc.path) : null),

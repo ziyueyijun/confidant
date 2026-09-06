@@ -161,6 +161,17 @@ body {
   word-break: break-word;
   outline: none;
 }
+/* 编辑区焦点环(31/修):PM 根(contenteditable)不在 .editor-prose 本身,
+   UA 对 [contenteditable]:focus 的 outline:auto 细白环会透出;Blink 对
+   编辑宿主 :focus-visible 恒真(鼠标点击也匹配),故由宿主
+   data-keyboard-focus 标记仅键盘(Tab)进入时显示 accent 细环 */
+.editor-prose .ProseMirror {
+  outline: none;
+}
+.editor-prose[data-keyboard-focus="true"] .ProseMirror:focus {
+  outline: 1px solid var(--accent);
+  outline-offset: -1px;
+}
 
 .editor-prose :is(h1, h2, h3, h4, h5, h6) {
   font-weight: 600;

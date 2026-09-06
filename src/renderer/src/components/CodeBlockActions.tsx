@@ -8,7 +8,6 @@ import { createPortal } from "react-dom";
 const btnStyle: React.CSSProperties = {
   position: "absolute",
   top: 6,
-  right: 8,
   padding: "2px 10px",
   fontSize: 12,
   borderRadius: 5,
@@ -22,7 +21,7 @@ const btnStyle: React.CSSProperties = {
 
 export function CodeBlockActions() {
   const [pre, setPre] = useState<HTMLElement | null>(null);
-  const [pos, setPos] = useState<{ top: number } | null>(null);
+  const [pos, setPos] = useState<{ top: number; right: number } | null>(null);
   const [copied, setCopied] = useState(false);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -31,8 +30,9 @@ export function CodeBlockActions() {
     const sr = scroll?.getBoundingClientRect();
     const r = el.getBoundingClientRect();
     if (!sr || r.width === 0) return;
-    // 只定位 top;水平贴 right(8)即可——同时设 left 会把按钮拉伸成整宽
-    setPos({ top: r.top - sr.top + 6 });
+    // 顶/右都按 pre 矩形换算(31/修):内容列 60vw 居中后,固定 right(8)
+    // 会贴全宽滚动容器右缘,与 pre 脱钩错位;同时设 left 会把按钮拉伸成整宽
+    setPos({ top: r.top - sr.top + 6, right: sr.right - r.right + 8 });
   }, []);
 
   useEffect(() => {
@@ -65,10 +65,12 @@ export function CodeBlockActions() {
     scroll.addEventListener("mousemove", onMove);
     scroll.addEventListener("mouseleave", onLeave);
     scroll.addEventListener("scroll", sync, true);
+    window.addEventListener("resize", sync);
     return () => {
       scroll.removeEventListener("mousemove", onMove);
       scroll.removeEventListener("mouseleave", onLeave);
       scroll.removeEventListener("scroll", sync, true);
+      window.removeEventListener("resize", sync);
     };
   }, [place]);
 
@@ -96,7 +98,7 @@ export function CodeBlockActions() {
       data-testid="code-copy-btn"
       onMouseDown={(e) => e.preventDefault()}
       onClick={() => void doCopy()}
-      style={{ ...btnStyle, top: pos.top }}
+      style={{ ...btnStyle, top: pos.top, right: pos.right }}
     >
       {copied ? "已复制" : "复制"}
     </button>,
