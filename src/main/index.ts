@@ -41,6 +41,11 @@ import {
 import { applyMenuTemplate, getMenuItem, popupContextMenu, updateMenuItems } from "./menu";
 import { registerImageScheme, installImageProtocolHandler } from "./asset-protocol";
 import {
+  attachWindowStateCapture,
+  loadWindowState,
+  restoreBounds,
+} from "./window-state";
+import {
   runRestoreCheck,
   runRestoreSeed,
   runSelfCheck,
@@ -115,10 +120,14 @@ function armCloseFlush(win: BrowserWindow): void {
   });
 }
 
-function createWindow(): BrowserWindow {
+async function createWindow(): Promise<BrowserWindow> {
+  // 窗口状态记忆(25):屏外兜底后恢复上次的几何;最大化在显示前套用,避免闪现正常态
+  const saved = await loadWindowState();
+  const safeBounds = restoreBounds(saved);
   const win = new BrowserWindow({
-    width: 1200,
-    height: 800,
+    width: Math.max(safeBounds?.width ?? 1200, 800),
+    height: Math.max(safeBounds?.height ?? 800, 560),
+    ...(safeBounds ? { x: safeBounds.x, y: safeBounds.y } : {}),
     minWidth: 800,
     minHeight: 560,
     title: "confidant · 知己笔记",
@@ -133,8 +142,10 @@ function createWindow(): BrowserWindow {
     },
   });
 
+  if (saved.maximized) win.maximize();
   win.once("ready-to-show", () => win.show());
   armCloseFlush(win);
+  attachWindowStateCapture(win);
 
   if (process.env["CONFIDANT_DEVTOOLS"] === "1") {
     win.webContents.openDevTools({ mode: "detach" });
@@ -546,13 +557,13 @@ app.on("before-quit", () => {
 // 图片资产协议须在 ready 前注册;自检 userData 隔离在 createWindow 前即可
 registerImageScheme();
 
-app.whenReady().then(() => {
+app.whenReady().then(async () => {
   installImageProtocolHandler();
   registerIpc();
-  createWindow();
+  await createWindow();
 
   app.on("activate", () => {
-    if (BrowserWindow.getAllWindows().length === 0) createWindow();
+    if (BrowserWindow.getAllWindows().length === 0) void createWindow();
   });
 });
 

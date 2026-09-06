@@ -18,6 +18,14 @@ export interface LastSession {
   file: string | null;
 }
 
+/** 窗口状态记忆(25):关闭时记住最大/正常与正常态 bounds,重启还原。 */
+export interface WindowStateV1 {
+  /** 上次关闭时是否处于最大化。 */
+  maximized: boolean;
+  /** 正常态位置与大小(最大化前的值);从未记录过为 null。 */
+  bounds: { x: number; y: number; width: number; height: number } | null;
+}
+
 export interface AppStateV1 {
   version: 1;
   recentFolders: RecentFolder[];
@@ -26,6 +34,7 @@ export interface AppStateV1 {
   /** 树展开记忆:工作区根路径 → 展开的目录相对路径列表。 */
   expanded: Record<string, string[]>;
   theme: "system" | "light" | "dark";
+  window: WindowStateV1;
 }
 
 const DEFAULT_STATE: AppStateV1 = {
@@ -35,6 +44,7 @@ const DEFAULT_STATE: AppStateV1 = {
   sidebar: { visible: true, width: 260 },
   expanded: {},
   theme: "system",
+  window: { maximized: false, bounds: null },
 };
 
 export const RECENT_LIMIT = 10;
@@ -73,11 +83,18 @@ function persistSoon(): void {
   }, 300);
 }
 
-/** 等当前待写落盘(退出前)。 */
+/** 等当前待写落盘(退出前):防抖计时器未触发时补一次立即写,避免退出瞬间丢状态。 */
 export async function flushState(): Promise<void> {
   if (saveTimer) {
     clearTimeout(saveTimer);
     saveTimer = null;
+    const state = cached;
+    if (state) {
+      pendingSave = (async () => {
+        await mkdir(join(app.getPath("userData")), { recursive: true });
+        await writeTextFileAtomic(statePath(), JSON.stringify(state, null, 2));
+      })().catch((err) => console.error("[state] persist failed:", err));
+    }
   }
   await pendingSave;
 }

@@ -69,9 +69,13 @@ export function updateMenuItems(states: MenuItemState[]): void {
 }
 
 /** 查询已构建菜单项状态(自检驱动用)。 */
-export function getMenuItem(id: string): { label: string; enabled: boolean } | null {
+export function getMenuItem(
+  id: string,
+): { label: string; enabled: boolean; accelerator?: string } | null {
   const item = byId.get(id);
-  return item ? { label: item.label, enabled: item.enabled } : null;
+  return item
+    ? { label: item.label, enabled: item.enabled, accelerator: item.accelerator ?? undefined }
+    : null;
 }
 
 /**

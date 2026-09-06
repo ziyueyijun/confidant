@@ -444,7 +444,6 @@ export default function App() {
           {!workspace && (
             <Welcome
               recentFolders={recentFolders}
-              onOpenFolder={() => void openFolderViaDialog()}
               onOpenRecent={(p) => void openWorkspace(p)}
             />
           )}

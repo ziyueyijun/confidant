@@ -53,6 +53,6 @@ confidant(知己笔记):本地优先、所见即所得(WYSIWYG)的 Markdown 桌�
 ## 工作流约定
 
 - 工作项以本地 markdown 跟踪在 `.scratch/<effort>/`(不上 GitHub Issues),约定见 [docs/agents/issue-tracker.md](docs/agents/issue-tracker.md) 与 [docs/agents/triage-labels.md](docs/agents/triage-labels.md)。两个 effort:`confidant-v1`(规格决议,汇编产物 spec.md)与 `confidant-v1-impl`(实现,票 01–20 按依赖序,票头 `Status:`/`Blocked by:`,决议追加 `## Answer`)。代码注释里的 `(05)`、`(10-12)` 即 impl 票号。
-- 现状:实现票 01–20 均已提交(master);收尾票 21(应用图标管线,占位图随包、终稿素材待人工)、22–24(技术债清偿:App.tsx 1669→537 行按域抽 hook/组件、engine.ts 1009→631 行抽私有模块、跨层重复上收 @shared/engine)均已完成并实机复验,清偿记录见 [docs/tech-debt.md](docs/tech-debt.md)。**待人工收尾**:票 20 的干净机安装复核与首验清单(清单在票内)、票 21 图标终稿、v1 附录 B 画像假设检验(记录单在 [.scratch/confidant-v2/00-persona-check.md](.scratch/confidant-v2/00-persona-check.md),完成后即可开 v2 范围裁决)。
+- 现状:实现票 01–20 均已提交(master);收尾票 21(应用图标管线,占位图随包、终稿素材待人工)、22–24(技术债清偿:App.tsx 1669→537 行按域抽 hook/组件、engine.ts 1009→631 行抽私有模块、跨层重复上收 @shared/engine)均已完成并实机复验,清偿记录见 [docs/tech-debt.md](docs/tech-debt.md);界面微调票 25(窗口状态记忆/欢迎页去主按钮/标语行「最懂你的笔记软件」/编辑菜单中文与段落格式快捷键)已提交并实机复验,记录见票 25,仓库已建首个 [CONTEXT.md](CONTEXT.md)。**待人工收尾**:票 20 的干净机安装复核与首验清单(清单在票内)、票 21 图标终稿、v1 附录 B 画像假设检验(记录单在 [.scratch/confidant-v2/00-persona-check.md](.scratch/confidant-v2/00-persona-check.md),完成后即可开 v2 范围裁决)。
 - 一次性产物(原型、临时脚本、构建残留)不入库(`engine-prototype/`、`.claude/`、`out/` 已在 .gitignore)。
 - 领域词汇与裁决依据沉淀在规格与票中;仓库尚无 CONTEXT.md 与 ADR(按 docs/agents/domain.md 惯例,需要时惰性建立,不必预设)。

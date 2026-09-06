@@ -125,6 +125,13 @@ export async function runSelfCheck(win: BrowserWindow, notePath: string | null):
         if (recentItem?.enabled) return fail("open-recent should stay disabled");
         if (!aboutItem?.enabled) return fail("about should be enabled");
         if (!saveItem.label.includes("保存")) return fail(`save label wrong: ${saveItem.label}`);
+        // 25:编辑菜单 role 项显式中文;段落/格式新快捷键落地检查
+        const cutItem = getMenuItem("cut");
+        if (cutItem?.label !== "剪切") return fail(`cut role label not Chinese: ${cutItem?.label}`);
+        const h1Item = getMenuItem("heading-1");
+        if (h1Item?.accelerator !== "Ctrl+1") return fail(`heading-1 accelerator wrong: ${h1Item?.accelerator}`);
+        const openFolderItem = getMenuItem("open-folder");
+        if (openFolderItem?.accelerator !== "Ctrl+O") return fail(`open-folder accelerator wrong: ${openFolderItem?.accelerator}`);
 
         const typed2 = await typeAtEnd(win, mark2);
         if (!typed2.ok) return fail(`second typing failed: ${JSON.stringify(typed2)}`);
@@ -157,6 +164,7 @@ export async function runSelfCheck(win: BrowserWindow, notePath: string | null):
       if (probe.rootChildren <= 0 || !probe.bodyText.includes("知己笔记")) {
         return fail("welcome view not rendered");
       }
+      if (!probe.bodyText.includes("最懂你的笔记软件")) return fail("welcome subtitle missing");
     }
     if (issues.length) return fail("renderer console issues present");
     if (!failed) console.log("[smoke] ok");
@@ -825,7 +833,8 @@ export async function runRestoreCheck(win: BrowserWindow, expectFile: string): P
   await delay(1800);
   try {
     const welcomeGone = await pollUntil(
-      () => js<boolean>(`document.body.innerText.includes("打开文件夹") === false`),
+      // 25:欢迎页标记改用标语行(「打开文件夹」按钮已移除,旧判据会永远为真)
+      () => js<boolean>(`document.body.innerText.includes("最懂你的笔记软件") === false`),
       8000,
     );
     if (!welcomeGone) {
