@@ -32,6 +32,9 @@ import { useTreeExpansion } from "./hooks/use-tree-expansion";
 import { useDocMissing } from "./hooks/use-doc-missing";
 import { useEditorHost } from "./hooks/use-editor-host";
 import { useFileOperations } from "./hooks/use-file-operations";
+import { useMenuBridgeRegistration } from "./hooks/use-menu-bridge-registration";
+import { useRecentFolders } from "./hooks/use-recent-folders";
+import { useStartupRecovery } from "./hooks/use-startup-recovery";
 
 
 export default function App() {
@@ -167,135 +170,9 @@ export default function App() {
     bumpUi: () => setUiTick((t) => t + 1),
   });
 
-  // ── 菜单桥(03) ──
-  useEffect(() => {
-    const menu = createMenuBridge();
-    menuRef.current = menu;
-    menu.register(Cmd.openFolder, () => true, () => void openFolderViaDialog());
-    menu.register(Cmd.save, (ctx) => ctx.docOpen, () => void pipelineRef.current?.flush());
-    menu.register(Cmd.undo, (ctx) => ctx.docOpen && ctx.canUndo, () => engineRef.current?.undo());
-    menu.register(Cmd.redo, (ctx) => ctx.docOpen && ctx.canRedo, () => engineRef.current?.redo());
-    // 查找(14/15):Ctrl+F 当前文件;Ctrl+Shift+F 全工作区
-    const openFind = (scope: "file" | "workspace"): void => {
-      setFindScope(scope);
-      setFindOpen(true);
-      setFindFocus((f) => f + 1);
-    };
-    menu.register(Cmd.find, (ctx) => ctx.docOpen, () => openFind("file"));
-    menu.register(
-      Cmd.workspaceSearch,
-      (ctx) => ctx.hasWorkspace,
-      () => openFind("workspace"),
-    );
-    menu.register(Cmd.toggleSidebar, () => !!workspaceRef.current, toggleSidebar);
-    menu.register(Cmd.insertImage, (ctx) => ctx.docOpen, () => void insertImageViaDialog());
-    // 行内格式(07):与浮动工具条同一引擎命令面
-    const runFormat = (fn: (e: Engine) => boolean): void => {
-      const ed = engineRef.current;
-      if (!ed) return;
-      fn(ed);
-      setUiTick((t) => t + 1);
-    };
-    menu.register(Cmd.bold, (ctx) => ctx.docOpen, () => runFormat((e) => e.toggleBold()));
-    menu.register(Cmd.italic, (ctx) => ctx.docOpen, () => runFormat((e) => e.toggleItalic()));
-    menu.register(Cmd.strike, (ctx) => ctx.docOpen, () => runFormat((e) => e.toggleStrike()));
-    menu.register(Cmd.clearFormat, (ctx) => ctx.docOpen, () => runFormat((e) => e.clearFormat()));
-    menu.register(Cmd.link, (ctx) => ctx.docOpen, () => setLinkRequest((r) => r + 1));
-    // 导出/打印(19):当前文档渲染通道(与磁盘 mtime 无关)
-    const runExport = (kind: "pdf" | "print"): void => {
-      const doc = docRef.current;
-      const ed = engineRef.current;
-      if (!doc || !ed) return;
-      void (async () => {
-        const res = await window.confidant.printExport(kind, {
-          notePath: doc.path,
-          head: doc.head,
-          bodyMd: ed.getMarkdown(),
-        });
-        if (!res.ok) {
-          if (res.error.code !== "PRINT_CANCELED") {
-            await window.confidant.infoDialog(`导出失败:${res.error.message}`);
-          }
-          return;
-        }
-        if (kind === "pdf" && res.value.pdfPath) {
-          showNotice(`已导出 PDF:${basename(res.value.pdfPath)}`, {
-            action: {
-              label: "打开所在文件夹",
-              run: () => void window.confidant.showItemInFolder(res.value.pdfPath!),
-            },
-          });
-        }
-      })();
-    };
-    menu.register(Cmd.exportPdf, (ctx) => ctx.docOpen, () => runExport("pdf"));
-    menu.register(Cmd.print, (ctx) => ctx.docOpen, () => runExport("print"));
-    // 块级段落命令(08):标题/正文/列表/引用/代码块/表格,表格内置灰
-    const blockRule = (ctx: MenuContext) => ctx.docOpen && !ctx.inTable;
-    const runBlock = (kind: Parameters<Engine["setBlockKind"]>[0]): void => {
-      const ed = engineRef.current;
-      if (!ed) return;
-      ed.setBlockKind(kind);
-      setUiTick((t) => t + 1);
-      refreshMenuContext();
-    };
-    menu.register(Cmd.heading1, blockRule, () => runBlock("heading1"));
-    menu.register(Cmd.heading2, blockRule, () => runBlock("heading2"));
-    menu.register(Cmd.heading3, blockRule, () => runBlock("heading3"));
-    menu.register(Cmd.heading4, blockRule, () => runBlock("heading4"));
-    menu.register(Cmd.heading5, blockRule, () => runBlock("heading5"));
-    menu.register(Cmd.heading6, blockRule, () => runBlock("heading6"));
-    menu.register(Cmd.paragraph, blockRule, () => runBlock("paragraph"));
-    menu.register(Cmd.bulletList, blockRule, () => runBlock("bulletList"));
-    menu.register(Cmd.orderedList, blockRule, () => runBlock("orderedList"));
-    menu.register(Cmd.taskList, blockRule, () => runBlock("taskList"));
-    menu.register(Cmd.quote, blockRule, () => runBlock("quote"));
-    menu.register(Cmd.codeBlock, blockRule, () => runBlock("codeBlock"));
-    menu.register(Cmd.insertTable, blockRule, () => {
-      engineRef.current?.insertTable();
-      setUiTick((t) => t + 1);
-    });
-    menu.register(Cmd.about, () => true, () => void window.confidant.showAbout());
-    menu.register(Cmd.quit, () => true, () => window.confidant.closeWindow());
-    // 外观三态(18)
-    menu.register(Cmd.themeSystem, () => true, () => applyThemeMode("system"));
-    menu.register(Cmd.themeLight, () => true, () => applyThemeMode("light"));
-    menu.register(Cmd.themeDark, () => true, () => applyThemeMode("dark"));
-    // 文件操作命令(10):文件菜单(工作区/选中态驱动)
-    const wsRule = (ctx: MenuContext) => ctx.hasWorkspace;
-    const selRule = (ctx: MenuContext) => ctx.hasWorkspace && ctx.hasSelection;
-    const treeSelectedAbs = (): { abs: string; rel: string; kind: "dir" | "md" } | null => {
-      const ws = workspaceRef.current;
-      const sel = selectedRef.current;
-      if (!ws || !sel) return null;
-      return { abs: wsJoin(ws.root, sel.rel), rel: sel.rel, kind: sel.kind };
-    };
-    menu.register(Cmd.newNote, wsRule, () => {
-      const ws = workspaceRef.current;
-      const sel = selectedRef.current;
-      if (!ws) return;
-      const dirRel = sel && sel.kind === "dir" ? sel.rel : "";
-      void doCreateNote(dirRel);
-    });
-    menu.register(Cmd.newFolder, wsRule, () => {
-      const sel = selectedRef.current;
-      const dirRel = sel && sel.kind === "dir" ? sel.rel : "";
-      setPrompt({ type: "new-folder", dirRel });
-    });
-    menu.register(Cmd.rename, selRule, () => {
-      const sel = selectedRef.current;
-      const ws = workspaceRef.current;
-      if (!sel || !ws) return;
-      setPrompt({ type: "rename", rel: sel.rel, name: sel.rel.split("/").pop()! });
-    });
-    menu.register(Cmd.delete, selRule, () => {
-      const t = treeSelectedAbs();
-      if (t) void doDeleteEntry({ relPath: t.rel, kind: t.kind });
-    });
-    menu.init();
-    refreshMenuContext();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+
+
+
 
   // ── 主进程回调订阅 ──
   useEffect(() => {
@@ -461,76 +338,21 @@ export default function App() {
     clearMissing,
   });
 
-  // 当前文件自动展开与 toggle 持久化归 useTreeExpansion(22)。  // 当前文件自动展开与 toggle 持久化归 useTreeExpansion(22)。
+  // ── 菜单桥接线(03):命令注册表 → useMenuBridgeRegistration(22) ──
+  useMenuBridgeRegistration({
+    menuRef, docRef, engineRef, pipelineRef, workspaceRef, selectedRef,
+    setFindOpen, setFindScope, setFindFocus, setLinkRequest, setUiTick,
+    toggleSidebar, insertImageViaDialog, applyThemeMode, openFolderViaDialog,
+    doCreateNote, doDeleteEntry, setPrompt, showNotice, refreshMenuContext,
+  });
 
-  // ── 最近打开(13):欢迎页列表 + 菜单动态子项同一数据源 ──
-  const [recentFolders, setRecentFolders] = useState<Array<{ path: string; name: string }>>([]);
-  useEffect(() => {
-    void (async () => {
-      const list = (await window.confidant.stateGet("recentFolders")) as
-        | Array<{ path: string; name: string }>
-        | null;
-      setRecentFolders(list ?? []);
-    })();
-  }, []);
-  useEffect(() => {
-    const menu = menuRef.current;
-    if (!menu) return;
-    const recents = recentFolders.map((r) => ({ path: r.path, name: r.name }));
-    menu.rebuildRecent(recents);
-    recents.forEach((r, i) => {
-      menu.register(`recent-${i}`, () => true, () => void openWorkspace(r.path));
-    });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [recentFolders, openWorkspace]);
+  // 当前文件自动展开与 toggle 持久化归 useTreeExpansion(22)。
 
-  // ── 启动恢复(13):有历史 → 恢复工作区与最后文件;文件缺失 → 12 横幅语义 ──
-  const restoreAttempted = useRef(false);
-  const restoreRootRef = useRef<string | null>(null);
-  const restoreFileRef = useRef<string | null>(null);
-  const restoreRetried = useRef(false);
-  useEffect(() => {
-    if (restoreAttempted.current) return;
-    restoreAttempted.current = true;
-    void (async () => {
-      const last = (await window.confidant.stateGet("lastSession")) as {
-        workspace: string | null;
-        file: string | null;
-      } | null;
-      if (!last?.workspace) return; // 无历史 → 欢迎页
-      restoreRootRef.current = last.workspace;
-      restoreFileRef.current = last.file ?? null;
-      const res = await window.confidant.openWorkspace(last.workspace);
-      if (!res.ok) {
-        setLoadError(`恢复工作区失败:${res.error.message}`);
-        return;
-      }
-      if (!last.file) return;
-      const fileRes = await window.confidant.readTextFile(last.file);
-      if (!fileRes.ok) {
-        // 最后文件已不存在:按 12 处置(横幅,不静默)
-        openMissingNoteBanner(last.file);
-        return;
-      }
-      await openPath(last.file);
-    })();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  // ── 最近打开(13):欢迎页 + 菜单动态子项同一数据源 → useRecentFolders(22) ──
+  const recentFolders = useRecentFolders({ menuRef, openWorkspace });
 
-  // 恢复自愈:工作区状态未落到预期根(或缺失)且已有文档上下文 → 补开工作区并重开文件
-  useEffect(() => {
-    const root = restoreRootRef.current;
-    if (!root || restoreRetried.current) return;
-    const wsOk = workspace && workspace.root.toLowerCase() === root.toLowerCase();
-    if (wsOk) return;
-    if (!doc && workspace) return; // 无文档且已开其他工作区:尊重用户状态
-    restoreRetried.current = true;
-    void openWorkspace(root).then(() => {
-      const file = restoreFileRef.current;
-      if (file) void openPath(file);
-    });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [doc, workspace]);
+  // ── 启动恢复(13) → useStartupRecovery(22) ──
+  useStartupRecovery(workspace, doc, { openWorkspace, openPath, openMissingNoteBanner, setLoadError });
 
   // 空态/计数
   const mdCount = useMemo(() => (tree ? countMdInTree(tree) : 0), [tree]);
