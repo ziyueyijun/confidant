@@ -7,7 +7,7 @@ import { basename, dirname, join } from "node:path";
 import * as fsReal from "node:fs/promises";
 
 export interface FsAdapter {
-  writeFile(path: string, data: string, encoding: "utf8"): Promise<void>;
+  writeFile(path: string, data: string | Uint8Array, encoding?: BufferEncoding): Promise<void>;
   rename(from: string, to: string): Promise<void>;
   unlink(path: string): Promise<void>;
 }
@@ -39,6 +39,26 @@ export async function writeTextFileAtomic(
       await fsAdapter.unlink(tmp);
     } catch {
       // 临时文件可能未创建或已不在;忽略清理失败,保留原错误
+    }
+    throw err;
+  }
+}
+
+/** 二进制原子写(图片落盘等;语义同 writeTextFileAtomic)。 */
+export async function writeBinaryFileAtomic(
+  targetPath: string,
+  data: Uint8Array,
+  fsAdapter: FsAdapter = REAL_FS,
+): Promise<void> {
+  const tmp = tmpSiblingPath(targetPath);
+  try {
+    await fsAdapter.writeFile(tmp, data);
+    await fsAdapter.rename(tmp, targetPath);
+  } catch (err) {
+    try {
+      await fsAdapter.unlink(tmp);
+    } catch {
+      // ignore
     }
     throw err;
   }

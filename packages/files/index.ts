@@ -3,8 +3,18 @@
 // 随工单(02/04/05/10/11/12)渐进补齐。本包不依赖 Electron API(壳操作在 shell 入口)。
 
 export { readTextFile } from "./lib/read-write";
-export { writeTextFileAtomic } from "./lib/atomic-write";
+export { writeTextFileAtomic, writeBinaryFileAtomic } from "./lib/atomic-write";
 export type { FsAdapter } from "./lib/atomic-write";
+
+export {
+  extForImageMime,
+  imageBaseName,
+  uniqueFileName,
+  noteStemOf,
+  noteDirOf,
+  saveImageBytes,
+  saveImageCopy,
+} from "./lib/image-save";
 
 export { scanWorkspaceTree, compareTreeEntries, isHiddenName, countMarkdown, collectMarkdownPaths } from "./lib/tree";
 export type { TreeEntry, TreeEntryKind } from "./lib/tree";

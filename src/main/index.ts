@@ -6,7 +6,14 @@ import { join } from "node:path";
 import { mkdirSync } from "node:fs";
 import { readFile } from "node:fs/promises";
 import { IPC, type ErrorInfo, type MenuItemState, type MenuItemTemplate, type Result } from "@shared/ipc";
-import { readTextFile, writeTextFileAtomic, type TreeEntry } from "../../packages/files";
+import {
+  extForImageMime,
+  readTextFile,
+  saveImageBytes,
+  saveImageCopy,
+  writeTextFileAtomic,
+  type TreeEntry,
+} from "../../packages/files";
 import { applyMenuTemplate, getMenuItem, updateMenuItems } from "./menu";
 import {
   currentWorkspaceRoot,
@@ -331,6 +338,38 @@ async function runWorkspaceSelfCheck(win: BrowserWindow, wsDir: string, emptyDir
     if (!diskA.includes(mark1)) return fail("workspace note marker missing on disk");
     if (!diskA.startsWith("---\ntitle: a")) return fail("a.md front matter changed");
 
+    // 2.5) 粘贴位图(截图通道)→ 落盘同目录 → 相对引用写入并自动保存
+    const pasteOk = await js<boolean>(
+      `(() => {
+        const el = document.querySelector('[contenteditable="true"]');
+        if (!el) return false;
+        const b64 = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==";
+        const bytes = Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));
+        const file = new File([bytes], "clip.png", { type: "image/png" });
+        const dt = new DataTransfer();
+        dt.items.add(file);
+        const ev = new ClipboardEvent("paste", { clipboardData: dt, bubbles: true, cancelable: true });
+        el.dispatchEvent(ev);
+        return true;
+      })()`,
+    );
+    if (!pasteOk) return fail("paste dispatch failed");
+    // 轮询磁盘真相:图片落盘 + 引用写入(避免旧「已保存」状态误判)
+    const pasteLanded = await poll(async () => {
+      try {
+        const content = await readFile(aPath, "utf8");
+        const m = /!\[\]\(([^)\s]+)\)/.exec(content);
+        if (!m) return null;
+        const wsFiles2 = await (await import("node:fs/promises")).readdir(wsDir);
+        return wsFiles2.includes(m[1]!) ? { name: m[1]! } : null;
+      } catch {
+        return null;
+      }
+    });
+    if (!pasteLanded) return fail("pasted image reference/file not landed on disk");
+    const diskA2 = await readFile(aPath, "utf8");
+    if (!diskA2.includes(`![](${pasteLanded.name})`)) return fail("image reference missing in note");
+
     // 3) 外部新增 .md → 树即时出现;点击打开编辑保存
     const externalName = `外部新增-${Date.now()}.md`;
     const externalAbs = join(wsDir, externalName);
@@ -548,6 +587,50 @@ function registerIpc(): void {
 
   ipcMain.on(IPC.stateSet, (_e, key: keyof AppStateV1, value: unknown) => {
     setState(key, value as never);
+  });
+
+  // ── 图片落盘通道(05) ──
+  ipcMain.handle(IPC.imageSaveBytes, async (_e, params: { dirAbs: string; noteStem: string; mime: string; bytes: Uint8Array }): Promise<Result<{ fileName: string }>> => {
+    try {
+      const fileName = await saveImageBytes({
+        dirAbs: params.dirAbs,
+        noteStem: params.noteStem,
+        bytes: new Uint8Array(params.bytes),
+        ext: extForImageMime(params.mime),
+      });
+      return { ok: true, value: { fileName } };
+    } catch (err) {
+      return { ok: false, error: toError(err) };
+    }
+  });
+
+  ipcMain.handle(IPC.imageSaveCopy, async (_e, params: { dirAbs: string; noteStem: string; sourcePath: string }): Promise<Result<{ fileName: string }>> => {
+    try {
+      const fileName = await saveImageCopy({
+        dirAbs: params.dirAbs,
+        noteStem: params.noteStem,
+        sourcePath: params.sourcePath,
+      });
+      return { ok: true, value: { fileName } };
+    } catch (err) {
+      return { ok: false, error: toError(err) };
+    }
+  });
+
+  ipcMain.handle(IPC.imagePickDialog, async () => {
+    const win = menuTarget();
+    if (!win) return null;
+    const res = await dialog.showOpenDialog(win, {
+      title: "插入图片",
+      properties: ["openFile"],
+      filters: [
+        {
+          name: "图片",
+          extensions: ["png", "jpg", "jpeg", "gif", "webp", "bmp", "svg"],
+        },
+      ],
+    });
+    return res.canceled ? null : (res.filePaths[0] ?? null);
   });
 }
 

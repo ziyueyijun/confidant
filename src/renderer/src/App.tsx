@@ -7,6 +7,7 @@ import { basename } from "@shared/path";
 import type { TreeEntry } from "@shared/ipc";
 import { composeNoteText, parseNoteText } from "./editor/note-document";
 import { createSavePipeline, type SaveState } from "./editor/save-pipeline";
+import { landClipboardImage, landImageFile, looksLikeImageFile } from "./editor/image-insert";
 import { Cmd, createMenuBridge } from "./menu/menu-bridge";
 import { Sidebar } from "./components/Sidebar";
 import { countMdInTree, dirAncestorsOf, relPathOf, wsJoin, type Workspace } from "./workspace/workspace";
@@ -86,7 +87,7 @@ export default function App() {
     };
   }, []);
 
-  // ── 引擎 + IME 门控(02) ──
+  // ── 引擎 + IME 门控(02) + 图片粘贴/拖入落盘(05) ──
   useEffect(() => {
     const host = hostRef.current;
     if (!host) return;
@@ -98,14 +99,71 @@ export default function App() {
       onSelectionChange: refreshMenuContext,
     });
     engineRef.current = engine;
+
+    // 粘贴:剪贴板位图(截图)→ 落盘(位图优先;文件路径分支归 17)
+    const onPaste = (e: ClipboardEvent) => {
+      const doc = docRef.current;
+      const current = engineRef.current;
+      if (!doc || !current) return;
+      const items = e.clipboardData?.items ?? [];
+      const imageItem = [...items].find((it) => it.kind === "file" && it.type.startsWith("image/"));
+      if (!imageItem) return;
+      e.preventDefault();
+      const file = imageItem.getAsFile();
+      if (!file) return;
+      void (async () => {
+        try {
+          const landed = await landClipboardImage({
+            notePath: doc.path,
+            mime: file.type || "image/png",
+            bytes: new Uint8Array(await file.arrayBuffer()),
+          });
+          if (landed) current.insertImage(landed.fileName, "");
+        } catch (err) {
+          console.error("[image] paste insert failed:", err);
+        }
+      })();
+    };
+
+    // 拖入:图片文件(资源管理器)→ 复制落盘(沿用源扩展名)→ 按落点插入
+    const onDrop = (e: DragEvent) => {
+      const doc = docRef.current;
+      const current = engineRef.current;
+      if (!doc || !current) return;
+      const files = [...(e.dataTransfer?.files ?? [])];
+      const imageFile = files.find(looksLikeImageFile);
+      if (!imageFile) return;
+      e.preventDefault();
+      const sourcePath = window.confidant.pathForFile(imageFile);
+      if (!sourcePath) {
+        console.error("[image] drop: cannot resolve file path");
+        return;
+      }
+      void (async () => {
+        try {
+          const landed = await landImageFile({ notePath: doc.path, sourcePath });
+          if (landed) current.insertImageAtCoords(e.clientX, e.clientY, landed.fileName, "");
+        } catch (err) {
+          console.error("[image] drop insert failed:", err);
+        }
+      })();
+    };
+
     const start = () => pipelineRef.current?.setComposing(true);
     const end = () => pipelineRef.current?.setComposing(false);
+    const allowDrop = (e: DragEvent) => e.preventDefault(); // 允许落点坐标
+    host.addEventListener("paste", onPaste);
+    host.addEventListener("drop", onDrop);
+    host.addEventListener("dragover", allowDrop);
     host.addEventListener("compositionstart", start);
     host.addEventListener("compositionend", end);
     host.addEventListener("compositioncancel", end);
     return () => {
       engine.destroy();
       engineRef.current = null;
+      host.removeEventListener("paste", onPaste);
+      host.removeEventListener("drop", onDrop);
+      host.removeEventListener("dragover", allowDrop);
       host.removeEventListener("compositionstart", start);
       host.removeEventListener("compositionend", end);
       host.removeEventListener("compositioncancel", end);
@@ -133,6 +191,7 @@ export default function App() {
     menu.register(Cmd.undo, (ctx) => ctx.docOpen && ctx.canUndo, () => engineRef.current?.undo());
     menu.register(Cmd.redo, (ctx) => ctx.docOpen && ctx.canRedo, () => engineRef.current?.redo());
     menu.register(Cmd.toggleSidebar, () => !!workspaceRef.current, toggleSidebar);
+    menu.register(Cmd.insertImage, (ctx) => ctx.docOpen, () => void insertImageViaDialog());
     menu.register(Cmd.about, () => true, () => void window.confidant.showAbout());
     menu.register(Cmd.quit, () => true, () => window.confidant.closeWindow());
     menu.init();
@@ -273,6 +332,17 @@ export default function App() {
     },
     [openPath],
   );
+
+  // 「插入图片…」:选文件 → 复制落盘到笔记同目录 → 光标处插入相对引用
+  const insertImageViaDialog = useCallback(async () => {
+    const doc = docRef.current;
+    const engine = engineRef.current;
+    if (!doc || !engine) return;
+    const sourcePath = await window.confidant.pickImageFile();
+    if (!sourcePath) return;
+    const landed = await landImageFile({ notePath: doc.path, sourcePath });
+    if (landed) engine.insertImage(landed.fileName, "");
+  }, []);
 
   // 当前文件自动展开定位(父目录折叠时自动展开,写回记忆)
   useEffect(() => {

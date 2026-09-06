@@ -40,6 +40,12 @@ export const IPC = {
   stateGet: "state:get",
   /** 写入持久状态片段(主进程防抖落盘)。 */
   stateSet: "state:set",
+  /** 位图字节落盘(剪贴板粘贴通道;落盘规则见 packages/files image-save)。 */
+  imageSaveBytes: "image:save-bytes",
+  /** 图片文件复制落盘(拖入/菜单选取通道)。 */
+  imageSaveCopy: "image:save-copy",
+  /** 原生「选择图片文件」对话框(插入图片通道)。 */
+  imagePickDialog: "dialog:pick-image",
 } as const;
 
 export interface ErrorInfo {
@@ -104,6 +110,23 @@ export interface ConfidantApi {
   stateGet(key: string): Promise<unknown>;
   /** 写入持久状态片段(主进程防抖落盘)。 */
   stateSet(key: string, value: unknown): void;
+  /** 位图字节落盘到笔记同目录(命名防撞见落盘规则);返回文件名(相对引用用)。 */
+  saveClipboardImage(params: {
+    dirAbs: string;
+    noteStem: string;
+    mime: string;
+    bytes: Uint8Array;
+  }): Promise<Result<{ fileName: string }>>;
+  /** 把源图片文件复制落盘到笔记同目录(沿用源扩展名);返回文件名。 */
+  copyImageFromPath(params: {
+    dirAbs: string;
+    noteStem: string;
+    sourcePath: string;
+  }): Promise<Result<{ fileName: string }>>;
+  /** 原生选择图片文件(「插入图片」);取消返回 null。 */
+  pickImageFile(): Promise<string | null>;
+  /** 渲染层 File → 磁盘路径(拖入文件必需;webUtils)。非文件返回空串。 */
+  pathForFile(file: File): string;
 }
 
 declare global {

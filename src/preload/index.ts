@@ -1,6 +1,6 @@
 // 预载:contextBridge 暴露类型化桥面(与 shared/ipc.ts 的 ConfidantApi 契约一致)。
 
-import { contextBridge, ipcRenderer } from "electron";
+import { contextBridge, ipcRenderer, webUtils } from "electron";
 import {
   IPC,
   type ConfidantApi,
@@ -93,6 +93,29 @@ const api: ConfidantApi = {
 
   stateSet: (key: string, value: unknown) => {
     ipcRenderer.send(IPC.stateSet, key, value);
+  },
+
+  saveClipboardImage: (params: {
+    dirAbs: string;
+    noteStem: string;
+    mime: string;
+    bytes: Uint8Array;
+  }) =>
+    ipcRenderer.invoke(IPC.imageSaveBytes, params) as Promise<
+      Result<{ fileName: string }>
+    >,
+
+  copyImageFromPath: (params: { dirAbs: string; noteStem: string; sourcePath: string }) =>
+    ipcRenderer.invoke(IPC.imageSaveCopy, params) as Promise<Result<{ fileName: string }>>,
+
+  pickImageFile: () => ipcRenderer.invoke(IPC.imagePickDialog) as Promise<string | null>,
+
+  pathForFile: (file: File) => {
+    try {
+      return webUtils.getPathForFile(file);
+    } catch {
+      return "";
+    }
   },
 };
 

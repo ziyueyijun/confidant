@@ -50,6 +50,8 @@ export const Cmd = {
   strike: "strike",
   link: "link",
   clearFormat: "clear-format",
+  /** 「插入图片…」(05 落盘通道的菜单入口;选文件后复制落盘同目录)。 */
+  insertImage: "insert-image",
   // 视图
   toggleSidebar: "toggle-sidebar",
   workspaceSearch: "workspace-search",
@@ -136,6 +138,8 @@ export function buildMenuTemplate(): MenuItemTemplate[] {
         disabledItem(Cmd.strike, "删除线"),
         disabledItem(Cmd.link, "链接"),
         disabledItem(Cmd.clearFormat, "清除格式"),
+        sep(),
+        disabledItem(Cmd.insertImage, "插入图片…"),
       ],
     },
     {

@@ -67,6 +67,10 @@ export interface Engine {
   undo(): void;
   /** 执行重做。 */
   redo(): void;
+  /** 在光标处插入图片节点(引用相对路径;自动保存由上层管线触发)。 */
+  insertImage(src: string, alt?: string): boolean;
+  /** 在页面坐标处插入图片(drop 落点;失败回退光标处)。 */
+  insertImageAtCoords(clientX: number, clientY: number, src: string, alt?: string): boolean;
   /** 释放资源,host 内容清空。 */
   destroy(): void;
 }
@@ -127,6 +131,28 @@ export function createEngine(host: HTMLElement, callbacks: EngineCallbacks = {})
 
     redo() {
       editor?.commands.redo();
+    },
+
+    insertImage(src, alt = "") {
+      if (!editor) return false;
+      return editor
+        .chain()
+        .focus()
+        .insertContent({ type: "image", attrs: { src, alt } })
+        .run();
+    },
+
+    insertImageAtCoords(clientX, clientY, src, alt = "") {
+      if (!editor) return false;
+      const coords = editor.view.posAtCoords({ left: clientX, top: clientY });
+      if (coords) {
+        return editor
+          .chain()
+          .focus()
+          .insertContentAt(coords.pos, { type: "image", attrs: { src, alt } })
+          .run();
+      }
+      return this.insertImage(src, alt);
     },
 
     destroy() {

@@ -87,6 +87,21 @@ describe("markdown 往返(语义级)", () => {
     expect(out).toContain("段落。");
   });
 
+  it("insertImage:光标处插入图片节点,序列化出相对引用(05 落盘后写引用路径)", () => {
+    const host = document.createElement("div");
+    const engine = createEngine(host);
+    engine.loadMarkdown("开头段落\n");
+    engine.focus();
+    const ok = engine.insertImage("周报-123.png", "截图");
+    expect(ok).toBe(true);
+    const out = engine.getMarkdown();
+    expect(out).toContain("![截图](周报-123.png)");
+    // 往返不丢
+    engine.loadMarkdown(out);
+    expect(engine.getMarkdown()).toContain("![截图](周报-123.png)");
+    engine.destroy();
+  });
+
   it("序列化幂等(规范化收敛后二次往返不变)", () => {
     const input = ["# 标题", "", "", "段落。", "", "- a", "- b", "", ""].join("\n");
     const once = roundTrip(input);
