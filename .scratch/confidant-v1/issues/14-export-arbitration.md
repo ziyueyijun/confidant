@@ -1,7 +1,7 @@
 # 导出格式与管线裁决
 
 Type: grilling
-Status: open
+Status: claimed
 
 ## Question
 
