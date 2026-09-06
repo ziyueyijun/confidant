@@ -8,6 +8,7 @@ import {
   type MenuItemTemplate,
   type Result,
 } from "@shared/ipc";
+import type { TreeEntry } from "../../packages/files";
 
 const api: ConfidantApi = {
   openNoteDialog: () => ipcRenderer.invoke(IPC.openNoteDialog) as Promise<string | null>,
@@ -22,6 +23,14 @@ const api: ConfidantApi = {
     ipcRenderer.on(IPC.openFileRequest, listener);
     return () => {
       ipcRenderer.removeListener(IPC.openFileRequest, listener);
+    };
+  },
+
+  onOpenWorkspace: (cb: (path: string) => void) => {
+    const listener = (_e: unknown, path: string) => cb(path);
+    ipcRenderer.on(IPC.openWorkspaceRequest, listener);
+    return () => {
+      ipcRenderer.removeListener(IPC.openWorkspaceRequest, listener);
     };
   },
 
@@ -57,6 +66,33 @@ const api: ConfidantApi = {
 
   closeWindow: () => {
     ipcRenderer.send(IPC.closeWindow);
+  },
+
+  pickFolderDialog: () => ipcRenderer.invoke(IPC.pickFolderDialog) as Promise<string | null>,
+
+  openWorkspace: (path: string) =>
+    ipcRenderer.invoke(IPC.workspaceOpen, path) as Promise<Result<TreeEntry[]>>,
+
+  closeWorkspace: () => {
+    void ipcRenderer.invoke(IPC.workspaceClose);
+  },
+
+  onWorkspaceTree: (cb: (tree: TreeEntry[]) => void) => {
+    const listener = (_e: unknown, tree: TreeEntry[]) => cb(tree);
+    ipcRenderer.on(IPC.workspaceTreeUpdated, listener);
+    return () => {
+      ipcRenderer.removeListener(IPC.workspaceTreeUpdated, listener);
+    };
+  },
+
+  noteOpened: (path: string) => {
+    ipcRenderer.send(IPC.fileOpened, path);
+  },
+
+  stateGet: (key: string) => ipcRenderer.invoke(IPC.stateGet, key) as Promise<unknown>,
+
+  stateSet: (key: string, value: unknown) => {
+    ipcRenderer.send(IPC.stateSet, key, value);
   },
 };
 

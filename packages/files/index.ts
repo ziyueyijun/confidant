@@ -5,3 +5,6 @@
 export { readTextFile } from "./lib/read-write";
 export { writeTextFileAtomic } from "./lib/atomic-write";
 export type { FsAdapter } from "./lib/atomic-write";
+
+export { scanWorkspaceTree, compareTreeEntries, isHiddenName, countMarkdown, collectMarkdownPaths } from "./lib/tree";
+export type { TreeEntry, TreeEntryKind } from "./lib/tree";

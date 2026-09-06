@@ -1,13 +1,15 @@
-// 应用视图层:欢迎占位页(01 过渡态)→ 打开笔记 → 所见即所得编辑。
-// 保存语义全部经 save-pipeline(02):停顿 ~1s 自动写盘、Ctrl+S/按钮立即、
-// IME 组合期不写、关闭窗口前 flush(主进程拦截 → 本页应答)。
+// 应用视图层(04 形态):欢迎页 → 工作区(文件树侧栏 + 所见即所得编辑)。
+// 保存语义经 save-pipeline(02);命令源与 native 菜单经 menu-bridge(03)。
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createEngine, type Engine } from "../../../packages/engine";
 import { basename } from "@shared/path";
+import type { TreeEntry } from "@shared/ipc";
 import { composeNoteText, parseNoteText } from "./editor/note-document";
 import { createSavePipeline, type SaveState } from "./editor/save-pipeline";
 import { Cmd, createMenuBridge } from "./menu/menu-bridge";
+import { Sidebar } from "./components/Sidebar";
+import { countMdInTree, dirAncestorsOf, relPathOf, wsJoin, type Workspace } from "./workspace/workspace";
 
 interface OpenNote {
   path: string;
@@ -40,17 +42,27 @@ const EMPTY_SAVE_STATE: SaveState = {
   error: null,
 };
 
+const EMPTY_WORKSPACE_GUIDANCE =
+  "这个文件夹还没有笔记:右键左侧空白处可以新建,也可以把 .md 文件放进这个文件夹。";
+
 export default function App() {
   const hostRef = useRef<HTMLDivElement>(null);
   const engineRef = useRef<Engine | null>(null);
   const docRef = useRef<OpenNote | null>(null);
   const pipelineRef = useRef<ReturnType<typeof createSavePipeline> | null>(null);
+  const workspaceRef = useRef<Workspace | null>(null);
+  const menuRef = useRef<ReturnType<typeof createMenuBridge> | null>(null);
 
   const [doc, setDoc] = useState<OpenNote | null>(null);
   const [saveState, setSaveState] = useState<SaveState>(EMPTY_SAVE_STATE);
   const [loadError, setLoadError] = useState<string | null>(null);
 
-  // 保存管线:io = 把「head + 引擎正文」原子写回当前文件
+  const [workspace, setWorkspace] = useState<Workspace | null>(null);
+  const [tree, setTree] = useState<TreeEntry[] | null>(null);
+  const [expanded, setExpanded] = useState<ReadonlySet<string>>(new Set());
+  const [sidebar, setSidebar] = useState({ visible: true, width: 260 });
+
+  // ── 保存管线(02) ──
   useEffect(() => {
     const pipeline = createSavePipeline(
       {
@@ -74,7 +86,7 @@ export default function App() {
     };
   }, []);
 
-  // 引擎生命周期 + IME 组合门控(DOM 组合事件经 host 冒泡,规格 §9.1)
+  // ── 引擎 + IME 门控(02) ──
   useEffect(() => {
     const host = hostRef.current;
     if (!host) return;
@@ -101,8 +113,6 @@ export default function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // 菜单桥(03):整表下发 + 命令接线 + 上下文启用态刷新
-  const menuRef = useRef<ReturnType<typeof createMenuBridge> | null>(null);
   const refreshMenuContext = useCallback(() => {
     const menu = menuRef.current;
     const engine = engineRef.current;
@@ -114,24 +124,23 @@ export default function App() {
     });
   }, []);
 
+  // ── 菜单桥(03) ──
   useEffect(() => {
     const menu = createMenuBridge();
     menuRef.current = menu;
-    menu.register(Cmd.openFolder, () => true, () => void openNote());
+    menu.register(Cmd.openFolder, () => true, () => void openFolderViaDialog());
     menu.register(Cmd.save, (ctx) => ctx.docOpen, () => void pipelineRef.current?.flush());
     menu.register(Cmd.undo, (ctx) => ctx.docOpen && ctx.canUndo, () => engineRef.current?.undo());
     menu.register(Cmd.redo, (ctx) => ctx.docOpen && ctx.canRedo, () => engineRef.current?.redo());
+    menu.register(Cmd.toggleSidebar, () => !!workspaceRef.current, toggleSidebar);
     menu.register(Cmd.about, () => true, () => void window.confidant.showAbout());
     menu.register(Cmd.quit, () => true, () => window.confidant.closeWindow());
     menu.init();
     refreshMenuContext();
-    return () => {
-      menuRef.current = null;
-    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // 主进程关闭前 flush:先落盘再回执,保证无「未保存内容」态
+  // ── 主进程回调订阅 ──
   useEffect(() => {
     return window.confidant.onFlushRequest(() => {
       const p = pipelineRef.current;
@@ -140,8 +149,106 @@ export default function App() {
     });
   }, []);
 
-  // 打开指定路径
+  useEffect(() => {
+    return window.confidant.onWorkspaceTree((next) => setTree(next));
+  }, []);
+
+  useEffect(() => {
+    return window.confidant.onOpenFile((path) => void openPath(path));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
+    return window.confidant.onOpenWorkspace((path) => void openWorkspace(path));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // ── 持久化布局状态启动载入 ──
+  useEffect(() => {
+    void (async () => {
+      const stored = (await window.confidant.stateGet("sidebar")) as {
+        visible?: boolean;
+        width?: number;
+      } | null;
+      if (stored && typeof stored === "object") {
+        setSidebar((prev) => ({
+          visible: typeof stored.visible === "boolean" ? stored.visible : prev.visible,
+          width: typeof stored.width === "number" ? stored.width : prev.width,
+        }));
+      }
+    })();
+  }, []);
+
+  // 树展开记忆:按工作区载入;切换工作区时恢复对应展开集合
+  useEffect(() => {
+    if (!workspace) return;
+    void (async () => {
+      const map = (await window.confidant.stateGet("expanded")) as
+        | Record<string, string[]>
+        | null;
+      const rels = map?.[workspace.root] ?? [];
+      setExpanded(new Set(rels));
+    })();
+  }, [workspace]);
+
+  const persistExpanded = useCallback(
+    (rels: string[]) => {
+      const ws = workspaceRef.current;
+      if (!ws) return;
+      void (async () => {
+        const map = ((await window.confidant.stateGet("expanded")) as Record<string, string[]> | null) ?? {};
+        map[ws.root] = rels;
+        window.confidant.stateSet("expanded", map);
+      })();
+    },
+    [],
+  );
+
+  // ── 工作区 ──
+  const openFolderViaDialog = useCallback(async () => {
+    const path = await window.confidant.pickFolderDialog();
+    if (path) await openWorkspace(path);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const openWorkspace = useCallback(async (root: string) => {
+    // 切换前先把当前编辑内容落盘(02 语义)
+    if (docRef.current) await pipelineRef.current?.flush();
+    const res = await window.confidant.openWorkspace(root);
+    if (!res.ok) {
+      setLoadError(`无法打开文件夹:${res.error.message}`);
+      return;
+    }
+    const ws: Workspace = {
+      root,
+      name: root.replace(/[\\/]+$/, "").split(/[\\/]/).pop() ?? root,
+    };
+    workspaceRef.current = ws;
+    setWorkspace(ws);
+    setTree(res.value);
+    // 工作区切换:关闭旧文档编辑态(内容已 flush 落盘)
+    docRef.current = null;
+    setDoc(null);
+    pipelineRef.current?.resetClean();
+    setLoadError(null);
+    document.title = `${ws.name} · confidant`;
+  }, []);
+
+  const closeWorkspace = useCallback(() => {
+    docRef.current = null;
+    setDoc(null);
+    pipelineRef.current?.resetClean();
+    workspaceRef.current = null;
+    setWorkspace(null);
+    setTree(null);
+    void window.confidant.closeWorkspace();
+    document.title = "confidant · 知己笔记";
+  }, []);
+
+  // ── 打开/切换文档(先 flush 旧文档 → 装载新文档) ──
   const openPath = useCallback(async (path: string) => {
+    if (docRef.current && docRef.current.path.toLowerCase() === path.toLowerCase()) return;
+    if (docRef.current) await pipelineRef.current?.flush();
     const res = await window.confidant.readTextFile(path);
     if (!res.ok) {
       setLoadError(res.error.code === "ENOENT" ? "文件不存在或已被移动。" : `打开失败:${res.error.message}`);
@@ -155,22 +262,73 @@ export default function App() {
     engineRef.current?.loadMarkdown(docModel.bodyMd);
     pipelineRef.current?.resetClean();
     document.title = `${next.name} · confidant`;
+    window.confidant.noteOpened(path);
   }, []);
 
-  // 欢迎页「打开文件夹」→ 原生对话框选 .md(04 立起文件树后替换此过渡入口)
-  const openNote = useCallback(async () => {
-    const path = await window.confidant.openNoteDialog();
-    if (path) await openPath(path);
-  }, [openPath]);
+  const openRel = useCallback(
+    (rel: string) => {
+      const ws = workspaceRef.current;
+      if (!ws) return;
+      void openPath(wsJoin(ws.root, rel));
+    },
+    [openPath],
+  );
 
-  // Ctrl+S 由 native 菜单 accelerator 承载(03 起;菜单项启用时按键被菜单消费,
-  // 渲染层不再自接键位——单一命令源)
-  // 主进程请求打开文件(冒烟驱动/菜单打开)
+  // 当前文件自动展开定位(父目录折叠时自动展开,写回记忆)
   useEffect(() => {
-    return window.confidant.onOpenFile((path) => void openPath(path));
-  }, [openPath]);
+    const ws = workspace;
+    if (!ws || !doc) return;
+    const rel = relPathOf(ws.root, doc.path);
+    if (!rel) return;
+    const dirParts = rel.split("/");
+    if (dirParts.length <= 1) return;
+    const dirRel = dirParts.slice(0, -1).join("/");
+    const needed = dirAncestorsOf(dirRel);
+    setExpanded((prev) => {
+      const missing = needed.filter((p) => !prev.has(p));
+      if (missing.length === 0) return prev;
+      const nextSet = new Set(prev);
+      for (const p of missing) nextSet.add(p);
+      return nextSet;
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [workspace, doc]);
+
+  // 展开集合变更 → 持久化(去抖由 stateSet 主进程侧兜底;此处直接整体写)
+  const toggleDir = useCallback(
+    (relPath: string) => {
+      setExpanded((prev) => {
+        const next = new Set(prev);
+        if (next.has(relPath)) next.delete(relPath);
+        else next.add(relPath);
+        persistExpanded([...next]);
+        return next;
+      });
+    },
+    [persistExpanded],
+  );
+
+  const toggleSidebar = useCallback(() => {
+    setSidebar((prev) => {
+      const next = { ...prev, visible: !prev.visible };
+      window.confidant.stateSet("sidebar", next);
+      return next;
+    });
+  }, []);
+
+  const commitSidebar = useCallback((s: { visible: boolean; width: number }) => {
+    window.confidant.stateSet("sidebar", s);
+  }, []);
+
+  // 空态/计数
+  const mdCount = useMemo(() => (tree ? countMdInTree(tree) : 0), [tree]);
 
   const engineHost = <div ref={hostRef} className="editor-prose" data-testid="editor-prose" />;
+
+  const activeRel = useMemo(
+    () => (workspace && doc ? relPathOf(workspace.root, doc.path) : null),
+    [workspace, doc],
+  );
 
   const errorText = saveState.error ? describeWriteError(saveState.error) : loadError;
   const statusText = saveState.saving
@@ -181,26 +339,60 @@ export default function App() {
         ? `已保存 ${new Date(saveState.savedAt).toLocaleTimeString("zh-CN", { hour12: false })}`
         : saveState.dirty
           ? "有未保存的修改"
-          : "已打开";
+          : doc
+            ? "已打开"
+            : workspace
+              ? ""
+              : "";
+
+  const showEditorArea = !!doc;
+  const guidanceVisible = !!workspace && !doc && mdCount === 0;
 
   return (
     <div style={{ height: "100%", position: "relative", display: "flex", flexDirection: "column" }}>
-      {doc && (
-        <header
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: 12,
-            padding: "6px 14px",
-            borderBottom: "1px solid #e3e3e3",
-            background: "#fafafa",
-            fontSize: 13,
-            flexShrink: 0,
-          }}
-        >
-          <strong style={{ fontSize: 14 }}>{doc.name}</strong>
-          <span style={{ color: errorText ? "#c0392b" : "#888" }}>{statusText}</span>
-          <span style={{ flex: 1 }} />
+      <header
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: 10,
+          padding: "4px 12px",
+          borderBottom: "1px solid var(--shell-border, #e3e3e3)",
+          background: "var(--shell-bg, #fafafa)",
+          fontSize: 13,
+          flexShrink: 0,
+        }}
+      >
+        {workspace && (
+          <button
+            type="button"
+            data-testid="sidebar-toggle"
+            title={sidebar.visible ? "收起侧栏" : "显示侧栏"}
+            onClick={toggleSidebar}
+            style={{
+              border: "none",
+              background: "transparent",
+              cursor: "pointer",
+              fontSize: 14,
+              padding: "2px 6px",
+              color: "inherit",
+            }}
+          >
+            {sidebar.visible ? "◀" : "▶"}
+          </button>
+        )}
+        {doc && <strong style={{ fontSize: 14 }}>{doc.name}</strong>}
+        {!doc && workspace && (
+          <strong style={{ fontSize: 14, fontWeight: 500, color: "#888" }}>{workspace.name}</strong>
+        )}
+        {!workspace && <strong style={{ fontSize: 14 }}>知己笔记</strong>}
+        {doc && <span style={{ color: errorText ? "#c0392b" : "#888" }}>{statusText}</span>}
+        {errorText && (
+          <span data-testid="load-error" style={{ color: "#c0392b" }}>
+            {errorText}
+          </span>
+        )}
+        <span style={{ flex: 1 }} />
+        {doc && (
           <button
             type="button"
             onClick={() => void pipelineRef.current?.flush()}
@@ -208,56 +400,118 @@ export default function App() {
           >
             保存
           </button>
-        </header>
-      )}
-      {doc?.head && (
-        <div className="fm-block" data-testid="fm-block">
-          <pre>{doc.head.replace(/\n$/, "")}</pre>
-        </div>
-      )}
-      {/* 编辑区常驻(引擎在挂载即建,host 必须首帧在场);欢迎态用浮层盖住 */}
-      <div
-        className="editor-scroll"
-        style={{ display: doc ? undefined : "none" }}
-        data-testid="editor-scroll"
-      >
-        {engineHost}
-      </div>
-      {!doc && (
+        )}
+      </header>
+      <div style={{ display: "flex", flex: 1, minHeight: 0 }}>
+        {workspace && sidebar.visible && (
+          <Sidebar
+            workspaceName={workspace.name}
+            tree={tree}
+            expanded={expanded}
+            activeRel={activeRel}
+            width={sidebar.width}
+            onToggleDir={toggleDir}
+            onOpenFile={openRel}
+            onWidthChange={(width) => setSidebar((p) => ({ ...p, width }))}
+            onWidthDragEnd={() => commitSidebar(sidebar)}
+          />
+        )}
         <div
           style={{
-            position: "absolute",
-            inset: 0,
+            flex: 1,
+            minWidth: 0,
             display: "flex",
             flexDirection: "column",
-            alignItems: "center",
-            justifyContent: "center",
-            gap: 12,
-            background: "var(--color-background, #fff)",
+            position: "relative",
           }}
         >
-          <h1 style={{ margin: 0, fontSize: 28, fontWeight: 600 }}>知己笔记</h1>
-          <p style={{ margin: 0, color: "#777" }}>
-            confidant · 像写字板一样,直接写在你的文件夹里
-          </p>
-          {loadError && <p style={{ color: "#c0392b" }}>{loadError}</p>}
-          <button
-            type="button"
-            onClick={() => void openNote()}
-            style={{
-              marginTop: 8,
-              padding: "10px 22px",
-              fontSize: 15,
-              borderRadius: 6,
-              border: "1px solid #b8b8b8",
-              cursor: "pointer",
-              background: "#f5f5f5",
-            }}
+          {doc?.head && (
+            <div className="fm-block" data-testid="fm-block">
+              <pre>{doc.head.replace(/\n$/, "")}</pre>
+            </div>
+          )}
+          <div
+            className="editor-scroll"
+            style={{ display: showEditorArea ? undefined : "none" }}
+            data-testid="editor-scroll"
           >
-            打开文件夹
-          </button>
+            {engineHost}
+          </div>
+          {!workspace && (
+            <div
+              style={{
+                position: "absolute",
+                inset: 0,
+                display: "flex",
+                flexDirection: "column",
+                alignItems: "center",
+                justifyContent: "center",
+                gap: 12,
+                background: "var(--color-background, #fff)",
+              }}
+            >
+              <h1 style={{ margin: 0, fontSize: 28, fontWeight: 600 }}>知己笔记</h1>
+              <p style={{ margin: 0, color: "#777" }}>
+                confidant · 像写字板一样,直接写在你的文件夹里
+              </p>
+              <button
+                type="button"
+                onClick={() => void openFolderViaDialog()}
+                style={{
+                  marginTop: 8,
+                  padding: "10px 22px",
+                  fontSize: 15,
+                  borderRadius: 6,
+                  border: "1px solid #b8b8b8",
+                  cursor: "pointer",
+                  background: "#f5f5f5",
+                }}
+              >
+                打开文件夹
+              </button>
+            </div>
+          )}
+          {guidanceVisible && (
+            <div
+              data-testid="empty-workspace-guidance"
+              style={{
+                position: "absolute",
+                inset: 0,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                padding: 24,
+              }}
+            >
+              <p
+                style={{
+                  maxWidth: 420,
+                  textAlign: "center",
+                  lineHeight: 1.8,
+                  color: "#999",
+                  fontSize: 14,
+                }}
+              >
+                {EMPTY_WORKSPACE_GUIDANCE}
+              </p>
+            </div>
+          )}
+          {!doc && workspace && mdCount > 0 && (
+            <div
+              style={{
+                position: "absolute",
+                inset: 0,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                pointerEvents: "none",
+              }}
+            >
+              <p style={{ color: "#bbb", fontSize: 14 }}>从左侧选择一个笔记开始书写</p>
+            </div>
+          )}
         </div>
-      )}
+      </div>
     </div>
   );
 }

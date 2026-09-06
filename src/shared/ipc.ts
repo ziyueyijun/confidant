@@ -1,12 +1,17 @@
 // IPC 协议(主 ↔ 预载 ↔ 渲染 三侧共用;通道一律 invoke/handle 单向调用)。
 // 结果类型统一走 ok/error 判别式,跨上下文不丢错误信息。
 
+import type { TreeEntry } from "../../packages/files";
+export type { TreeEntry } from "../../packages/files";
+
 export const IPC = {
   openNoteDialog: "dialog:open-note",
   readTextFile: "files:read-text",
   writeTextFile: "files:write-text",
   /** 主进程请求渲染层打开指定文件(冒烟驱动 / 外部唤入共用通道)。 */
   openFileRequest: "app:open-file-request",
+  /** 主进程请求渲染层打开指定工作区(冒烟驱动共用通道)。 */
+  openWorkspaceRequest: "app:open-workspace-request",
   /** 主进程请求渲染层 flush 未落盘内容(窗口关闭前,02 票)。 */
   flushRequest: "app:flush-request",
   /** 渲染层 flush 完成回执。 */
@@ -21,6 +26,20 @@ export const IPC = {
   aboutDialog: "dialog:about",
   /** 关闭窗口(退出命令;走与点 X 相同的 flush 路径)。 */
   closeWindow: "window:close",
+  /** 原生「打开文件夹(工作区)」对话框。 */
+  pickFolderDialog: "dialog:pick-folder",
+  /** 打开工作区:主进程起监听并返回初始整树。 */
+  workspaceOpen: "workspace:open",
+  /** 关闭当前工作区监听。 */
+  workspaceClose: "workspace:close",
+  /** 主进程 → 渲染层:工作区树已更新(外部变更重扫后推送)。 */
+  workspaceTreeUpdated: "workspace:tree-updated",
+  /** 渲染层 → 主进程:某文件已作为当前文档打开(会话恢复数据)。 */
+  fileOpened: "file:opened",
+  /** 读取持久状态片段。 */
+  stateGet: "state:get",
+  /** 写入持久状态片段(主进程防抖落盘)。 */
+  stateSet: "state:set",
 } as const;
 
 export interface ErrorInfo {
@@ -49,7 +68,7 @@ export interface MenuItemState {
 
 /** 渲染进程可见的桥面(经 preload 注入 window.confidant)。随工单渐进扩展。 */
 export interface ConfidantApi {
-  /** 原生对话框选一个 .md 笔记(01 过渡入口;04 立起树后由工作区打开替换)。取消返回 null。 */
+  /** 原生「选择 .md 笔记」对话框(01 过渡入口遗留,04 后被工作区形态替换)。取消返回 null。 */
   openNoteDialog(): Promise<string | null>;
   readTextFile(path: string): Promise<Result<string>>;
   writeTextFile(path: string, content: string): Promise<Result<void>>;
@@ -65,10 +84,26 @@ export interface ConfidantApi {
   closeWindow(): void;
   /** 订阅主进程的「打开文件」请求(冒烟驱动与菜单打开共用)。返回退订函数。 */
   onOpenFile(cb: (path: string) => void): () => void;
+  /** 订阅主进程的「打开工作区」请求(冒烟驱动共用)。返回退订函数。 */
+  onOpenWorkspace(cb: (path: string) => void): () => void;
   /** 订阅主进程的「关闭前 flush」请求;处理完后必须调 flushAck。 */
   onFlushRequest(cb: () => void): () => void;
   /** 通知主进程 flush 已完成。 */
   flushAck(): void;
+  /** 原生「选择文件夹(工作区)」对话框。取消返回 null。 */
+  pickFolderDialog(): Promise<string | null>;
+  /** 打开工作区(主进程起监听、记录最近打开),返回初始整树。 */
+  openWorkspace(path: string): Promise<Result<TreeEntry[]>>;
+  /** 关闭当前工作区监听。 */
+  closeWorkspace(): void;
+  /** 订阅工作区树更新(外部变更重扫;整树替换)。返回退订函数。 */
+  onWorkspaceTree(cb: (tree: TreeEntry[]) => void): () => void;
+  /** 上报「某文件已成为当前文档」(主进程记录会话恢复数据)。 */
+  noteOpened(path: string): void;
+  /** 读取持久状态片段(不存在返回 null)。 */
+  stateGet(key: string): Promise<unknown>;
+  /** 写入持久状态片段(主进程防抖落盘)。 */
+  stateSet(key: string, value: unknown): void;
 }
 
 declare global {

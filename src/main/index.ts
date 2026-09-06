@@ -6,13 +6,33 @@ import { join } from "node:path";
 import { mkdirSync } from "node:fs";
 import { readFile } from "node:fs/promises";
 import { IPC, type ErrorInfo, type MenuItemState, type MenuItemTemplate, type Result } from "@shared/ipc";
-import { readTextFile, writeTextFileAtomic } from "../../packages/files";
+import { readTextFile, writeTextFileAtomic, type TreeEntry } from "../../packages/files";
 import { applyMenuTemplate, getMenuItem, updateMenuItems } from "./menu";
+import {
+  currentWorkspaceRoot,
+  startWorkspaceWatch,
+  stopWorkspaceWatch,
+} from "./workspace";
+import {
+  flushState,
+  getState,
+  pushRecentFolder,
+  setState,
+  updateLastSession,
+  type AppStateV1,
+} from "./state-store";
 
 const isDev = !!process.env["ELECTRON_RENDERER_URL"];
 const smoke = process.env["CONFIDANT_SMOKE"] === "1";
 const e2eFile = process.env["CONFIDANT_E2E_FILE"];
 const e2eFlushOnClose = process.env["CONFIDANT_E2E_FLUSHONCLOSE"] === "1";
+const e2eWs = process.env["CONFIDANT_E2E_WS"] ?? null;
+
+// 自检/冒烟一律使用隔离的 userData,不污染真实应用状态
+if (smoke || e2eFile || e2eWs) {
+  const base = process.env["TEMP"] ?? process.env["TMP"] ?? "C:/Windows/Temp";
+  app.setPath("userData", join(base, "confidant-e2e-state", `run-${process.pid}`));
+}
 
 function toError(err: unknown): ErrorInfo {
   const e = err as { code?: string; message?: string };
@@ -103,6 +123,14 @@ async function runSelfCheck(win: BrowserWindow, notePath: string | null): Promis
     failed = true;
     console.error(`[smoke] FAILED: ${reason}`);
     if (issues.length) console.error("[smoke] renderer issues:", issues);
+    try {
+      const errs = (await win.webContents.executeJavaScript(
+        "Array.isArray(window.__errs) ? window.__errs : []",
+      )) as string[];
+      if (errs.length) console.error("[smoke] page errors:", errs);
+    } catch {
+      // 页面不可用时不查
+    }
   };
 
   const js = <T>(code: string): Promise<T> => win.webContents.executeJavaScript(code) as Promise<T>;
@@ -210,6 +238,165 @@ async function runSelfCheck(win: BrowserWindow, notePath: string | null): Promis
   }
 }
 
+/** 工作区形态自检:打开空文件夹(空态引导)→ 打开真实工作区(树/点击/自动保存)→
+ *  外部新增即时上树 → 侧栏折叠/还原。 */
+async function runWorkspaceSelfCheck(win: BrowserWindow, wsDir: string, emptyDir: string | null): Promise<void> {
+  const issues: string[] = [];
+  win.webContents.on("console-message", (event) => {
+    const level = event.level;
+    if (typeof level === "number" ? level >= 2 : level === "error" || level === "warning") {
+      issues.push(`console[${String(level)}]: ${event.message}`);
+    }
+  });
+  let failed = false;
+  const fail = async (reason: string): Promise<void> => {
+    failed = true;
+    console.error(`[smoke] FAILED: ${reason}`);
+    if (issues.length) console.error("[smoke] renderer issues:", issues);
+    try {
+      const errs = (await win.webContents.executeJavaScript(
+        "Array.isArray(window.__errs) ? window.__errs : []",
+      )) as string[];
+      if (errs.length) console.error("[smoke] page errors:", errs);
+    } catch {
+      // 页面不可用时不查
+    }
+  };
+  const js = <T>(code: string): Promise<T> => win.webContents.executeJavaScript(code) as Promise<T>;
+
+  const poll = async <T>(probe: () => Promise<T | null>, timeoutMs = 6000): Promise<T | null> => {
+    const deadline = Date.now() + timeoutMs;
+    while (Date.now() < deadline) {
+      const v = await probe();
+      if (v !== null && v !== false) return v;
+      await delay(150);
+    }
+    return null;
+  };
+
+  const q = (selector: string): string =>
+    `document.querySelector(${JSON.stringify(selector)}) !== null`;
+  const bodyHas = (text: string): Promise<boolean> =>
+    js<boolean>(`document.body.innerText.includes(${JSON.stringify(text)})`);
+
+  await delay(1200);
+  try {
+    // 页面级错误收集(React 渲染异常不一定走 console-message)
+    await js<void>(`
+      window.__errs = [];
+      window.addEventListener("error", (e) => window.__errs.push("error: " + (e.error?.stack ?? e.message)));
+      window.addEventListener("unhandledrejection", (e) => window.__errs.push("rejection: " + String(e.reason?.stack ?? e.reason)));
+    `);
+
+    // 1) 空文件夹 → 空态引导文案
+    if (emptyDir) {
+      win.webContents.send(IPC.openWorkspaceRequest, emptyDir);
+      const guided = await poll(() => js<boolean>(q("[data-testid='empty-workspace-guidance']")));
+      if (!guided) {
+        const diag = await js<string>(
+          `JSON.stringify({
+            guidance: document.querySelector("[data-testid='empty-workspace-guidance']") !== null,
+            error: document.querySelector("[data-testid='load-error']")?.textContent ?? null,
+            body: document.body.innerText.slice(0, 300),
+          })`,
+        );
+        return fail(`empty-workspace guidance not shown; diag=${diag}`);
+      }
+      if (!(await bodyHas("这个文件夹还没有笔记"))) return fail("guidance copy missing");
+    }
+
+    // 2) 打开真实工作区:目录行出现;点文件夹展开出 b.md;点 a.md 进入编辑
+    win.webContents.send(IPC.openWorkspaceRequest, wsDir);
+    const dirRow = await poll(() => js<boolean>(q("[data-rel='笔记文件夹']")));
+    if (!dirRow) return fail("workspace tree folder row missing");
+    await js<void>(`document.querySelector("[data-rel='笔记文件夹']").click()`);
+    const subRow = await poll(() => js<boolean>(q("[data-rel='笔记文件夹/b.md']")));
+    if (!subRow) return fail("folder expand did not reveal b.md");
+
+    await js<void>(`document.querySelector("[data-rel='a.md']").click()`);
+    const editorLive = await poll(async () => {
+      // 所见即所得渲染:标题不带 # 标记,正文文字可辨
+      const t = await js<string>("document.body.innerText");
+      return t.includes("正文 a。") ? true : null;
+    });
+    if (!editorLive) return fail("a.md did not open in editor");
+
+    const mark1 = `工作区保存-${Date.now()}`;
+    const typed = await typeAtEnd(win, mark1);
+    if (!typed.ok) return fail(`typing failed: ${JSON.stringify(typed)}`);
+    const saved = await waitSaved(win);
+    if (saved !== "saved") return fail(`autosave not reached (${saved})`);
+    const aPath = join(wsDir, "a.md");
+    const diskA = await readFile(aPath, "utf8");
+    if (!diskA.includes(mark1)) return fail("workspace note marker missing on disk");
+    if (!diskA.startsWith("---\ntitle: a")) return fail("a.md front matter changed");
+
+    // 3) 外部新增 .md → 树即时出现;点击打开编辑保存
+    const externalName = `外部新增-${Date.now()}.md`;
+    const externalAbs = join(wsDir, externalName);
+    const { writeFile } = await import("node:fs/promises");
+    await writeFile(externalAbs, "# 外部新增\n", "utf8");
+    const externalRow = await poll(() =>
+      js<boolean>(q(`[data-rel='${externalName}']`)),
+    );
+    if (!externalRow) return fail("external new file not reflected in tree");
+    await js<void>(`document.querySelector(${JSON.stringify(`[data-rel='${externalName}']`)}).click()`);
+    // 等待头部文件名切换为外部文件(避免树内旧行文本误判)
+    const extOpen = await poll(async () => {
+      const headerName = await js<string>(
+        `document.querySelector("header strong")?.textContent ?? ""`,
+      );
+      return headerName === externalName ? true : null;
+    });
+    if (!extOpen) return fail("external file did not open");
+    const mark2 = `外部新增标记-${Date.now()}`;
+    const typed2 = await typeAtEnd(win, mark2);
+    if (!typed2.ok) return fail(`typing2 failed: ${JSON.stringify(typed2)}`);
+    const saved2 = await waitSaved(win);
+    if (saved2 !== "saved") {
+      const diag = await js<string>(
+        `JSON.stringify({
+          text: document.body.innerText.slice(0, 300),
+          html: document.getElementById('root')?.innerHTML.slice(0, 900) ?? 'no-root',
+        })`,
+      );
+      return fail(`autosave2 not reached (${saved2}); diag=${diag}`);
+    }
+    const diskExt = await readFile(externalAbs, "utf8");
+    if (!diskExt.includes(mark2)) return fail("external note marker missing on disk");
+
+    // 4) 侧栏折叠/还原(可见按钮,不依赖快捷键)
+    const before = await js<boolean>(q("[data-testid='sidebar']"));
+    if (!before) return fail("sidebar missing");
+    await js<void>(`document.querySelector("[data-testid='sidebar-toggle']").click()`);
+    const collapsed = await poll(() => js<boolean>(`document.querySelector("[data-testid='sidebar']") === null`));
+    if (!collapsed) return fail("sidebar did not collapse");
+    await js<void>(`document.querySelector("[data-testid='sidebar-toggle']").click()`);
+    const restored = await poll(() => js<boolean>(q("[data-testid='sidebar']")));
+    if (!restored) return fail("sidebar did not restore");
+
+    if (issues.length) return fail("renderer console issues present");
+    console.log("[smoke] workspace e2e ok");
+  } catch (err) {
+    await fail(`workspace self-check threw: ${String(err)}`);
+  } finally {
+    if (failed) process.exitCode = 1;
+    try {
+      if (!win.isDestroyed()) {
+        mkdirSync(join(__dirname, "../../out/smoke"), { recursive: true });
+        const { writeFileSync } = await import("node:fs");
+        writeFileSync(
+          join(__dirname, "../../out/smoke/smoke.png"),
+          (await win.webContents.capturePage()).toPNG(),
+        );
+      }
+    } catch {
+      // ignore
+    }
+    app.quit();
+  }
+}
+
 function createWindow(): BrowserWindow {
   const win = new BrowserWindow({
     width: 1200,
@@ -235,9 +422,11 @@ function createWindow(): BrowserWindow {
     win.webContents.openDevTools({ mode: "detach" });
   }
 
-  if (smoke || e2eFile) {
+  if (smoke || e2eFile || e2eWs) {
     win.webContents.once("did-finish-load", () => {
-      void runSelfCheck(win, e2eFile ?? null);
+      const emptyWs = process.env["CONFIDANT_E2E_WS_EMPTY"] ?? null;
+      if (e2eWs) void runWorkspaceSelfCheck(win, e2eWs, emptyWs);
+      else void runSelfCheck(win, e2eFile ?? null);
     });
   }
 
@@ -314,7 +503,58 @@ function registerIpc(): void {
     const win = menuTarget();
     if (win) win.close();
   });
+
+  // ── 工作区与状态(04) ──
+  ipcMain.handle(IPC.pickFolderDialog, async () => {
+    const win = menuTarget();
+    if (!win) return null;
+    const res = await dialog.showOpenDialog(win, {
+      title: "打开文件夹",
+      properties: ["openDirectory"],
+    });
+    return res.canceled ? null : (res.filePaths[0] ?? null);
+  });
+
+  ipcMain.handle(IPC.workspaceOpen, async (e, path: string): Promise<Result<TreeEntry[]>> => {
+    const wc = e.sender;
+    try {
+      const tree = await startWorkspaceWatch(path, (next) => {
+        if (!wc.isDestroyed()) wc.send(IPC.workspaceTreeUpdated, next);
+      });
+      await pushRecentFolder(path);
+      await updateLastSession({ workspace: path, file: null });
+      return { ok: true, value: tree };
+    } catch (err) {
+      return { ok: false, error: toError(err) };
+    }
+  });
+
+  ipcMain.handle(IPC.workspaceClose, async () => {
+    await stopWorkspaceWatch();
+  });
+
+  ipcMain.on(IPC.fileOpened, (_e, path: string) => {
+    const ws = currentWorkspaceRoot();
+    if (!ws) return;
+    const normalized = path.replace(/\\/g, "/");
+    if (normalized.toLowerCase().startsWith(ws.toLowerCase())) {
+      void updateLastSession({ file: path });
+    }
+  });
+
+  ipcMain.handle(IPC.stateGet, async (_e, key: keyof AppStateV1) => {
+    return (await getState(key)) ?? null;
+  });
+
+  ipcMain.on(IPC.stateSet, (_e, key: keyof AppStateV1, value: unknown) => {
+    setState(key, value as never);
+  });
 }
+
+// 退出前把防抖中的状态落盘
+app.on("before-quit", () => {
+  void flushState();
+});
 
 app.whenReady().then(() => {
   registerIpc();
