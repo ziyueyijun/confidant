@@ -12,6 +12,8 @@ export type MenuContext = {
   docOpen: boolean;
   canUndo: boolean;
   canRedo: boolean;
+  /** 选区/光标在表格内(块级段落命令置灰;表格交互走右键,规格 9.6)。 */
+  inTable: boolean;
 };
 
 export type CommandRun = () => void | Promise<void>;
@@ -188,7 +190,7 @@ export interface MenuBridge {
 
 export function createMenuBridge(): MenuBridge {
   const handlers = new Map<CommandId, { rule: EnabledRule; run: CommandRun }>();
-  let context: MenuContext = { docOpen: false, canUndo: false, canRedo: false };
+  let context: MenuContext = { docOpen: false, canUndo: false, canRedo: false, inTable: false };
   const lastState = new Map<string, boolean>();
   let unsubCommand: (() => void) | null = null;
 

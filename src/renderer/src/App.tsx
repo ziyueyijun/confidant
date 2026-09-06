@@ -9,7 +9,7 @@ import { composeNoteText, parseNoteText } from "./editor/note-document";
 import { createSavePipeline, type SaveState } from "./editor/save-pipeline";
 import { landClipboardImage, landImageFile, looksLikeImageFile } from "./editor/image-insert";
 import { isRemoteSrc, resolveImageAbsPath, resolveImageSourceUrl } from "./editor/image-source";
-import { Cmd, createMenuBridge } from "./menu/menu-bridge";
+import { Cmd, createMenuBridge, type MenuContext } from "./menu/menu-bridge";
 import { Sidebar } from "./components/Sidebar";
 import { FormatOverlay } from "./components/FormatOverlay";
 import { countMdInTree, dirAncestorsOf, relPathOf, wsJoin, type Workspace } from "./workspace/workspace";
@@ -264,6 +264,7 @@ export default function App() {
       docOpen: !!docRef.current,
       canUndo: engine?.canUndo() ?? false,
       canRedo: engine?.canRedo() ?? false,
+      inTable: engine?.isInsideTable() ?? false,
     });
   }, []);
 
@@ -289,6 +290,31 @@ export default function App() {
     menu.register(Cmd.strike, (ctx) => ctx.docOpen, () => runFormat((e) => e.toggleStrike()));
     menu.register(Cmd.clearFormat, (ctx) => ctx.docOpen, () => runFormat((e) => e.clearFormat()));
     menu.register(Cmd.link, (ctx) => ctx.docOpen, () => setLinkRequest((r) => r + 1));
+    // 块级段落命令(08):标题/正文/列表/引用/代码块/表格,表格内置灰
+    const blockRule = (ctx: MenuContext) => ctx.docOpen && !ctx.inTable;
+    const runBlock = (kind: Parameters<Engine["setBlockKind"]>[0]): void => {
+      const ed = engineRef.current;
+      if (!ed) return;
+      ed.setBlockKind(kind);
+      setUiTick((t) => t + 1);
+      refreshMenuContext();
+    };
+    menu.register(Cmd.heading1, blockRule, () => runBlock("heading1"));
+    menu.register(Cmd.heading2, blockRule, () => runBlock("heading2"));
+    menu.register(Cmd.heading3, blockRule, () => runBlock("heading3"));
+    menu.register(Cmd.heading4, blockRule, () => runBlock("heading4"));
+    menu.register(Cmd.heading5, blockRule, () => runBlock("heading5"));
+    menu.register(Cmd.heading6, blockRule, () => runBlock("heading6"));
+    menu.register(Cmd.paragraph, blockRule, () => runBlock("paragraph"));
+    menu.register(Cmd.bulletList, blockRule, () => runBlock("bulletList"));
+    menu.register(Cmd.orderedList, blockRule, () => runBlock("orderedList"));
+    menu.register(Cmd.taskList, blockRule, () => runBlock("taskList"));
+    menu.register(Cmd.quote, blockRule, () => runBlock("quote"));
+    menu.register(Cmd.codeBlock, blockRule, () => runBlock("codeBlock"));
+    menu.register(Cmd.insertTable, blockRule, () => {
+      engineRef.current?.insertTable();
+      setUiTick((t) => t + 1);
+    });
     menu.register(Cmd.about, () => true, () => void window.confidant.showAbout());
     menu.register(Cmd.quit, () => true, () => window.confidant.closeWindow());
     menu.init();

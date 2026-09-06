@@ -106,6 +106,21 @@ export interface LinkInfo {
   to: number;
 }
 
+/** 块级命令种类(08「段落」菜单;同一命令面供菜单调用)。 */
+export type BlockKind =
+  | "heading1"
+  | "heading2"
+  | "heading3"
+  | "heading4"
+  | "heading5"
+  | "heading6"
+  | "paragraph"
+  | "bulletList"
+  | "orderedList"
+  | "taskList"
+  | "quote"
+  | "codeBlock";
+
 export interface Engine {
   /** 以 markdown 整体替换文档(正文,front matter 由调用方拆出)。重建撤销历史。 */
   loadMarkdown(markdown: string): void;
@@ -152,6 +167,14 @@ export interface Engine {
   docSize(): number;
   /** 区间纯文本(doc.textBetween;定位/测试)。 */
   textBetween(from: number, to: number): string;
+
+  // ── 块级命令(08;「段落」菜单入口,不依赖语法输入) ──
+  /** 选区是否在表格内(段落命令在表格内置灰,规格 9.6 表交互由右键承担)。 */
+  isInsideTable(): boolean;
+  /** 当前块/多块应用块命令。kind: heading1..6 / paragraph / 列表 / 引用 / 代码块。 */
+  setBlockKind(kind: BlockKind): boolean;
+  /** 插入空表格并把光标带入首个单元格。 */
+  insertTable(rows?: number, cols?: number): boolean;
   /** 在光标处插入图片节点(引用相对路径;自动保存由上层管线触发)。 */
   insertImage(src: string, alt?: string): boolean;
   /** 在页面坐标处插入图片(drop 落点;失败回退光标处)。 */
@@ -369,6 +392,52 @@ export function createEngine(
       const ed = editor;
       if (!ed) return "";
       return ed.state.doc.textBetween(from, to, "");
+    },
+
+    isInsideTable() {
+      const ed = editor;
+      if (!ed) return false;
+      const { selection } = ed.state;
+      const atTable = ($pos: { depth: number; node: (d: number) => { type: { name: string } } }): boolean => {
+        for (let d = $pos.depth; d > 0; d--) {
+          if ($pos.node(d).type.name === "table") return true;
+        }
+        return false;
+      };
+      return atTable(selection.$from) || atTable(selection.$to);
+    },
+
+    setBlockKind(kind) {
+      const ed = editor;
+      if (!ed) return false;
+      const chain = ed.chain().focus();
+      switch (kind) {
+        case "heading1":
+        case "heading2":
+        case "heading3":
+        case "heading4":
+        case "heading5":
+        case "heading6":
+          return chain.toggleHeading({ level: Number(kind.slice(-1)) as 1 | 2 | 3 | 4 | 5 | 6 }).run();
+        case "paragraph":
+          return chain.setParagraph().run();
+        case "bulletList":
+          return chain.toggleBulletList().run();
+        case "orderedList":
+          return chain.toggleOrderedList().run();
+        case "taskList":
+          return chain.toggleTaskList().run();
+        case "quote":
+          return chain.toggleBlockquote().run();
+        case "codeBlock":
+          return chain.toggleCodeBlock().run();
+      }
+    },
+
+    insertTable(rows = 2, cols = 2) {
+      const ed = editor;
+      if (!ed) return false;
+      return ed.chain().focus().insertTable({ rows, cols, withHeaderRow: true }).run();
     },
 
     insertImage(src, alt = "") {

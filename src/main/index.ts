@@ -426,6 +426,38 @@ async function runWorkspaceSelfCheck(win: BrowserWindow, wsDir: string, emptyDir
     });
     if (!boldSaved) return fail("bold not persisted via toolbar (autosave)");
 
+    // 2.8) 段落菜单命令(08):菜单通道 → 标题2 → 正文还原 → 插入表格 → 撤销
+    win.webContents.send(IPC.menuCommand, "heading-2");
+    const h2 = await poll(async () => {
+      const content = await readFile(aPath, "utf8");
+      return content.includes("## **正文 a。**") ? true : null;
+    });
+    if (!h2) return fail("heading-2 via menu not persisted");
+    win.webContents.send(IPC.menuCommand, "paragraph");
+    const paraBack = await poll(async () => {
+      const content = await readFile(aPath, "utf8");
+      return content.includes("**正文 a。**") && !content.includes("## **正文 a。**")
+        ? true
+        : null;
+    });
+    if (!paraBack) return fail("paragraph restore via menu not persisted");
+    win.webContents.send(IPC.menuCommand, "insert-table");
+    const tableIn = await poll(async () => {
+      const dom = await js<boolean>(q("table"));
+      if (!dom) return null;
+      const content = await readFile(aPath, "utf8");
+      return content.includes("| --- | --- |") ? true : null;
+    });
+    if (!tableIn) return fail("insert table via menu failed");
+    win.webContents.send(IPC.menuCommand, "undo");
+    const tableUndone = await poll(async () => {
+      const dom = await js<boolean>(`document.querySelector("table") === null`);
+      if (!dom) return null;
+      const content = await readFile(aPath, "utf8");
+      return !content.includes("| --- | --- |") ? true : null;
+    });
+    if (!tableUndone) return fail("undo of table insert not applied/persisted");
+
     // 3) 外部新增 .md → 树即时出现;点击打开编辑保存
     const externalName = `外部新增-${Date.now()}.md`;
     const externalAbs = join(wsDir, externalName);
