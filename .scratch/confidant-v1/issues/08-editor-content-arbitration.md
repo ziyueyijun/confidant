@@ -1,7 +1,7 @@
 # 编辑区内容能力仲裁
 
 Type: grilling
-Status: open
+Status: claimed
 
 ## Question
 
