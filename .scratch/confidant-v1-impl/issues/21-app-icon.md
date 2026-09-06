@@ -11,12 +11,14 @@
 
 **Status:** ready-for-agent
 
-- [x] exe 图标不再是默认 Electron 图标:打包产物 `out/dist/win-unpacked/confidant.exe` 提取关联图标,视觉确认占位图标(截图留档)。
-- [x] 生成脚本可重跑:删除 ico 重跑一次,输出一致(尺寸集合齐全)。
+- [x] exe 图标不再是默认 Electron 图标:打包产物 `out/dist/win-unpacked/confidant.exe` 提取关联图标,像素采样确认蓝底白卡占位设计(32px:上/左缘 accent 蓝 r44,122,221 / r34,107,196、中心白卡、圆角 alpha 过渡)——非默认 Electron 标。
+- [x] 生成脚本可重跑:删除 ico 重跑一次,md5 与首跑一致(d5249311…);9 尺寸(16–256)齐全。
 - [ ] 人工项:最终图标设计稿确认 → 换源重跑 → 重打包复核(终稿素材到位前占位图标可随 20 人工尾一并发布,不阻塞)。
 
 ## 实现记录(21)
 
 - 提交:`feat(21): 应用图标…`。
-- 占位设计:accent 蓝圆角方底 + 白色圆角纸卡 + 三条正文线(末条半长)——几何形,16px 仍可读;深浅通吃(浅色主题于深/浅任务栏均取 `#1f6fcf` 系中调,白卡描边防浅任务栏同化)。
-- 证据:ico 尺寸集合与提取截图路径;`npm run dist:dir` 重打包通过。
+- 占位设计:accent 蓝圆角方底(上 `#2E7DE3` 下 `#1558A5` 垂直渐变,浅 accent 系取色,源参注释标 index.css 色板出处)+ 白色圆角纸卡(细描边 `#D8E6F5` 防浅任务栏同化)+ 三条圆头正文线(两长 `#84B0E5` 一短 accent `#1F6FCF`);几何比例参数化,16px 仍可读。
+- 管线:`build/generate-icon.ps1`(纯 ASCII,PS 5.1 编码坑:UTF-8 中文注释会导致解析错乱——脚本内注释禁用中文,取色出处以 ASCII 指向 index.css);产物 `build/icon.ico`(PNG-in-ICO ×9);package.json `build.win.icon` 显式接线。
+- 证据:重打包 `npm run dist:dir` 通过(首次 EBUSY 为安全扫描瞬时锁,重试即过);嵌入图标像素采样见上;采样图留 out/icon-check/(gitignore 内,不入库)。
+- 陷阱登记:PS 5.1 读无 BOM UTF-8 会把多字节序列与换行错配导致解析错乱——生成类脚本一律纯 ASCII。
