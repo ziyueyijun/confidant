@@ -538,6 +538,7 @@ export default function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+
   // ── 持久化布局状态启动载入 ──
   useEffect(() => {
     void (async () => {
@@ -971,6 +972,83 @@ export default function App() {
     window.confidant.stateSet("sidebar", s);
   }, []);
 
+  // ── 最近打开(13):欢迎页列表 + 菜单动态子项同一数据源 ──
+  const [recentFolders, setRecentFolders] = useState<Array<{ path: string; name: string }>>([]);
+  useEffect(() => {
+    void (async () => {
+      const list = (await window.confidant.stateGet("recentFolders")) as
+        | Array<{ path: string; name: string }>
+        | null;
+      setRecentFolders(list ?? []);
+    })();
+  }, []);
+  useEffect(() => {
+    const menu = menuRef.current;
+    if (!menu) return;
+    const recents = recentFolders.map((r) => ({ path: r.path, name: r.name }));
+    menu.rebuildRecent(recents);
+    recents.forEach((r, i) => {
+      menu.register(`recent-${i}`, () => true, () => void openWorkspace(r.path));
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [recentFolders, openWorkspace]);
+
+  // ── 启动恢复(13):有历史 → 恢复工作区与最后文件;文件缺失 → 12 横幅语义 ──
+  const restoreAttempted = useRef(false);
+  const restoreRootRef = useRef<string | null>(null);
+  const restoreFileRef = useRef<string | null>(null);
+  const restoreRetried = useRef(false);
+  useEffect(() => {
+    if (restoreAttempted.current) return;
+    restoreAttempted.current = true;
+    void (async () => {
+      const last = (await window.confidant.stateGet("lastSession")) as {
+        workspace: string | null;
+        file: string | null;
+      } | null;
+      if (!last?.workspace) return; // 无历史 → 欢迎页
+      restoreRootRef.current = last.workspace;
+      restoreFileRef.current = last.file ?? null;
+      const res = await window.confidant.openWorkspace(last.workspace);
+      if (!res.ok) {
+        setLoadError(`恢复工作区失败:${res.error.message}`);
+        return;
+      }
+      if (!last.file) return;
+      const fileRes = await window.confidant.readTextFile(last.file);
+      if (!fileRes.ok) {
+        // 最后文件已不存在:按 12 处置(横幅,不静默)
+        const name = last.file.replace(/[\\/]+$/, "").split(/[\\/]/).pop() ?? "笔记";
+        const stub: OpenNote = { path: last.file, name, head: null };
+        docRef.current = stub;
+        setDoc(stub);
+        engineRef.current?.loadMarkdown("");
+        pipelineRef.current?.resetClean();
+        docMissingRef.current = true;
+        setDocMissing(true);
+        document.title = `${name} · confidant`;
+        return;
+      }
+      await openPath(last.file);
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // 恢复自愈:工作区状态未落到预期根(或缺失)且已有文档上下文 → 补开工作区并重开文件
+  useEffect(() => {
+    const root = restoreRootRef.current;
+    if (!root || restoreRetried.current) return;
+    const wsOk = workspace && workspace.root.toLowerCase() === root.toLowerCase();
+    if (wsOk) return;
+    if (!doc && workspace) return; // 无文档且已开其他工作区:尊重用户状态
+    restoreRetried.current = true;
+    void openWorkspace(root).then(() => {
+      const file = restoreFileRef.current;
+      if (file) void openPath(file);
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [doc, workspace]);
+
   // 空态/计数
   const mdCount = useMemo(() => (tree ? countMdInTree(tree) : 0), [tree]);
 
@@ -1000,7 +1078,8 @@ export default function App() {
   const guidanceVisible = !!workspace && !doc && mdCount === 0;
 
   return (
-    <div style={{ height: "100%", position: "relative", display: "flex", flexDirection: "column" }}>
+    <div style={{ height: "100%", position: "relative", display: "flex", flexDirection: "column" }}
+    >
       <header
         style={{
           display: "flex",
@@ -1124,6 +1203,36 @@ export default function App() {
               >
                 打开文件夹
               </button>
+              {recentFolders.length > 0 && (
+                <div
+                  data-testid="welcome-recents"
+                  style={{ marginTop: 22, width: 320, maxHeight: 220, overflowY: "auto" }}
+                >
+                  <div style={{ fontSize: 12, color: "#999", marginBottom: 6 }}>最近打开</div>
+                  {recentFolders.map((r) => (
+                    <button
+                      key={r.path}
+                      type="button"
+                      title={r.path}
+                      onClick={() => void openWorkspace(r.path)}
+                      style={{
+                        display: "block",
+                        width: "100%",
+                        textAlign: "left",
+                        padding: "6px 8px",
+                        border: "none",
+                        background: "transparent",
+                        cursor: "pointer",
+                        fontSize: 13,
+                        color: "inherit",
+                        borderRadius: 4,
+                      }}
+                    >
+                      {r.name}
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
           )}
           {guidanceVisible && (

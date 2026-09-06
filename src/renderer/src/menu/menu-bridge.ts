@@ -32,8 +32,8 @@ export const Cmd = {
   save: "save",
   exportPdf: "export-pdf",
   print: "print",
-  rename: "rename",
-  delete: "delete",
+  rename: "file-rename",
+  delete: "file-delete",
   quit: "quit",
   // 编辑
   undo: "undo",
@@ -75,8 +75,35 @@ export type CommandId = (typeof Cmd)[keyof typeof Cmd];
 
 const sep = (): MenuItemTemplate => ({ id: `sep-${Math.random().toString(36).slice(2)}`, type: "separator" });
 
+/** 「最近打开」条目(13):name 展示;同名列追加父目录名消歧。 */
+export interface RecentItem {
+  path: string;
+  name: string;
+}
+
+function recentSubmenu(recent: RecentItem[]): MenuItemTemplate {
+  if (recent.length === 0) {
+    return { id: "menu-recent", type: "submenu", label: "最近打开", submenu: [{ id: "recent-empty", label: "无最近记录", enabled: false }] };
+  }
+  const count: Record<string, number> = {};
+  for (const r of recent) count[r.name] = (count[r.name] ?? 0) + 1;
+  return {
+    id: "menu-recent",
+    type: "submenu",
+    label: "最近打开",
+    submenu: recent.map((r, i) => {
+      const duplicate = (count[r.name] ?? 0) > 1;
+      const parent = r.path.replace(/[\\/]+$/, "").split(/[\\/]/).slice(0, -1).pop() ?? "";
+      return {
+        id: `recent-${i}`,
+        label: duplicate ? `${r.name}(…/${parent})` : r.name,
+      };
+    }),
+  };
+}
+
 /** 规格 §7 默认菜单结构(zh-CN;accelerator 即固定快捷键清单)。 */
-export function buildMenuTemplate(): MenuItemTemplate[] {
+export function buildMenuTemplate(recent: RecentItem[] = []): MenuItemTemplate[] {
   const disabledItem = (id: string, label: string, accelerator?: string): MenuItemTemplate => ({
     id,
     label,
@@ -91,7 +118,7 @@ export function buildMenuTemplate(): MenuItemTemplate[] {
         disabledItem(Cmd.newNote, "新建笔记"),
         disabledItem(Cmd.newFolder, "新建文件夹"),
         disabledItem(Cmd.openFolder, "打开文件夹"),
-        disabledItem(Cmd.openRecent, "最近打开"),
+        recentSubmenu(recent),
         sep(),
         disabledItem(Cmd.save, "保存", "Ctrl+S"),
         sep(),
@@ -188,19 +215,21 @@ type EnabledRule = (ctx: MenuContext) => boolean;
 
 export interface MenuBridge {
   /** 首次建立:整表下发 native 菜单 + 订阅命令事件。 */
-  init(): void;
-  /** 注册/更新命令实现(注册后该 id 才能按规则点亮)。 */
-  register(id: CommandId, rule: EnabledRule, run: CommandRun): void;
+  init(recent?: RecentItem[]): void;
+  /** 「最近打开」列表变化:整表重建(13)。 */
+  rebuildRecent(recent: RecentItem[]): void;
+  /** 注册/更新命令实现(注册后该 id 才能按规则点亮;动态 id(最近打开)同样适用)。 */
+  register(id: string, rule: EnabledRule, run: CommandRun): void;
   /** 撤销注册(命令下线时置灰)。 */
-  unregister(id: CommandId): void;
+  unregister(id: string): void;
   /** 上下文变化(文档切换/引擎历史变化)后刷新全部启用态。 */
   setContext(ctx: MenuContext): void;
   /** 执行指定 id 命令(供测试/主进程驱动)。 */
-  invoke(id: CommandId): void;
+  invoke(id: string): void;
 }
 
 export function createMenuBridge(): MenuBridge {
-  const handlers = new Map<CommandId, { rule: EnabledRule; run: CommandRun }>();
+  const handlers = new Map<string, { rule: EnabledRule; run: CommandRun }>();
   let context: MenuContext = {
     docOpen: false,
     canUndo: false,
@@ -209,6 +238,7 @@ export function createMenuBridge(): MenuBridge {
     hasWorkspace: false,
     hasSelection: false,
   };
+  let recentItems: RecentItem[] = [];
   const lastState = new Map<string, boolean>();
   let unsubCommand: (() => void) | null = null;
 
@@ -221,21 +251,22 @@ export function createMenuBridge(): MenuBridge {
           out.push({ id: item.id, enabled: true });
           continue;
         }
-        const h = handlers.get(item.id as CommandId);
+        const h = handlers.get(item.id);
         const enabled = item.type === "submenu" ? true : h ? h.rule(context) : false;
         out.push({ id: item.id, enabled });
         if (item.submenu) collect(item.submenu);
       }
     };
-    collect(buildMenuTemplate());
+    collect(buildMenuTemplate(recentItems));
     return out;
   }
 
   return {
-    init() {
-      window.confidant.setMenuTemplate(buildMenuTemplate());
+    init(recent: RecentItem[] = []) {
+      recentItems = recent;
+      window.confidant.setMenuTemplate(buildMenuTemplate(recentItems));
       unsubCommand ??= window.confidant.onMenuCommand((id) => {
-        const h = handlers.get(id as CommandId);
+        const h = handlers.get(id);
         if (!h || !h.rule(context)) return; // 未注册或失活命令不执行
         try {
           void h.run();
@@ -243,6 +274,13 @@ export function createMenuBridge(): MenuBridge {
           console.error(`[menu] command ${id} failed:`, err);
         }
       });
+      this.setContext(context);
+    },
+
+    rebuildRecent(recent: RecentItem[]) {
+      recentItems = recent;
+      window.confidant.setMenuTemplate(buildMenuTemplate(recentItems));
+      lastState.clear();
       this.setContext(context);
     },
 

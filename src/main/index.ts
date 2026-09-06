@@ -50,11 +50,18 @@ const smoke = process.env["CONFIDANT_SMOKE"] === "1";
 const e2eFile = process.env["CONFIDANT_E2E_FILE"];
 const e2eFlushOnClose = process.env["CONFIDANT_E2E_FLUSHONCLOSE"] === "1";
 const e2eWs = process.env["CONFIDANT_E2E_WS"] ?? null;
+const e2eSeed = process.env["CONFIDANT_E2E_SEED"] ?? null;
+const e2eRestore = process.env["CONFIDANT_E2E_RESTORE"] === "1";
+const e2eStateDir = process.env["CONFIDANT_E2E_STATE_DIR"] ?? null;
 
 // 自检/冒烟一律使用隔离的 userData,不污染真实应用状态
-if (smoke || e2eFile || e2eWs) {
-  const base = process.env["TEMP"] ?? process.env["TMP"] ?? "C:/Windows/Temp";
-  app.setPath("userData", join(base, "confidant-e2e-state", `run-${process.pid}`));
+if (smoke || e2eFile || e2eWs || e2eSeed || e2eRestore) {
+  if (e2eStateDir) {
+    app.setPath("userData", e2eStateDir);
+  } else {
+    const base = process.env["TEMP"] ?? process.env["TMP"] ?? "C:/Windows/Temp";
+    app.setPath("userData", join(base, "confidant-e2e-state", `run-${process.pid}`));
+  }
 }
 
 function toError(err: unknown): ErrorInfo {
@@ -655,6 +662,118 @@ async function runWorkspaceSelfCheck(win: BrowserWindow, wsDir: string, emptyDir
   }
 }
 
+/** 播种运行:打开工作区 → 打开 a.md → 键入标记 → 自动保存 → 退出(13 恢复数据源)。 */
+async function runRestoreSeed(win: BrowserWindow, wsDir: string): Promise<void> {
+  const js = <T>(code: string): Promise<T> => win.webContents.executeJavaScript(code) as Promise<T>;
+  let failed = false;
+  const fail = async (reason: string): Promise<void> => {
+    failed = true;
+    console.error(`[smoke] seed FAILED: ${reason}`);
+  };
+  await delay(1200);
+  try {
+    win.webContents.send(IPC.openWorkspaceRequest, wsDir);
+    const row = await pollUntil(() => js<boolean>(`!!document.querySelector("[data-rel='a.md']")`), 10000);
+    if (!row) return fail("a.md row missing");
+    await js<void>(`document.querySelector("[data-rel='a.md']").click()`);
+    const opened = await pollUntil(
+      async () => (await js<string>(`document.querySelector("header strong")?.textContent ?? ""`)) === "a.md",
+      10000,
+    );
+    if (!opened) return fail("a.md not opened");
+    const marker = `恢复标记-${Date.now()}`;
+    const typed = await typeAtEnd(win, marker);
+    if (!typed.ok) return fail(`typing failed: ${typed.detail}`);
+    const saved = await waitSaved(win);
+    if (saved !== "saved") return fail(`autosave not reached (${saved})`);
+    console.log(`[smoke] seed ok marker=${marker}`);
+  } catch (err) {
+    await fail(`seed threw: ${String(err)}`);
+  } finally {
+    if (failed) process.exitCode = 1;
+    app.quit();
+  }
+}
+
+/** 恢复运行:常规启动应直接回到上次工作区与最后文件;文件缺失场景另验。 */
+async function runRestoreCheck(win: BrowserWindow, expectFile: string): Promise<void> {
+  const js = <T>(code: string): Promise<T> => win.webContents.executeJavaScript(code) as Promise<T>;
+  const consoleIssues: string[] = [];
+  win.webContents.on("console-message", (event) => {
+    const level = event.level;
+    if (typeof level === "number" ? level >= 2 : level === "error" || level === "warning") {
+      consoleIssues.push(`console[${String(level)}]: ${event.message}`);
+    }
+  });
+  let failed = false;
+  const fail = async (reason: string): Promise<void> => {
+    failed = true;
+    console.error(`[smoke] restore FAILED: ${reason}`);
+    if (consoleIssues.length) console.error("[smoke] restore console issues:", consoleIssues);
+  };
+  await delay(1800);
+  try {
+    const welcomeGone = await pollUntil(
+      () => js<boolean>(`document.body.innerText.includes("打开文件夹") === false`),
+      8000,
+    );
+    if (!welcomeGone) {
+      const diag = await js<string>(
+        `(async () => JSON.stringify({
+          body: document.body.innerText.slice(0, 220),
+          sidebar: !!document.querySelector("[data-testid='sidebar']"),
+          err: document.querySelector("[data-testid='load-error']")?.textContent ?? null,
+          last: await window.confidant.stateGet("lastSession"),
+          dbg: window.__dbg ?? null,
+          ws: window.__ws ?? null,
+          ws2: window.__ws2 ?? null,
+          rc: window.__rc ?? 0,
+          lastRenderWs: window.__lastWsInRender ?? null,
+        }))()`,
+      );
+      return fail(`welcome page shown instead of restore; diag=${diag}`);
+    }
+    const header = await pollUntil(
+      async () => (await js<string>(`document.querySelector("header strong")?.textContent ?? ""`)) === expectFile,
+      10000,
+    );
+    if (!header) return fail(`restored file header mismatch (expect ${expectFile})`);
+    const wsDir = process.env["CONFIDANT_E2E_WS_DIR"];
+    if (wsDir) {
+      const content = await readFile(join(wsDir, expectFile), "utf8");
+      if (!content.includes("恢复标记-")) return fail("marker missing on disk");
+    }
+    const markerVisible = await js<boolean>(`document.body.innerText.includes("恢复标记-")`);
+    if (!markerVisible) return fail("typed marker not in restored editor");
+    console.log("[smoke] restore ok");
+  } catch (err) {
+    await fail(`restore threw: ${String(err)}`);
+  } finally {
+    if (failed) process.exitCode = 1;
+    app.quit();
+  }
+}
+
+function pollUntil<T>(probe: () => Promise<T | null | false>, timeoutMs: number): Promise<T | null> {
+  return new Promise((resolve) => {
+    const deadline = Date.now() + timeoutMs;
+    const tick = async (): Promise<void> => {
+      try {
+        const v = await probe();
+        if (v !== null && v !== false) {
+          resolve(v as T);
+          return;
+        }
+      } catch {
+        // 页面未就绪,继续轮询
+      }
+      if (Date.now() > deadline) resolve(null);
+      else setTimeout(() => void tick(), 200);
+    };
+    void tick();
+  });
+}
+
 function createWindow(): BrowserWindow {
   const win = new BrowserWindow({
     width: 1200,
@@ -680,10 +799,12 @@ function createWindow(): BrowserWindow {
     win.webContents.openDevTools({ mode: "detach" });
   }
 
-  if (smoke || e2eFile || e2eWs) {
+  if (smoke || e2eFile || e2eWs || e2eSeed || e2eRestore) {
     win.webContents.once("did-finish-load", () => {
       const emptyWs = process.env["CONFIDANT_E2E_WS_EMPTY"] ?? null;
       if (e2eWs) void runWorkspaceSelfCheck(win, e2eWs, emptyWs);
+      else if (e2eSeed) void runRestoreSeed(win, e2eSeed);
+      else if (e2eRestore) void runRestoreCheck(win, "a.md");
       else void runSelfCheck(win, e2eFile ?? null);
     });
   }
