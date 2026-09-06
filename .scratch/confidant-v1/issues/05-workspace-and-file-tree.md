@@ -1,7 +1,7 @@
 # 工作区与文件树形态
 
 Type: grilling
-Status: open
+Status: claimed
 
 ## Question
 
