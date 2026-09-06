@@ -1,7 +1,7 @@
 # 编辑面深层交互
 
 Type: grilling
-Status: open
+Status: claimed
 
 ## Question
 
