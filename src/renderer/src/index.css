@@ -151,10 +151,11 @@ body {
 }
 
 .editor-prose {
-  /* 27:上限约 860px 居中;窄窗时两侧留白下限 16px(自适应,不再固定 48px) */
-  max-width: min(860px, 100% - 32px);
+  /* 27/修:内容列自适应窗口(左右留白 ≈20%,60vw),窄窗留白下限 16px;
+     不再固定 860px 上限(用户实测「没有自适应撑满」) */
+  max-width: min(60vw, 100% - 32px);
   margin: 0 auto;
-  padding: 32px 24px 40vh;
+  padding: 32px 0 40vh; /* 左右留白由 max-width 承担,内部不再设 padding */
   font-size: 16px;
   line-height: 1.7;
   word-break: break-word;
@@ -220,12 +221,19 @@ body {
   width: 3.2em;
   box-sizing: border-box;
   padding: 12px 0.6em 12px 0; /* 垂直与 pre padding 一致,行号右对齐 */
-  text-align: right;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end; /* 右对齐(替代 text-align,flex 布局) */
+  justify-content: flex-start;
   color: var(--muted);
   user-select: none;
-  white-space: pre;
   overflow: hidden;
   font: inherit;
+  line-height: inherit;
+}
+/* 行号每行块级 span:单列渲染不依赖 white-space(修复「行号折成两列」) */
+.editor-prose .code-linenums .code-ln {
+  display: block;
   line-height: inherit;
 }
 .editor-prose[data-code-wrap="off"] pre {
@@ -399,9 +407,9 @@ body {
   background: rgba(255, 160, 40, 0.75);
 }
 .fm-block {
-  max-width: min(860px, 100% - 32px);
+  max-width: min(60vw, 100% - 32px);
   margin: 0 auto;
-  padding: 12px 24px 0;
+  padding: 12px 0 0;
 }
 .fm-block pre {
   margin: 0;

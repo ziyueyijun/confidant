@@ -42,11 +42,12 @@ describe("代码块高亮(28)", () => {
 });
 
 describe("代码块行号(28)", () => {
-  it("行号 widget 默认存在,内容与代码行数一致", () => {
+  it("行号 widget 默认存在,每行一个块级 span(不依赖 white-space)", () => {
     const { engine, host } = makeEngine("```js\na\nb\nc\n```\n");
     const nums = host.querySelector("[contenteditable='true'] .code-linenums");
     expect(nums).not.toBeNull();
-    expect(nums!.textContent).toBe("1\n2\n3");
+    const lines = [...nums!.querySelectorAll(".code-ln")].map((s) => s.textContent);
+    expect(lines).toEqual(["1", "2", "3"]);
     engine.destroy();
   });
 
@@ -67,8 +68,7 @@ describe("代码块行号(28)", () => {
     clone.querySelector(".code-linenums")?.remove();
     expect(clone.textContent).toBe("a\nb");
     engine.destroy();
-  });
-});
+  });});
 
 describe("代码块往返不回归(28)", () => {
   it("高亮与行号为纯视图态:序列化字节不变", () => {

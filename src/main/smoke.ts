@@ -328,6 +328,7 @@ export async function runSelfCheck(win: BrowserWindow, notePath: string | null):
           return fail("front matter changed after source mode roundtrip");
         }
         console.log("[smoke] source mode ok (enter/save/exit)");
+
       }
     } else {
       const probe = await js<{ rootChildren: number; bodyText: string; title: string }>(

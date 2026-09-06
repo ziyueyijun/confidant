@@ -22,7 +22,7 @@ const btnStyle: React.CSSProperties = {
 
 export function CodeBlockActions() {
   const [pre, setPre] = useState<HTMLElement | null>(null);
-  const [pos, setPos] = useState<{ left: number; top: number } | null>(null);
+  const [pos, setPos] = useState<{ top: number } | null>(null);
   const [copied, setCopied] = useState(false);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -31,7 +31,8 @@ export function CodeBlockActions() {
     const sr = scroll?.getBoundingClientRect();
     const r = el.getBoundingClientRect();
     if (!sr || r.width === 0) return;
-    setPos({ left: r.left - sr.left + r.width - 78, top: r.top - sr.top + 6 });
+    // 只定位 top;水平贴 right(8)即可——同时设 left 会把按钮拉伸成整宽
+    setPos({ top: r.top - sr.top + 6 });
   }, []);
 
   useEffect(() => {
@@ -95,7 +96,7 @@ export function CodeBlockActions() {
       data-testid="code-copy-btn"
       onMouseDown={(e) => e.preventDefault()}
       onClick={() => void doCopy()}
-      style={{ ...btnStyle, left: pos.left, top: pos.top }}
+      style={{ ...btnStyle, top: pos.top }}
     >
       {copied ? "已复制" : "复制"}
     </button>,

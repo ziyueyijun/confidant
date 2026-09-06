@@ -76,7 +76,9 @@ function getDecorations(doc: Parameters<typeof DecorationSet.create>[0], opts: C
         from = to;
       }
     }
-    // 行号:inline widget 于文本起点;内容随插件重建刷新(1..N 行)
+    // 行号:inline widget 于文本起点;内容随插件重建刷新(1..N 行)。
+    // 每行一个块级 span(不依赖 white-space——CSS 文件规则在该环境下
+    // computed 异常,span 块方案 100% 确定单列,修复「行号折成两列」)。
     if (opts.getLineNumbers()) {
       const lines = lineCount(text);
       decorations.push(
@@ -85,7 +87,12 @@ function getDecorations(doc: Parameters<typeof DecorationSet.create>[0], opts: C
           () => {
             const el = document.createElement("span");
             el.className = "code-linenums";
-            el.textContent = Array.from({ length: lines }, (_, i) => i + 1).join("\n");
+            for (let i = 1; i <= lines; i++) {
+              const n = document.createElement("span");
+              n.className = "code-ln";
+              n.textContent = String(i);
+              el.appendChild(n);
+            }
             return el;
           },
           { side: -1 },
