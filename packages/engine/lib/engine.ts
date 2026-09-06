@@ -10,6 +10,7 @@ import { TableHeader } from "@tiptap/extension-table-header";
 import { TaskList } from "@tiptap/extension-task-list";
 import { TaskItem } from "@tiptap/extension-task-item";
 import { Image } from "@tiptap/extension-image";
+import type { Node as PMNode } from "@tiptap/pm/model";
 
 /**
  * 图片显示解析器:markdown 引用(src 原样) → 渲染层可加载的 URL。
@@ -91,6 +92,18 @@ export interface EngineCallbacks {
   onUpdate?: () => void;
   /** 选区变化(菜单启用态等消费)。 */
   onSelectionChange?: () => void;
+  /** 编辑器失焦(浮动条等失焦隐藏)。 */
+  onBlur?: () => void;
+  /** 单击链接文字(进入编辑态;不跳转,规格 §14;跳转在 16)。 */
+  onLinkClick?: (info: LinkInfo) => void;
+}
+
+/** 链接节点信息(07 编辑 / 16 打开共用)。 */
+export interface LinkInfo {
+  href: string;
+  /** 链接 mark 覆盖的文本区间(改文本/地址用)。 */
+  from: number;
+  to: number;
 }
 
 export interface Engine {
@@ -110,6 +123,35 @@ export interface Engine {
   undo(): void;
   /** 执行重做。 */
   redo(): void;
+
+  // ── 行内格式(07;浮动工具条与「格式」菜单同一命令面) ──
+  toggleBold(): boolean;
+  toggleItalic(): boolean;
+  toggleStrike(): boolean;
+  /** 清除格式 = 去全部行内 mark(含链接)。 */
+  clearFormat(): boolean;
+  /** 当前选区是否全为某 mark(混排时 false,工具条不误报全选态)。 */
+  isMarkAllActive(kind: "bold" | "italic" | "strike" | "underline" | "link"): boolean;
+  /** 选区中的首个链接 href(无则 null;供工具条/编辑态预填)。 */
+  linkHrefInSelection(): string | null;
+  /** 链接设置:有文本选区 → 包裹;空选区 → 插入显示文本并加链。 */
+  applyLink(href: string, displayText?: string): boolean;
+  /**
+   * 链接编辑(07 编辑态):光标在已有链接内时更新地址(displayText 给出且不同 → 一并改文本,
+   * 留空 → 只改地址;空 href → 移除链接);无链接上下文时退化为 applyLink。
+   */
+  applyLinkEdit(href: string, displayText?: string): boolean;
+  /** 选区/光标处链接信息(编辑态入口)。 */
+  linkRangeAtSelection(): LinkInfo | null;
+  /** 在 pos 处的链接信息(单击命中用)。 */
+  linkRangeAtPos(pos: number): LinkInfo | null;
+
+  /** 设置文本选区并聚焦(测试/查找定位/点击跳转定位共用)。 */
+  setSelection(from: number, to: number): boolean;
+  /** 文档内容总长(定位用)。 */
+  docSize(): number;
+  /** 区间纯文本(doc.textBetween;定位/测试)。 */
+  textBetween(from: number, to: number): string;
   /** 在光标处插入图片节点(引用相对路径;自动保存由上层管线触发)。 */
   insertImage(src: string, alt?: string): boolean;
   /** 在页面坐标处插入图片(drop 落点;失败回退光标处)。 */
@@ -141,6 +183,15 @@ export function createEngine(
   const wire = (ed: Editor): Editor => {
     ed.on("update", () => callbacks.onUpdate?.());
     ed.on("selectionUpdate", () => callbacks.onSelectionChange?.());
+    ed.on("blur", () => callbacks.onBlur?.());
+    // 单击链接 → 编辑态回调(不跳转;链接节点本身不拦截,由 PM 光标行为收尾)
+    ed.view.dom.addEventListener("click", (ev) => {
+      if (!callbacks.onLinkClick) return;
+      const coords = ed.view.posAtCoords({ left: ev.clientX, top: ev.clientY });
+      if (!coords) return;
+      const info = linkRangeAt(ed, coords.pos);
+      if (info) callbacks.onLinkClick(info);
+    });
     return ed;
   };
 
@@ -189,6 +240,135 @@ export function createEngine(
 
     redo() {
       editor?.commands.redo();
+    },
+
+    // ── 行内格式(07) ──
+    toggleBold() {
+      return editor?.chain().focus().toggleMark("bold").run() ?? false;
+    },
+    toggleItalic() {
+      return editor?.chain().focus().toggleMark("italic").run() ?? false;
+    },
+    toggleStrike() {
+      return editor?.chain().focus().toggleMark("strike").run() ?? false;
+    },
+    clearFormat() {
+      if (!editor) return false;
+      return editor.chain().focus().unsetAllMarks().run();
+    },
+
+    isMarkAllActive(kind) {
+      const ed = editor;
+      if (!ed) return false;
+      const { doc, selection } = ed.state;
+      if (selection.empty) return ed.isActive(kind);
+      // 混排判定:任一覆盖文本节点不带该 mark → 非全选态(工具条不误报)
+      for (const range of selection.ranges) {
+        let all = true;
+        doc.nodesBetween(range.$from.pos, range.$to.pos, (node) => {
+          if (!node.isText) return true;
+          if (!node.marks.some((m) => m.type.name === kind)) {
+            all = false;
+            return false;
+          }
+          return true;
+        });
+        if (!all) return false;
+      }
+      return true;
+    },
+
+    linkHrefInSelection() {
+      const ed = editor;
+      if (!ed) return null;
+      const link = ed.isActive("link");
+      if (!link) return null;
+      const href = ed.getAttributes("link")?.href as string | undefined;
+      return href ?? null;
+    },
+
+    applyLink(href, displayText) {
+      const ed = editor;
+      if (!ed) return false;
+      const clean = (href ?? "").trim();
+      if (!clean) return ed.chain().focus().unsetMark("link").run();
+      if (ed.state.selection.empty) {
+        // 空选区:插入显示文本并加链(无文本则以 href 为文本)
+        const text = (displayText ?? "").trim() || clean;
+        return ed
+          .chain()
+          .focus()
+          .insertContent({ type: "text", text, marks: [{ type: "link", attrs: { href: clean } }] })
+          .run();
+      }
+      return ed.chain().focus().setMark("link", { href: clean }).run();
+    },
+
+    linkRangeAtSelection() {
+      const ed = editor;
+      if (!ed) return null;
+      return linkRangeAt(ed, ed.state.selection.from);
+    },
+
+    linkRangeAtPos(pos) {
+      const ed = editor;
+      if (!ed) return null;
+      return linkRangeAt(ed, pos);
+    },
+
+    applyLinkEdit(href, displayText) {
+      const ed = editor;
+      if (!ed) return false;
+      const info = linkRangeAt(ed, ed.state.selection.from);
+      const clean = (href ?? "").trim();
+      if (!info) return this.applyLink(clean, displayText);
+      const currentText = ed.state.doc.textBetween(info.from, info.to, "");
+      if (!clean) {
+        // 移除链接 mark(保留文本)
+        return ed
+          .chain()
+          .focus()
+          .setTextSelection({ from: info.from, to: info.to })
+          .unsetMark("link")
+          .run();
+      }
+      const wantText = (displayText ?? "").trim();
+      if (wantText && wantText !== currentText) {
+        // 改显示文本:替换区间并保持链接 mark
+        return ed
+          .chain()
+          .focus()
+          .setTextSelection({ from: info.from, to: info.to })
+          .deleteSelection()
+          .insertContentAt(info.from, {
+            type: "text",
+            text: wantText,
+            marks: [{ type: "link", attrs: { href: clean } }],
+          })
+          .run();
+      }
+      return ed
+        .chain()
+        .focus()
+        .setTextSelection({ from: info.from, to: info.to })
+        .setMark("link", { href: clean })
+        .run();
+    },
+
+    setSelection(from, to) {
+      const ed = editor;
+      if (!ed) return false;
+      return ed.chain().focus().setTextSelection({ from, to }).run();
+    },
+
+    docSize() {
+      return editor?.state.doc.content.size ?? 0;
+    },
+
+    textBetween(from, to) {
+      const ed = editor;
+      if (!ed) return "";
+      return ed.state.doc.textBetween(from, to, "");
     },
 
     insertImage(src, alt = "") {
@@ -243,4 +423,59 @@ export function createEngine(
       host.innerHTML = "";
     },
   };
+}
+
+/** 链接 mark 文本区间扩展:从 pos 向两侧合并同 href 的相邻链接文本节点。 */
+function linkRangeAt(ed: Editor, pos: number): LinkInfo | null {
+  const { doc } = ed.state;
+  if (doc.content.size === 0) return null;
+  const $pos = doc.resolve(Math.max(0, Math.min(pos, doc.content.size)));
+  const parent = $pos.parent;
+  if (!parent.isTextblock) return null;
+  const blockStart = $pos.start();
+  const blockEnd = blockStart + parent.content.size;
+
+  // 找覆盖 pos 的文本节点及其链接 mark
+  const children: Array<{ node: PMNode; offset: number }> = [];
+  parent.content.forEach((node, offset) => children.push({ node, offset }));
+  let hit: { start: number; end: number; href: string } | null = null;
+  for (const { node, offset } of children) {
+    const start = blockStart + offset;
+    const end = start + node.nodeSize;
+    if (pos >= start && pos < end) {
+      if (node.isText) {
+        const link = node.marks.find((m) => m.type.name === "link");
+        if (link) hit = { start, end, href: link.attrs.href as string };
+      }
+      break;
+    }
+  }
+  if (!hit) return null;
+
+  // 向两侧合并相邻同 href 链接文本
+  let from = hit.start;
+  let to = hit.end;
+  for (;;) {
+    const prev = doc.resolve(Math.max(from - 1, blockStart - 1)).nodeBefore;
+    if (prev && prev.isText && from > blockStart) {
+      const mk = prev.marks.find((m) => m.type.name === "link");
+      if (mk && mk.attrs.href === hit.href) {
+        from -= prev.nodeSize;
+        continue;
+      }
+    }
+    break;
+  }
+  for (;;) {
+    const nxt = doc.resolve(Math.min(to + 1, blockEnd + 1)).nodeAfter;
+    if (nxt && nxt.isText && to < blockEnd) {
+      const mk = nxt.marks.find((m) => m.type.name === "link");
+      if (mk && mk.attrs.href === hit.href) {
+        to += nxt.nodeSize;
+        continue;
+      }
+    }
+    break;
+  }
+  return { href: hit.href, from, to };
 }

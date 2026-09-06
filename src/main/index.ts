@@ -394,6 +394,38 @@ async function runWorkspaceSelfCheck(win: BrowserWindow, wsDir: string, emptyDir
     });
     if (!imgRendered) return fail("image not rendered via asset protocol");
 
+    // 2.7) 浮动格式工具条:DOM 选中文字 → 浮现 → 点加粗 → 自动保存落盘含 **
+    const selMade = await js<{ ok: boolean; detail: string }>(
+      `(() => {
+        const el = document.querySelector('[contenteditable="true"]');
+        if (!el) return { ok: false, detail: "no-editor" };
+        el.focus();
+        const p = [...el.querySelectorAll("p")].find((n) => n.textContent?.includes("正文 a"));
+        if (!p) return { ok: false, detail: "no-para" };
+        const tn = [...p.childNodes].find((n) => n.nodeType === Node.TEXT_NODE && n.textContent.includes("正文 a"));
+        if (!tn) return { ok: false, detail: "no-text-node" };
+        const text = tn.textContent ?? "";
+        const start = text.indexOf("正文 a");
+        const range = document.createRange();
+        range.setStart(tn, start);
+        range.setEnd(tn, start + "正文 a。".length);
+        const sel = window.getSelection();
+        if (!sel) return { ok: false, detail: "no-selection" };
+        sel.removeAllRanges();
+        sel.addRange(range);
+        return { ok: true, detail: "selected" };
+      })()`,
+    );
+    if (!selMade.ok) return fail(`selection failed: ${JSON.stringify(selMade)}`);
+    const toolbarShown = await poll(() => js<boolean>(q("[data-testid='format-toolbar']")));
+    if (!toolbarShown) return fail("format toolbar not shown on selection");
+    await js<void>(`document.querySelector("[data-testid='format-toolbar'] button[title='加粗']").click()`);
+    const boldSaved = await poll(async () => {
+      const content = await readFile(aPath, "utf8");
+      return content.includes("**正文 a。**") ? true : null;
+    });
+    if (!boldSaved) return fail("bold not persisted via toolbar (autosave)");
+
     // 3) 外部新增 .md → 树即时出现;点击打开编辑保存
     const externalName = `外部新增-${Date.now()}.md`;
     const externalAbs = join(wsDir, externalName);

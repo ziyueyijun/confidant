@@ -11,6 +11,7 @@ import { landClipboardImage, landImageFile, looksLikeImageFile } from "./editor/
 import { isRemoteSrc, resolveImageAbsPath, resolveImageSourceUrl } from "./editor/image-source";
 import { Cmd, createMenuBridge } from "./menu/menu-bridge";
 import { Sidebar } from "./components/Sidebar";
+import { FormatOverlay } from "./components/FormatOverlay";
 import { countMdInTree, dirAncestorsOf, relPathOf, wsJoin, type Workspace } from "./workspace/workspace";
 
 interface OpenNote {
@@ -58,6 +59,10 @@ export default function App() {
   const [doc, setDoc] = useState<OpenNote | null>(null);
   const [saveState, setSaveState] = useState<SaveState>(EMPTY_SAVE_STATE);
   const [loadError, setLoadError] = useState<string | null>(null);
+  /** 引擎 UI 节拍:编辑/选区/命令后递增,驱动浮动条重算。 */
+  const [uiTick, setUiTick] = useState(0);
+  const [linkRequest, setLinkRequest] = useState(0);
+  const [engine, setEngine] = useState<Engine | null>(null);
 
   const [workspace, setWorkspace] = useState<Workspace | null>(null);
   const [tree, setTree] = useState<TreeEntry[] | null>(null);
@@ -98,8 +103,13 @@ export default function App() {
         onUpdate: () => {
           if (docRef.current) pipelineRef.current?.notifyEdit();
           refreshMenuContext();
+          setUiTick((t) => t + 1);
         },
-        onSelectionChange: refreshMenuContext,
+        onSelectionChange: () => {
+          refreshMenuContext();
+          setUiTick((t) => t + 1);
+        },
+        onBlur: () => setUiTick((t) => t + 1),
       },
       {
         // 图片显示:引用按当前文档目录解析(远程不渲染;网络图裁决出)
@@ -111,6 +121,7 @@ export default function App() {
       },
     );
     engineRef.current = engine;
+    setEngine(engine);
 
     // 粘贴:剪贴板位图(截图)→ 落盘(位图优先;文件路径分支归 17)
     const onPaste = (e: ClipboardEvent) => {
@@ -233,6 +244,7 @@ export default function App() {
     return () => {
       engine.destroy();
       engineRef.current = null;
+      setEngine(null);
       host.removeEventListener("paste", onPaste);
       host.removeEventListener("drop", onDrop);
       host.removeEventListener("dragover", allowDrop);
@@ -265,6 +277,18 @@ export default function App() {
     menu.register(Cmd.redo, (ctx) => ctx.docOpen && ctx.canRedo, () => engineRef.current?.redo());
     menu.register(Cmd.toggleSidebar, () => !!workspaceRef.current, toggleSidebar);
     menu.register(Cmd.insertImage, (ctx) => ctx.docOpen, () => void insertImageViaDialog());
+    // 行内格式(07):与浮动工具条同一引擎命令面
+    const runFormat = (fn: (e: Engine) => boolean): void => {
+      const ed = engineRef.current;
+      if (!ed) return;
+      fn(ed);
+      setUiTick((t) => t + 1);
+    };
+    menu.register(Cmd.bold, (ctx) => ctx.docOpen, () => runFormat((e) => e.toggleBold()));
+    menu.register(Cmd.italic, (ctx) => ctx.docOpen, () => runFormat((e) => e.toggleItalic()));
+    menu.register(Cmd.strike, (ctx) => ctx.docOpen, () => runFormat((e) => e.toggleStrike()));
+    menu.register(Cmd.clearFormat, (ctx) => ctx.docOpen, () => runFormat((e) => e.clearFormat()));
+    menu.register(Cmd.link, (ctx) => ctx.docOpen, () => setLinkRequest((r) => r + 1));
     menu.register(Cmd.about, () => true, () => void window.confidant.showAbout());
     menu.register(Cmd.quit, () => true, () => window.confidant.closeWindow());
     menu.init();
@@ -395,6 +419,7 @@ export default function App() {
     pipelineRef.current?.resetClean();
     document.title = `${next.name} · confidant`;
     window.confidant.noteOpened(path);
+    setUiTick((t) => t + 1);
   }, []);
 
   const openRel = useCallback(
@@ -655,6 +680,8 @@ export default function App() {
           )}
         </div>
       </div>
+      {/* 浮动格式工具条与链接编辑(07) */}
+      <FormatOverlay engine={engine} tick={uiTick} openLinkRequest={linkRequest} />
     </div>
   );
 }
