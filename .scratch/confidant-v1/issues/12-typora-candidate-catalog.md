@@ -1,7 +1,7 @@
 # Typora 功能面候选清单
 
 Type: research
-Status: open
+Status: claimed
 
 ## Question
 
