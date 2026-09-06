@@ -124,6 +124,18 @@ body {
   display: block;
   margin: 0.8em auto;
 }
+/* 图片节点视图(06):等比收缩居中的渲染层容器 */
+.editor-prose .confidant-image-node {
+  margin: 0.8em 0;
+  text-align: center;
+  line-height: 0;
+}
+.editor-prose .confidant-image-node img {
+  margin: 0 auto;
+  max-width: 100%;
+  height: auto;
+  border-radius: 2px;
+}
 .editor-prose a {
   color: #0969da;
   text-decoration: underline;

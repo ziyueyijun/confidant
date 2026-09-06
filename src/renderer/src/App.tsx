@@ -8,6 +8,7 @@ import type { TreeEntry } from "@shared/ipc";
 import { composeNoteText, parseNoteText } from "./editor/note-document";
 import { createSavePipeline, type SaveState } from "./editor/save-pipeline";
 import { landClipboardImage, landImageFile, looksLikeImageFile } from "./editor/image-insert";
+import { isRemoteSrc, resolveImageAbsPath, resolveImageSourceUrl } from "./editor/image-source";
 import { Cmd, createMenuBridge } from "./menu/menu-bridge";
 import { Sidebar } from "./components/Sidebar";
 import { countMdInTree, dirAncestorsOf, relPathOf, wsJoin, type Workspace } from "./workspace/workspace";
@@ -91,13 +92,24 @@ export default function App() {
   useEffect(() => {
     const host = hostRef.current;
     if (!host) return;
-    const engine = createEngine(host, {
-      onUpdate: () => {
-        if (docRef.current) pipelineRef.current?.notifyEdit();
-        refreshMenuContext();
+    const engine = createEngine(
+      host,
+      {
+        onUpdate: () => {
+          if (docRef.current) pipelineRef.current?.notifyEdit();
+          refreshMenuContext();
+        },
+        onSelectionChange: refreshMenuContext,
       },
-      onSelectionChange: refreshMenuContext,
-    });
+      {
+        // 图片显示:引用按当前文档目录解析(远程不渲染;网络图裁决出)
+        resolveImageUrl: (raw) => {
+          const doc = docRef.current;
+          if (!doc) return "";
+          return resolveImageSourceUrl(doc.path, raw) ?? "";
+        },
+      },
+    );
     engineRef.current = engine;
 
     // 粘贴:剪贴板位图(截图)→ 落盘(位图优先;文件路径分支归 17)
@@ -152,9 +164,69 @@ export default function App() {
     const start = () => pipelineRef.current?.setComposing(true);
     const end = () => pipelineRef.current?.setComposing(false);
     const allowDrop = (e: DragEvent) => e.preventDefault(); // 允许落点坐标
+
+    // ── 图片右键操作(06):打开所在文件夹 / 复制图片 / 删除(引用+回收站) ──
+    const onContextMenu = async (e: MouseEvent): Promise<void> => {
+      const doc = docRef.current;
+      const current = engineRef.current;
+      if (!doc || !current) return;
+      const target = e.target as Element | null;
+      const wrapper = target?.closest(".confidant-image-node");
+      if (!wrapper) return; // 非图片:留给树/其他右键
+      e.preventDefault();
+      const raw = wrapper.getAttribute("data-src-raw") ?? "";
+      if (isRemoteSrc(raw)) {
+        await window.confidant.infoDialog("这是一张网络图片(远程图不做下载与显示)。");
+        return;
+      }
+      const abs = resolveImageAbsPath(doc.path, raw);
+      if (!abs) {
+        await window.confidant.infoDialog("图片引用无效。");
+        return;
+      }
+      if (!(await window.confidant.pathExists(abs))) {
+        // 引用悬空(文件已被外部删走):明确提示,不静默;可移除引用
+        const choice = await window.confidant.showContextMenu([
+          { id: "gone", label: "图片文件已不存在(可能已被外部删除)", enabled: false },
+          { id: "remove-ref", label: "移除引用" },
+        ]);
+        if (choice === "remove-ref") current.removeImageNodeAtElement(wrapper);
+        return;
+      }
+      const choice = await window.confidant.showContextMenu([
+        { id: "open", label: "打开所在文件夹" },
+        { id: "copy", label: "复制图片" },
+        { id: "remove", label: "删除" },
+      ]);
+      if (choice === "open") {
+        await window.confidant.showItemInFolder(abs);
+      } else if (choice === "copy") {
+        const r = await window.confidant.copyImageToClipboard(abs);
+        if (!r.ok) {
+          await window.confidant.infoDialog(`复制图片失败:${r.error.message}`);
+        }
+      } else if (choice === "remove") {
+        const yes = await window.confidant.confirmDialog(
+          "删除这张图片及其文件?将移入回收站",
+        );
+        if (!yes) return;
+        const refRemoved = current.removeImageNodeAtElement(wrapper); // 引用移除 → 自动保存
+        const tr = await window.confidant.trashItem(abs);
+        if (!tr.ok) {
+          await window.confidant.infoDialog(
+            refRemoved
+              ? `图片文件未能移入回收站:${tr.error.message}(引用已从文档移除)。`
+              : `图片文件未能移入回收站:${tr.error.message}`,
+          );
+        }
+      }
+    };
+
     host.addEventListener("paste", onPaste);
     host.addEventListener("drop", onDrop);
     host.addEventListener("dragover", allowDrop);
+    const handleContextMenu = (e: MouseEvent): void => void onContextMenu(e);
+    host.addEventListener("contextmenu", handleContextMenu);
     host.addEventListener("compositionstart", start);
     host.addEventListener("compositionend", end);
     host.addEventListener("compositioncancel", end);
@@ -164,6 +236,7 @@ export default function App() {
       host.removeEventListener("paste", onPaste);
       host.removeEventListener("drop", onDrop);
       host.removeEventListener("dragover", allowDrop);
+      host.removeEventListener("contextmenu", handleContextMenu);
       host.removeEventListener("compositionstart", start);
       host.removeEventListener("compositionend", end);
       host.removeEventListener("compositioncancel", end);

@@ -1,10 +1,20 @@
 // 主进程:窗口生命周期、IPC 承载与自检驱动。
 // 单窗口形态(无托盘/无状态栏);Windows 平台规则:窗口全关即退出。
 
-import { app, BrowserWindow, dialog, ipcMain, Menu } from "electron";
+import {
+  app,
+  BrowserWindow,
+  clipboard,
+  ClipboardItem,
+  dialog,
+  ipcMain,
+  Menu,
+  nativeImage,
+  shell,
+} from "electron";
 import { join } from "node:path";
 import { mkdirSync } from "node:fs";
-import { readFile } from "node:fs/promises";
+import { access, readFile } from "node:fs/promises";
 import { IPC, type ErrorInfo, type MenuItemState, type MenuItemTemplate, type Result } from "@shared/ipc";
 import {
   extForImageMime,
@@ -14,7 +24,8 @@ import {
   writeTextFileAtomic,
   type TreeEntry,
 } from "../../packages/files";
-import { applyMenuTemplate, getMenuItem, updateMenuItems } from "./menu";
+import { applyMenuTemplate, getMenuItem, popupContextMenu, updateMenuItems } from "./menu";
+import { registerImageScheme, installImageProtocolHandler } from "./asset-protocol";
 import {
   currentWorkspaceRoot,
   startWorkspaceWatch,
@@ -370,6 +381,19 @@ async function runWorkspaceSelfCheck(win: BrowserWindow, wsDir: string, emptyDir
     const diskA2 = await readFile(aPath, "utf8");
     if (!diskA2.includes(`![](${pasteLanded.name})`)) return fail("image reference missing in note");
 
+    // 2.6) 渲染验证:编辑区出现 <img> 且资产协议真实加载(naturalWidth > 0)
+    const imgRendered = await poll(async () => {
+      const state = await js<{ src: string; w: number } | null>(
+        `(() => {
+          const img = document.querySelector(".confidant-image-node img");
+          if (!img) return null;
+          return { src: img.getAttribute("src") ?? "", w: img.naturalWidth };
+        })()`,
+      );
+      return state && state.src.startsWith("confidant-img://") && state.w > 0 ? state : null;
+    });
+    if (!imgRendered) return fail("image not rendered via asset protocol");
+
     // 3) 外部新增 .md → 树即时出现;点击打开编辑保存
     const externalName = `外部新增-${Date.now()}.md`;
     const externalAbs = join(wsDir, externalName);
@@ -632,6 +656,79 @@ function registerIpc(): void {
     });
     return res.canceled ? null : (res.filePaths[0] ?? null);
   });
+
+  // ── 图片右键操作与系统能力(06) ──
+  ipcMain.handle(IPC.showContextMenu, async (e, items: MenuItemTemplate[]) => {
+    const win = BrowserWindow.fromWebContents(e.sender);
+    if (!win) return null;
+    return popupContextMenu(win, items);
+  });
+
+  ipcMain.handle(IPC.showItemInFolder, async (_e, targetPath: string) => {
+    shell.showItemInFolder(targetPath);
+  });
+
+  ipcMain.handle(IPC.imageCopyToClipboard, async (_e, path: string): Promise<Result<void>> => {
+    try {
+      const image = nativeImage.createFromPath(path);
+      if (image.isEmpty()) throw Object.assign(new Error("无法读取图片数据"), { code: "IMG_EMPTY" });
+      // Electron 44 异步剪贴板:统一以 image/png 写入(系统位图通道)
+      const pngBytes = Uint8Array.from(image.toPNG());
+      const blob = new Blob([pngBytes], { type: "image/png" });
+      await clipboard.write([new ClipboardItem({ "image/png": blob })]);
+      return { ok: true, value: undefined };
+    } catch (err) {
+      return { ok: false, error: toError(err) };
+    }
+  });
+
+  ipcMain.handle(IPC.trashItem, async (_e, path: string): Promise<Result<void>> => {
+    try {
+      await shell.trashItem(path);
+      return { ok: true, value: undefined };
+    } catch (err) {
+      return { ok: false, error: toError(err) };
+    }
+  });
+
+  ipcMain.handle(IPC.confirmDialog, async (e, message: string, detail: string): Promise<boolean> => {
+    const win = BrowserWindow.fromWebContents(e.sender);
+    const opts: Electron.MessageBoxOptions = {
+      type: "question",
+      title: "确认",
+      message,
+      detail,
+      buttons: ["取消", "删除"],
+      defaultId: 1,
+      cancelId: 0,
+      noLink: true,
+    };
+    const res = win ? await dialog.showMessageBox(win, opts) : await dialog.showMessageBox(opts);
+    return res.response === 1;
+  });
+
+  ipcMain.handle(IPC.infoDialog, async (e, message: string, detail: string): Promise<void> => {
+    const win = BrowserWindow.fromWebContents(e.sender);
+    const opts: Electron.MessageBoxOptions = {
+      type: "info",
+      title: "知己笔记",
+      message,
+      detail,
+      buttons: ["好的"],
+      noLink: true,
+    };
+    if (win) await dialog.showMessageBox(win, opts);
+    else await dialog.showMessageBox(opts);
+  });
+
+  ipcMain.handle(IPC.pathExists, async (_e, path: string): Promise<boolean> => {
+    try {
+      await access(path);
+      return true;
+    } catch {
+      return false;
+    }
+  });
 }
 
 // 退出前把防抖中的状态落盘
@@ -639,7 +736,11 @@ app.on("before-quit", () => {
   void flushState();
 });
 
+// 图片资产协议须在 ready 前注册;自检 userData 隔离在 createWindow 前即可
+registerImageScheme();
+
 app.whenReady().then(() => {
+  installImageProtocolHandler();
   registerIpc();
   createWindow();
 

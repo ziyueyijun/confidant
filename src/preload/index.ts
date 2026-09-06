@@ -117,6 +117,24 @@ const api: ConfidantApi = {
       return "";
     }
   },
+
+  showContextMenu: (items: MenuItemTemplate[]) =>
+    ipcRenderer.invoke(IPC.showContextMenu, items) as Promise<string | null>,
+
+  showItemInFolder: (targetPath: string) => ipcRenderer.invoke(IPC.showItemInFolder, targetPath) as Promise<void>,
+
+  copyImageToClipboard: (path: string) =>
+    ipcRenderer.invoke(IPC.imageCopyToClipboard, path) as Promise<Result<void>>,
+
+  trashItem: (path: string) => ipcRenderer.invoke(IPC.trashItem, path) as Promise<Result<void>>,
+
+  confirmDialog: (message: string, detail?: string) =>
+    ipcRenderer.invoke(IPC.confirmDialog, message, detail ?? "") as Promise<boolean>,
+
+  infoDialog: (message: string, detail?: string) =>
+    ipcRenderer.invoke(IPC.infoDialog, message, detail ?? "") as Promise<void>,
+
+  pathExists: (path: string) => ipcRenderer.invoke(IPC.pathExists, path) as Promise<boolean>,
 };
 
 contextBridge.exposeInMainWorld("confidant", api);

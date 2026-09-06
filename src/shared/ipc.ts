@@ -46,6 +46,20 @@ export const IPC = {
   imageSaveCopy: "image:save-copy",
   /** 原生「选择图片文件」对话框(插入图片通道)。 */
   imagePickDialog: "dialog:pick-image",
+  /** 临时上下文菜单(右键;返回所选项 id 或 null)。 */
+  showContextMenu: "menu:popup-context",
+  /** 在系统资源管理器中显示并选中目标(打开所在文件夹)。 */
+  showItemInFolder: "shell:show-item-in-folder",
+  /** 把本地图片文件数据写入系统剪贴板(复制图片)。 */
+  imageCopyToClipboard: "image:copy-to-clipboard",
+  /** 移入系统回收站。 */
+  trashItem: "shell:trash-item",
+  /** 原生确认对话框。 */
+  confirmDialog: "dialog:confirm",
+  /** 原生信息对话框。 */
+  infoDialog: "dialog:info",
+  /** 路径是否存在(悬空引用判定)。 */
+  pathExists: "fs:path-exists",
 } as const;
 
 export interface ErrorInfo {
@@ -62,6 +76,8 @@ export interface MenuItemTemplate {
   label?: string;
   accelerator?: string;
   role?: string;
+  /** 上下文菜单(临时 popup)项可用态;应用菜单由 updateItems 驱动,忽略此项。 */
+  enabled?: boolean;
   submenu?: MenuItemTemplate[];
 }
 
@@ -127,6 +143,20 @@ export interface ConfidantApi {
   pickImageFile(): Promise<string | null>;
   /** 渲染层 File → 磁盘路径(拖入文件必需;webUtils)。非文件返回空串。 */
   pathForFile(file: File): string;
+  /** 右键上下文菜单;返回所选正常项 id(关闭/跳出为 null)。 */
+  showContextMenu(items: MenuItemTemplate[]): Promise<string | null>;
+  /** 资源管理器中定位目标文件/文件夹。 */
+  showItemInFolder(targetPath: string): Promise<void>;
+  /** 图片文件内容写入系统剪贴板。 */
+  copyImageToClipboard(path: string): Promise<Result<void>>;
+  /** 移入系统回收站(删除通道;回收站可还原)。 */
+  trashItem(path: string): Promise<Result<void>>;
+  /** 原生确认框(删除确认等)。 */
+  confirmDialog(message: string, detail?: string): Promise<boolean>;
+  /** 原生信息框(明确提示,不静默)。 */
+  infoDialog(message: string, detail?: string): Promise<void>;
+  /** 路径是否存在(悬空引用判定)。 */
+  pathExists(path: string): Promise<boolean>;
 }
 
 declare global {

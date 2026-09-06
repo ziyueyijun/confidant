@@ -6,7 +6,7 @@
 // 本包不感知 React、不感知文件系统、不感知 UI 壳。
 
 export { createEngine } from "./lib/engine";
-export type { Engine, EngineCallbacks } from "./lib/engine";
+export type { Engine, EngineCallbacks, EngineOptions, ImageUrlResolver } from "./lib/engine";
 
 export { splitFrontMatter } from "./lib/frontmatter";
 export type { FrontMatterSplit } from "./lib/frontmatter";

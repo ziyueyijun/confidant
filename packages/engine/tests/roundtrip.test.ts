@@ -87,6 +87,38 @@ describe("markdown 往返(语义级)", () => {
     expect(out).toContain("段落。");
   });
 
+  it("图片显示解析:NodeView 按注入 resolver 换源,文档/序列化保留原始引用(06)", () => {
+    const host = document.createElement("div");
+    const engine = createEngine(
+      host,
+      {},
+      { resolveImageUrl: (raw) => `ASSET://${encodeURIComponent(raw)}` },
+    );
+    engine.loadMarkdown("![样品](./pic/a.png)\n");
+    const img = host.querySelector("img") as HTMLImageElement | null;
+    // getAttribute 取原始值(jsdom 会把 img.src 协议头小写化)
+    expect(img?.getAttribute("src")).toBe("ASSET://.%2Fpic%2Fa.png");
+    // 序列化仍是原文引用(不改源语法)
+    expect(engine.getMarkdown()).toContain("![样品](./pic/a.png)");
+    engine.destroy();
+  });
+
+  it("removeImageNodeAtElement:按 NodeView DOM 删除图片节点,序列化无残留(06)", () => {
+    const host = document.createElement("div");
+    const engine = createEngine(host);
+    engine.loadMarkdown("![甲](a.png)\n\n尾段\n");
+    const wrapper = host.querySelector(".confidant-image-node") as HTMLElement;
+    expect(wrapper).not.toBeNull();
+    const removed = engine.removeImageNodeAtElement(wrapper.querySelector("img")!);
+    expect(removed).toBe(true);
+    const out = engine.getMarkdown();
+    expect(out).not.toContain("a.png");
+    expect(out).toContain("尾段");
+    // 非图片元素 → false
+    expect(engine.removeImageNodeAtElement(host)).toBe(false);
+    engine.destroy();
+  });
+
   it("insertImage:光标处插入图片节点,序列化出相对引用(05 落盘后写引用路径)", () => {
     const host = document.createElement("div");
     const engine = createEngine(host);

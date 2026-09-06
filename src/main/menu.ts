@@ -73,3 +73,38 @@ export function getMenuItem(id: string): { label: string; enabled: boolean } | n
   const item = byId.get(id);
   return item ? { label: item.label, enabled: item.enabled } : null;
 }
+
+/**
+ * 临时上下文菜单(右键菜单;renderer 经 IPC 触发)。
+ * 返回所选正常项 id;关闭/跳出返回 null。role/separator 不产生选择。
+ */
+export function popupContextMenu(
+  win: BrowserWindow,
+  template: MenuItemTemplate[],
+): Promise<string | null> {
+  return new Promise((resolve) => {
+    let chosen: string | null = null;
+    const clicked = (id: string): void => {
+      chosen = id;
+    };
+    const convert = (tpl: MenuItemTemplate): MenuItemConstructorOptions => {
+      if (tpl.type === "separator") return { type: "separator" };
+      if (tpl.type === "role") {
+        return { label: tpl.label, role: tpl.role as MenuItemConstructorOptions["role"] };
+      }
+      const opt: MenuItemConstructorOptions = { label: tpl.label };
+      if (tpl.type === "submenu") {
+        opt.submenu = (tpl.submenu ?? []).map(convert);
+      } else {
+        opt.click = () => clicked(tpl.id);
+        opt.enabled = tpl.enabled !== false;
+      }
+      return opt;
+    };
+    const menu = Menu.buildFromTemplate(template.map(convert));
+    menu.on("menu-will-close", () => {
+      setImmediate(() => resolve(chosen));
+    });
+    menu.popup({ window: win });
+  });
+}
