@@ -11,6 +11,7 @@ export function makeEditor(
   host: HTMLElement,
   markdown: string,
   resolveImageUrl: ImageUrlResolver,
+  handlePaste?: (event: ClipboardEvent) => boolean,
 ): Editor {
   return new Editor({
     element: host,
@@ -107,6 +108,8 @@ export function makeEditor(
         if (types.has("listItem")) return runListCmd("listItem");
         return false;
       },
+      // 粘贴(17/26):在 PM 默认插入之前运行应用分派;返回 true 时 PM 不再插入(修双插)
+      handlePaste: (_view, event) => (handlePaste ? handlePaste(event) : false),
     },
   });
 }

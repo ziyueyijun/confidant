@@ -151,6 +151,147 @@ export async function runSelfCheck(win: BrowserWindow, notePath: string | null):
         const firstBad = checks.find((c) => typeof c === "string");
         if (firstBad) return fail(`disk check: ${firstBad}`);
         console.log(`[smoke] e2e ok — autosave ${mark1}; menu-command save ${mark2}`);
+
+        // 26:空段落点击探针(实机复验):Enter×3 造空段 → 真实输入事件点击空行各变体,
+        // 光标须落位(行中心为硬判据;其余变体仅记录)
+        // 26:空段落点击探针(实机复验)。注意:与真实使用一致地先开工作区再开文件
+        // (仅开文件时 `!workspace` 的欢迎页绝对定位覆盖编辑区,吞掉一切点击——那是
+        // E2E 直接开文件路径的伪影,真实用户无法走到;故探针必须带工作区)。
+        const probeDir = notePath.replace(/[\\/][^\\/]*$/, "");
+        const probeName = notePath.split(/[\\/]/).pop() ?? "fixture.md";
+        win.webContents.send(IPC.openWorkspaceRequest, probeDir);
+        await delay(800);
+        const wsReady = await pollUntil(
+          () => js<boolean>(`!!document.querySelector("[data-rel='${probeName}']")`),
+          15000,
+        );
+        if (!wsReady) {
+          const diag = await js<string>(
+            `JSON.stringify({
+              body: document.body.innerText.slice(0, 200),
+              sidebar: !!document.querySelector("[data-testid='sidebar']"),
+              rels: [...document.querySelectorAll("[data-rel]")].map((el) => el.getAttribute("data-rel")),
+              err: document.querySelector("[data-testid='load-error']")?.textContent ?? null,
+              title: document.title,
+            })`,
+          );
+          return fail(`empty-line click probe: workspace not opened (${probeDir}); diag=${diag}`);
+        }
+        win.webContents.send(IPC.openFileRequest, notePath);
+        const probeFileOpen = await pollUntil(
+          async () =>
+            (await js<string>(`document.querySelector("header strong")?.textContent ?? ""`)) === probeName,
+          8000,
+        );
+        if (!probeFileOpen) return fail(`empty-line click probe: file not opened (${probeName})`);
+        const probePoints = await js<{ ok: boolean; detail: string }>(
+          `(() => {
+            const el = document.querySelector('[contenteditable="true"]');
+            if (!el) return { ok: false, detail: "no-editor" };
+            el.focus();
+            const range = document.createRange();
+            range.selectNodeContents(el);
+            range.collapse(false);
+            const sel = window.getSelection();
+            sel?.removeAllRanges();
+            sel?.addRange(range);
+            for (let i = 0; i < 3; i++) {
+              el.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true, cancelable: true }));
+            }
+            const ps = [...el.querySelectorAll("p")];
+            const empties = ps.filter((p) => (p.textContent ?? "").trim() === "");
+            if (empties.length === 0) return { ok: false, detail: "no-empty-paragraph" };
+            const t = empties[Math.floor(empties.length / 2)];
+            t.scrollIntoView({ block: "center" });
+            const r = t.getBoundingClientRect();
+            if (r.height === 0) return { ok: false, detail: "empty-p-no-height" };
+            const hit = (x, y) => {
+              const el = document.elementFromPoint(x, y);
+              return el ? el.tagName + "#" + el.id + "." + el.className + " :: " + el.outerHTML.slice(0, 100) : "null";
+            };
+            const textP = ps.find((p) => (p.textContent ?? "").trim().length > 0);
+            const tr = textP ? textP.getBoundingClientRect() : null;
+            return {
+              ok: true,
+              detail: JSON.stringify({
+                cx: r.left + r.width / 2,
+                yMid: r.top + r.height / 2,
+                yTop: r.top,
+                yBottom: r.bottom,
+                hitCenter: hit(r.left + r.width / 2, r.top + r.height / 2),
+                hitMargin: hit(r.left + r.width / 2, r.top - 2),
+                textCtrl: tr ? { x: tr.left + tr.width / 2, y: tr.top + tr.height / 2 } : null,
+                empties: empties.length,
+              }),
+            };
+          })()`,
+        );
+        if (!probePoints.ok) return fail(`empty-line click probe setup: ${probePoints.detail}`);
+        const pp = JSON.parse(probePoints.detail) as {
+          cx: number; yMid: number; yTop: number; yBottom: number; empties: number;
+        };
+        const variants: Array<{ tag: string; x: number; y: number }> = [
+          { tag: "center", x: pp.cx, y: pp.yMid },
+          { tag: "line-top-margin", x: pp.cx, y: pp.yTop - 2 },
+          { tag: "line-bottom-margin", x: pp.cx, y: pp.yBottom + 2 },
+        ];
+        // 失焦变体:先真实点击侧栏空白(编辑器失焦),再点空行——覆盖「先点别处再点空行」场景
+        const sidebarBlur = await js<{ x: number; y: number } | null>(
+          `(() => {
+            const sb = document.querySelector("[data-testid='sidebar']");
+            const r = sb ? sb.getBoundingClientRect() : null;
+            if (!r || r.height === 0) return null;
+            return { x: r.left + 20, y: r.top + 40 };
+          })()`,
+        );
+        if (sidebarBlur) {
+          win.webContents.sendInputEvent({ type: "mouseDown", x: sidebarBlur.x, y: sidebarBlur.y, button: "left", clickCount: 1 });
+          win.webContents.sendInputEvent({ type: "mouseUp", x: sidebarBlur.x, y: sidebarBlur.y, button: "left", clickCount: 1 });
+          await delay(150);
+          const blurred = await js<boolean>(
+            `document.activeElement?.tagName === "BODY" ||
+             !(document.querySelector("[contenteditable='true']")?.contains(document.activeElement))`,
+          );
+          if (!blurred) return fail(`empty-line click probe: sidebar blur did not defocus editor`);
+          variants.push({ tag: "center-after-blur", x: pp.cx, y: pp.yMid });
+        }
+        const clickResults: Array<{ tag: string; ok: boolean; detail?: string }> = [];
+        await js<void>(`(() => {
+          window.__probeEvts = [];
+          window.addEventListener("mousedown", (e) => window.__probeEvts.push({ t: "down", x: e.clientX, y: e.clientY, tag: e.target?.tagName ?? "", cls: e.target?.className ?? "", trusted: e.isTrusted }), true);
+          window.addEventListener("mouseup", (e) => window.__probeEvts.push({ t: "up", x: e.clientX, y: e.clientY, tag: e.target?.tagName ?? "", trusted: e.isTrusted }), true);
+        })()`);
+        for (const v of variants) {
+          win.webContents.sendInputEvent({ type: "mouseDown", x: v.x, y: v.y, button: "left", clickCount: 1 });
+          win.webContents.sendInputEvent({ type: "mouseUp", x: v.x, y: v.y, button: "left", clickCount: 1 });
+          await delay(150);
+          const st = await js<{ ok: boolean; detail: string }>(
+            `(() => {
+              const el = document.querySelector('[contenteditable="true"]');
+              const sel2 = window.getSelection();
+              const focusInside = sel2?.focusNode
+                ? el === sel2.focusNode || el.contains(sel2.focusNode)
+                : false;
+              const evts = (window.__probeEvts ?? []).slice(-4);
+              window.__probeEvts = [];
+              return {
+                ok: focusInside,
+                detail: JSON.stringify({
+                  active: document.activeElement === el ? "editor" : document.activeElement?.tagName ?? "none",
+                  focusInside,
+                  collapsed: sel2?.isCollapsed ?? null,
+                  evts,
+                }),
+              };
+            })()`,
+          );
+          clickResults.push({ tag: v.tag, ok: st.ok, detail: st.detail });
+        }
+        const centerHit = clickResults.find((c) => c.tag === "center");
+        if (!centerHit?.ok) {
+          return fail(`empty-line click probe: center miss; setup=${probePoints.detail} all=${JSON.stringify(clickResults)}`);
+        }
+        console.log(`[smoke] empty-line click probe ok (${clickResults.map((c) => `${c.tag}:${c.ok ? "hit" : "miss"}`).join(" ")})`);
       }
     } else {
       const probe = await js<{ rootChildren: number; bodyText: string; title: string }>(

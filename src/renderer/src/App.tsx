@@ -441,7 +441,8 @@ export default function App() {
           >
             {engineHost}
           </div>
-          {!workspace && (
+          {/* 欢迎页:仅当既无工作区也无文档(直开文件路径下避免覆盖编辑区,26) */}
+          {!workspace && !doc && (
             <Welcome
               recentFolders={recentFolders}
               onOpenRecent={(p) => void openWorkspace(p)}

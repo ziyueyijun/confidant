@@ -136,6 +136,8 @@ export interface Engine {
 export interface EngineOptions {
   /** 图片显示源解析(默认原样;App 注入资产协议 resolver)。 */
   resolveImageUrl?: ImageUrlResolver;
+  /** 粘贴分派(17/26):在 PM 默认插入之前运行;返回 true 表示已处理(不再二次插入)。 */
+  handlePaste?: (event: ClipboardEvent) => boolean;
 }
 
 export function createEngine(
@@ -173,7 +175,7 @@ export function createEngine(
 
   const attach = (): Editor => {
     if (editor) return editor;
-    editor = wire(makeEditor(host, "", resolveImageUrl));
+    editor = wire(makeEditor(host, "", resolveImageUrl, options.handlePaste));
     return editor;
   };
 
@@ -184,7 +186,7 @@ export function createEngine(
       const wasFocused = editor?.isFocused ?? false;
       editor?.destroy();
       host.innerHTML = "";
-      editor = wire(makeEditor(host, markdown, resolveImageUrl));
+      editor = wire(makeEditor(host, markdown, resolveImageUrl, options.handlePaste));
       if (wasFocused) editor.commands.focus();
     },
 
