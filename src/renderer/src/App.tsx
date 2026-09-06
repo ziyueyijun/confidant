@@ -57,8 +57,8 @@ const btnSmall: CSSProperties = {
   padding: "3px 12px",
   fontSize: 13,
   borderRadius: 6,
-  border: "1px solid #c5c5c5",
-  background: "#fff",
+  border: "1px solid var(--border)",
+  background: "var(--surface)",
   cursor: "pointer",
 };
 
@@ -108,6 +108,43 @@ export default function App() {
   const [tree, setTree] = useState<TreeEntry[] | null>(null);
   const [expanded, setExpanded] = useState<ReadonlySet<string>>(new Set());
   const [sidebar, setSidebar] = useState({ visible: true, width: 260 });
+
+  // ── 外观(18):跟随系统 / 浅色 / 深色(持久化,菜单勾选同源) ──
+  const [themeMode, setThemeMode] = useState<"system" | "light" | "dark">("system");
+  useEffect(() => {
+    void (async () => {
+      const saved = (await window.confidant.stateGet("theme")) as
+        | "system"
+        | "light"
+        | "dark"
+        | null;
+      setThemeMode(saved === "light" || saved === "dark" ? saved : "system");
+    })();
+  }, []);
+  useEffect(() => {
+    const mq = window.matchMedia("(prefers-color-scheme: dark)");
+    const apply = (): void => {
+      const effective =
+        themeMode === "system" ? (mq.matches ? "dark" : "light") : themeMode;
+      document.documentElement.dataset.theme = effective;
+      const menu = menuRef.current;
+      if (menu) {
+        menu.setChecked(Cmd.themeSystem, themeMode === "system");
+        menu.setChecked(Cmd.themeLight, themeMode === "light");
+        menu.setChecked(Cmd.themeDark, themeMode === "dark");
+      }
+    };
+    apply();
+    if (themeMode === "system") {
+      mq.addEventListener("change", apply);
+      return () => mq.removeEventListener("change", apply);
+    }
+    return undefined;
+  }, [themeMode]);
+  const applyThemeMode = useCallback((mode: "system" | "light" | "dark") => {
+    setThemeMode(mode);
+    window.confidant.stateSet("theme", mode);
+  }, []);
 
   // ── 保存管线(02) ──
   useEffect(() => {
@@ -504,6 +541,10 @@ export default function App() {
     });
     menu.register(Cmd.about, () => true, () => void window.confidant.showAbout());
     menu.register(Cmd.quit, () => true, () => window.confidant.closeWindow());
+    // 外观三态(18)
+    menu.register(Cmd.themeSystem, () => true, () => applyThemeMode("system"));
+    menu.register(Cmd.themeLight, () => true, () => applyThemeMode("light"));
+    menu.register(Cmd.themeDark, () => true, () => applyThemeMode("dark"));
     // 文件操作命令(10):文件菜单(工作区/选中态驱动)
     const wsRule = (ctx: MenuContext) => ctx.hasWorkspace;
     const selRule = (ctx: MenuContext) => ctx.hasWorkspace && ctx.hasSelection;
@@ -1209,8 +1250,8 @@ export default function App() {
           alignItems: "center",
           gap: 10,
           padding: "4px 12px",
-          borderBottom: "1px solid var(--shell-border, #e3e3e3)",
-          background: "var(--shell-bg, #fafafa)",
+          borderBottom: "1px solid var(--shell-border, var(--border))",
+          background: "var(--shell-bg, var(--panel))",
           fontSize: 13,
           flexShrink: 0,
         }}
@@ -1235,12 +1276,12 @@ export default function App() {
         )}
         {doc && <strong style={{ fontSize: 14 }}>{doc.name}</strong>}
         {!doc && workspace && (
-          <strong style={{ fontSize: 14, fontWeight: 500, color: "#888" }}>{workspace.name}</strong>
+          <strong style={{ fontSize: 14, fontWeight: 500, color: "var(--muted)" }}>{workspace.name}</strong>
         )}
         {!workspace && <strong style={{ fontSize: 14 }}>知己笔记</strong>}
-        {doc && <span style={{ color: errorText ? "#c0392b" : "#888" }}>{statusText}</span>}
+        {doc && <span style={{ color: errorText ? "var(--danger)" : "var(--muted)" }}>{statusText}</span>}
         {errorText && (
-          <span data-testid="load-error" style={{ color: "#c0392b" }}>
+          <span data-testid="load-error" style={{ color: "var(--danger)" }}>
             {errorText}
           </span>
         )}
@@ -1314,7 +1355,7 @@ export default function App() {
               }}
             >
               <h1 style={{ margin: 0, fontSize: 28, fontWeight: 600 }}>知己笔记</h1>
-              <p style={{ margin: 0, color: "#777" }}>
+              <p style={{ margin: 0, color: "var(--muted)" }}>
                 confidant · 像写字板一样,直接写在你的文件夹里
               </p>
               <button
@@ -1337,7 +1378,7 @@ export default function App() {
                   data-testid="welcome-recents"
                   style={{ marginTop: 22, width: 320, maxHeight: 220, overflowY: "auto" }}
                 >
-                  <div style={{ fontSize: 12, color: "#999", marginBottom: 6 }}>最近打开</div>
+                  <div style={{ fontSize: 12, color: "var(--muted)", marginBottom: 6 }}>最近打开</div>
                   {recentFolders.map((r) => (
                     <button
                       key={r.path}
@@ -1381,7 +1422,7 @@ export default function App() {
                   maxWidth: 420,
                   textAlign: "center",
                   lineHeight: 1.8,
-                  color: "#999",
+                  color: "var(--muted)",
                   fontSize: 14,
                 }}
               >
@@ -1400,7 +1441,7 @@ export default function App() {
                 pointerEvents: "none",
               }}
             >
-              <p style={{ color: "#bbb", fontSize: 14 }}>从左侧选择一个笔记开始书写</p>
+              <p style={{ color: "var(--border)", fontSize: 14 }}>从左侧选择一个笔记开始书写</p>
             </div>
           )}
         </div>
@@ -1476,8 +1517,8 @@ export default function App() {
             alignItems: "center",
             gap: 12,
             padding: "8px 16px",
-            background: "rgba(40,40,40,.92)",
-            color: "#fff",
+            background: "rgba(20,20,20,.92)",
+            color: "var(--surface)",
             borderRadius: 8,
             fontSize: 13,
           }}
@@ -1502,7 +1543,7 @@ export default function App() {
           <button
             type="button"
             aria-label="关闭"
-            style={{ border: "none", background: "transparent", color: "#aaa", cursor: "pointer" }}
+            style={{ border: "none", background: "transparent", color: "var(--muted)", cursor: "pointer" }}
             onClick={dismissNotice}
           >
             ✕

@@ -1,8 +1,86 @@
 @import "tailwindcss";
 
-/* 全局壳底色(占位:shadcn 变量体系随 18 票同源收口,此处仅给可用观感) */
-:root {
-  color-scheme: light dark;
+/* ── 同源色板(深浅各一套;壳与正文渲染区共用,规格 §12 单点维护) ── */
+:root,
+:root[data-theme="light"] {
+  color-scheme: light;
+  --app-bg: #ffffff;
+  --app-fg: #1b1b1b;
+  --muted: #8a8a8a;
+  --panel: #f6f6f6;
+  --surface: #ffffff;
+  --border: #dedede;
+  --input-bg: #ffffff;
+  --accent: #1f6fcf;
+  --accent-soft: #dbe9f8;
+  --tree-active: #dbe9f8;
+  --code-bg: #f2f2f2;
+  --block-bg: #f6f8fa;
+  --block-border: #e1e4e8;
+  --quote-bar: #c8c8c8;
+  --quote-fg: #666666;
+  --danger: #c0392b;
+  --overlay: rgba(0, 0, 0, 0.15);
+  --shadow: rgba(0, 0, 0, 0.12);
+  --shell-bg: var(--panel);
+  --shell-border: var(--border);
+  --color-background: var(--app-bg);
+  --tree-active-bg: var(--tree-active);
+}
+
+/* 深色:手动深色,或跟随系统且未手动指定浅色 */
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --app-bg: #1f1f1f;
+  --app-fg: #d6d6d6;
+  --muted: #949494;
+  --panel: #262626;
+  --surface: #2b2b2b;
+  --border: #3c3c3c;
+  --input-bg: #333333;
+  --accent: #6aa9f2;
+  --accent-soft: #23446b;
+  --tree-active: #2c4258;
+  --code-bg: #333333;
+  --block-bg: #2c2c2c;
+  --block-border: #3f3f3f;
+  --quote-bar: #555555;
+  --quote-fg: #b5b5b5;
+  --danger: #e06c5c;
+  --overlay: rgba(0, 0, 0, 0.5);
+  --shadow: rgba(0, 0, 0, 0.5);
+  --shell-bg: var(--panel);
+  --shell-border: var(--border);
+  --color-background: var(--app-bg);
+  --tree-active-bg: var(--tree-active);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --app-bg: #1f1f1f;
+    --app-fg: #d6d6d6;
+    --muted: #949494;
+    --panel: #262626;
+    --surface: #2b2b2b;
+    --border: #3c3c3c;
+    --input-bg: #333333;
+    --accent: #6aa9f2;
+    --accent-soft: #23446b;
+    --tree-active: #2c4258;
+    --code-bg: #333333;
+    --block-bg: #2c2c2c;
+    --block-border: #3f3f3f;
+    --quote-bar: #555555;
+    --quote-fg: #b5b5b5;
+    --danger: #e06c5c;
+    --overlay: rgba(0, 0, 0, 0.5);
+    --shadow: rgba(0, 0, 0, 0.5);
+    --shell-bg: var(--panel);
+    --shell-border: var(--border);
+    --color-background: var(--app-bg);
+    --tree-active-bg: var(--tree-active);
+  }
 }
 
 html,
@@ -20,8 +98,8 @@ body {
     "Microsoft YaHei",
     system-ui,
     sans-serif;
-  background: var(--color-background, #ffffff);
-  color: var(--color-foreground, #1a1a1a);
+  background: var(--app-bg);
+  color: var(--app-fg);
   -webkit-font-smoothing: antialiased;
 }
 
@@ -69,19 +147,19 @@ body {
 .editor-prose blockquote {
   margin: 0.8em 0;
   padding: 0.1em 1em;
-  border-left: 3px solid #c9c9c9;
-  color: #555;
+  border-left: 3px solid var(--quote-bar);
+  color: var(--quote-fg);
 }
 .editor-prose code {
   font-family: Consolas, "Courier New", monospace;
   font-size: 0.9em;
-  background: #f2f2f2;
+  background: var(--code-bg);
   border-radius: 3px;
   padding: 0.1em 0.35em;
 }
 .editor-prose pre {
-  background: #f6f6f6;
-  border: 1px solid #e2e2e2;
+  background: var(--block-bg);
+  border: 1px solid var(--block-border);
   border-radius: 6px;
   padding: 12px 14px;
   overflow-x: auto;
@@ -100,7 +178,7 @@ body {
 }
 .editor-prose hr {
   border: none;
-  border-top: 1px solid #d4d4d4;
+  border-top: 1px solid var(--border);
   margin: 1.6em 0;
 }
 .editor-prose table {
@@ -110,12 +188,12 @@ body {
 }
 .editor-prose th,
 .editor-prose td {
-  border: 1px solid #d0d0d0;
+  border: 1px solid var(--border);
   padding: 4px 10px;
   text-align: left;
 }
 .editor-prose th {
-  background: #f4f4f4;
+  background: var(--panel);
   font-weight: 600;
 }
 .editor-prose img {
@@ -137,7 +215,7 @@ body {
   border-radius: 2px;
 }
 .editor-prose a {
-  color: #0969da;
+  color: var(--accent);
   text-decoration: underline;
   cursor: pointer;
 }
@@ -174,8 +252,8 @@ body {
   padding: 10px 14px;
   font-family: Consolas, "Courier New", monospace;
   font-size: 0.85em;
-  background: #f6f8fa;
-  border: 1px solid #e1e4e8;
+  background: var(--block-bg);
+  border: 1px solid var(--block-border);
   border-radius: 6px;
   overflow-x: auto;
   user-select: text;

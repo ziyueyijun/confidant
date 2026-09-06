@@ -222,6 +222,8 @@ export interface MenuBridge {
   register(id: string, rule: EnabledRule, run: CommandRun): void;
   /** 撤销注册(命令下线时置灰)。 */
   unregister(id: string): void;
+  /** 设置菜单项勾选态(外观三态等;与启用态独立 diff)。 */
+  setChecked(id: string, checked: boolean): void;
   /** 上下文变化(文档切换/引擎历史变化)后刷新全部启用态。 */
   setContext(ctx: MenuContext): void;
   /** 执行指定 id 命令(供测试/主进程驱动)。 */
@@ -240,6 +242,7 @@ export function createMenuBridge(): MenuBridge {
   };
   let recentItems: RecentItem[] = [];
   const lastState = new Map<string, boolean>();
+  const lastChecked = new Map<string, boolean>();
   let unsubCommand: (() => void) | null = null;
 
   function allStates(): MenuItemState[] {
@@ -304,6 +307,14 @@ export function createMenuBridge(): MenuBridge {
         diff.push({ id: s.id, enabled: s.enabled });
       }
       if (diff.length) window.confidant.updateMenuItems(diff);
+    },
+
+    setChecked(id, checked) {
+      if (lastChecked.get(id) === checked) return;
+      lastChecked.set(id, checked);
+      window.confidant.updateMenuItems([
+        { id, enabled: lastState.get(id) ?? false, checked },
+      ]);
     },
 
     invoke(id) {

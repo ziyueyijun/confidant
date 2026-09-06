@@ -70,8 +70,8 @@ export function Sidebar({
         minWidth: 0,
         display: "flex",
         flexDirection: "column",
-        borderRight: "1px solid var(--shell-border, #e3e3e3)",
-        background: "var(--shell-bg, #fafafa)",
+        borderRight: "1px solid var(--shell-border, var(--border))",
+        background: "var(--shell-bg, var(--panel))",
         position: "relative",
         flexShrink: 0,
       }}
@@ -81,7 +81,7 @@ export function Sidebar({
           padding: "8px 10px 4px",
           fontSize: 12,
           fontWeight: 600,
-          color: "#888",
+          color: "var(--muted)",
           overflow: "hidden",
           textOverflow: "ellipsis",
           whiteSpace: "nowrap",
@@ -103,7 +103,7 @@ export function Sidebar({
             padding: "4px 8px",
             fontSize: 12.5,
             borderRadius: 6,
-            border: "1px solid var(--shell-border, #d5d5d5)",
+            border: "1px solid var(--shell-border, var(--border))",
             background: "transparent",
             color: "inherit",
             cursor: "text",
@@ -132,7 +132,7 @@ export function Sidebar({
             onDropOn={onDropEntry}
           />
         ) : (
-          <div style={{ padding: 8, color: "#999", fontSize: 13 }}>正在扫描…</div>
+          <div style={{ padding: 8, color: "var(--muted)", fontSize: 13 }}>正在扫描…</div>
         )}
       </div>
       {/* 宽度拖拽把手 */}

@@ -109,10 +109,10 @@ export function SearchPanel({
         maxHeight: "60vh",
         display: "flex",
         flexDirection: "column",
-        background: "#fff",
-        border: "1px solid #d5d5d5",
+        background: "var(--surface)",
+        border: "1px solid var(--border)",
         borderRadius: 8,
-        boxShadow: "0 3px 14px rgba(0,0,0,.15)",
+        boxShadow: "0 3px 14px var(--overlay)",
         zIndex: 50,
         overflow: "hidden",
       }}
@@ -137,7 +137,7 @@ export function SearchPanel({
             padding: "5px 8px",
             fontSize: 13,
             borderRadius: 6,
-            border: "1px solid #c5c5c5",
+            border: "1px solid var(--border)",
             outline: "none",
           }}
         />
@@ -145,7 +145,7 @@ export function SearchPanel({
           type="button"
           aria-label="关闭查找"
           onClick={onClose}
-          style={{ border: "none", background: "transparent", cursor: "pointer", color: "#888" }}
+          style={{ border: "none", background: "transparent", cursor: "pointer", color: "var(--muted)" }}
         >
           ✕
         </button>
@@ -164,15 +164,15 @@ export function SearchPanel({
               borderRadius: 12,
               border: "none",
               cursor: "pointer",
-              background: scope === s ? "#2f6fbf" : "#ececec",
-              color: scope === s ? "#fff" : "#666",
+              background: scope === s ? "var(--accent)" : "var(--panel)",
+              color: scope === s ? "var(--surface)" : "var(--quote-fg)",
             }}
           >
             {s === "file" ? "当前文件" : "整个工作区"}
           </button>
         ))}
         <span style={{ flex: 1 }} />
-        <span data-testid="search-count" style={{ fontSize: 12, color: "#999", alignSelf: "center" }}>
+        <span data-testid="search-count" style={{ fontSize: 12, color: "var(--muted)", alignSelf: "center" }}>
           {query.trim() === ""
             ? ""
             : wsSearching
@@ -188,7 +188,7 @@ export function SearchPanel({
       </div>
       <div style={{ overflowY: "auto", padding: "0 6px 8px" }}>
         {empty && (
-          <div style={{ padding: "10px 8px", color: "#b0b0b0", fontSize: 13 }}>无结果</div>
+          <div style={{ padding: "10px 8px", color: "var(--muted)", fontSize: 13 }}>无结果</div>
         )}
         {scope === "file" &&
           hits.map((h, i) => (
@@ -210,7 +210,7 @@ export function SearchPanel({
                 style={{
                   fontSize: 12,
                   fontWeight: 600,
-                  color: "#555",
+                  color: "var(--quote-fg)",
                   padding: "2px 6px",
                   overflow: "hidden",
                   textOverflow: "ellipsis",
@@ -228,7 +228,7 @@ export function SearchPanel({
                   onClick={() => onOpenWorkspaceHit(f.path, query)}
                   style={{ ...rowStyle(false), fontFamily: "Consolas, monospace", fontSize: 12 }}
                 >
-                  <span style={{ color: "#aaa", marginRight: 6, userSelect: "none" }}>{l.line}</span>
+                  <span style={{ color: "var(--muted)", marginRight: 6, userSelect: "none" }}>{l.line}</span>
                   {summary(l.text)}
                 </button>
               ))}
@@ -245,7 +245,7 @@ function rowStyle(active: boolean): CSSProperties {
     width: "100%",
     textAlign: "left",
     border: "none",
-    background: active ? "var(--tree-active-bg, #e3edf7)" : "transparent",
+    background: active ? "var(--tree-active-bg, var(--accent-soft))" : "transparent",
     padding: "4px 8px",
     borderRadius: 6,
     cursor: "pointer",

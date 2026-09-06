@@ -44,7 +44,7 @@ export function TextPrompt({ title, initial = "", okLabel = "确定", validate, 
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
-        background: "rgba(0,0,0,.15)",
+        background: "var(--overlay)",
         zIndex: 60,
       }}
       onMouseDown={(e) => {
@@ -54,11 +54,11 @@ export function TextPrompt({ title, initial = "", okLabel = "确定", validate, 
       <div
         style={{
           width: 340,
-          background: "#fff",
-          border: "1px solid #ccc",
+          background: "var(--surface)",
+          border: "1px solid var(--border)",
           borderRadius: 8,
           padding: 14,
-          boxShadow: "0 4px 18px rgba(0,0,0,.18)",
+          boxShadow: "0 4px 18px var(--shadow)",
           display: "flex",
           flexDirection: "column",
           gap: 8,
@@ -80,12 +80,12 @@ export function TextPrompt({ title, initial = "", okLabel = "确定", validate, 
             padding: "6px 8px",
             fontSize: 13,
             borderRadius: 6,
-            border: "1px solid #bbb",
+            border: "1px solid var(--border)",
             outline: "none",
           }}
         />
         {error && (
-          <div data-testid="prompt-error" style={{ color: "#c0392b", fontSize: 12 }}>
+          <div data-testid="prompt-error" style={{ color: "var(--danger)", fontSize: 12 }}>
             {error}
           </div>
         )}
@@ -93,7 +93,7 @@ export function TextPrompt({ title, initial = "", okLabel = "确定", validate, 
           <button type="button" onClick={onCancel} style={btnStyle}>
             取消
           </button>
-          <button type="button" data-testid="prompt-ok" onClick={commit} style={{ ...btnStyle, background: "#e8f1fb" }}>
+          <button type="button" data-testid="prompt-ok" onClick={commit} style={{ ...btnStyle, background: "var(--accent-soft)" }}>
             {okLabel}
           </button>
         </div>
@@ -106,7 +106,7 @@ const btnStyle: React.CSSProperties = {
   padding: "4px 14px",
   fontSize: 13,
   borderRadius: 6,
-  border: "1px solid #c5c5c5",
-  background: "#fff",
+  border: "1px solid var(--border)",
+  background: "var(--surface)",
   cursor: "pointer",
 };

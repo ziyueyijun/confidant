@@ -28,12 +28,12 @@ const btn: React.CSSProperties = {
   cursor: "pointer",
   color: "inherit",
 };
-const activeBtn: React.CSSProperties = { ...btn, background: "#dbe9f8" };
+const activeBtn: React.CSSProperties = { ...btn, background: "var(--accent-soft)" };
 const inputStyle: React.CSSProperties = {
   padding: "5px 8px",
   fontSize: 13,
   borderRadius: 6,
-  border: "1px solid #c9c9c9",
+  border: "1px solid var(--border)",
   outline: "none",
   boxSizing: "border-box",
 };
@@ -41,8 +41,8 @@ const ghostBtn: React.CSSProperties = {
   padding: "4px 12px",
   fontSize: 13,
   borderRadius: 6,
-  border: "1px solid #c9c9c9",
-  background: "#fff",
+  border: "1px solid var(--border)",
+  background: "var(--surface)",
   cursor: "pointer",
 };
 
@@ -168,8 +168,8 @@ export function FormatOverlay({ engine, tick, openLinkRequest = 0 }: FormatOverl
         flexDirection: "column",
         gap: 6,
         padding: 10,
-        background: "#fff",
-        border: "1px solid #d8d8d8",
+        background: "var(--surface)",
+        border: "1px solid var(--border)",
         borderRadius: 8,
         boxShadow: "0 2px 10px rgba(0,0,0,.12)",
         zIndex: 41,
@@ -224,7 +224,7 @@ export function FormatOverlay({ engine, tick, openLinkRequest = 0 }: FormatOverl
           <button
             type="button"
             data-testid="link-commit"
-            style={{ ...ghostBtn, background: "#e8f1fb", borderColor: "#9cc1e5" }}
+            style={{ ...ghostBtn, background: "var(--accent-soft)", borderColor: "#9cc1e5" }}
             onMouseDown={(e)=>e.preventDefault()} onClick={commitLink}
           >
             {editingLink ? "更新" : "设置"}
@@ -246,8 +246,8 @@ export function FormatOverlay({ engine, tick, openLinkRequest = 0 }: FormatOverl
         alignItems: "center",
         gap: 2,
         padding: "2px 6px",
-        background: "#fff",
-        border: "1px solid #d8d8d8",
+        background: "var(--surface)",
+        border: "1px solid var(--border)",
         borderRadius: 8,
         boxShadow: "0 2px 10px rgba(0,0,0,.12)",
         zIndex: 40,
@@ -305,7 +305,7 @@ export function FormatOverlay({ engine, tick, openLinkRequest = 0 }: FormatOverl
         <span
           style={{
             fontSize: 12,
-            color: "#777",
+            color: "var(--muted)",
             padding: "0 6px",
             maxWidth: 180,
             overflow: "hidden",

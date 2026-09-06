@@ -619,6 +619,30 @@ async function runWorkspaceSelfCheck(win: BrowserWindow, wsDir: string, emptyDir
     });
     if (!movedBack) return fail("undo of move did not restore b.md");
 
+    // 5.6) 外观(18):深色/浅色即时生效(computed 校验)
+    win.webContents.send(IPC.menuCommand, "theme-dark");
+    const darkApplied = await poll(async () => {
+      const theme = await js<string>(`document.documentElement.dataset.theme ?? ""`);
+      if (theme !== "dark") return null;
+      const bg = await js<string>(`getComputedStyle(document.body).backgroundColor`);
+      return bg.includes("31, 31, 31") ? true : null;
+    });
+    if (!darkApplied) return fail("dark theme not applied");
+    win.webContents.send(IPC.menuCommand, "theme-light");
+    const lightApplied = await poll(async () => {
+      const theme = await js<string>(`document.documentElement.dataset.theme ?? ""`);
+      if (theme !== "light") return null;
+      const bg = await js<string>(`getComputedStyle(document.body).backgroundColor`);
+      return bg.includes("255, 255, 255") ? true : null;
+    });
+    if (!lightApplied) return fail("light theme not applied");
+    win.webContents.send(IPC.menuCommand, "theme-system");
+    const systemApplied = await poll(async () => {
+      const theme = await js<string>(`document.documentElement.dataset.theme ?? ""`);
+      return theme === "light" || theme === "dark" ? true : null;
+    });
+    if (!systemApplied) return fail("system theme mode not applied");
+
     // 6) 外部删除当前文件(12):横幅出现;不自动重建;「放弃」清空编辑态
     await js<void>(`document.querySelector("[data-rel='a.md']").click()`);
     const aOpen = await poll(async () => {
