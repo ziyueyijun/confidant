@@ -11,7 +11,8 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
-    "lint:boundaries": "depcruise \"packages/**/*.ts\" \"src/**/*.ts\" \"src/**/*.tsx\""
+    "lint:boundaries": "depcruise \"packages/**/*.ts\" \"src/**/*.ts\" \"src/**/*.tsx\"",
+    "dist:dir": "electron-vite build && electron-builder --win dir"
   },
   "repository": {
     "type": "git",
@@ -47,11 +48,35 @@
     "@vitejs/plugin-react": "^5.0.0",
     "dependency-cruiser": "^18.2.0",
     "electron": "^44.0.0",
+    "electron-builder": "^26.15.3",
     "electron-vite": "^5.0.0",
     "jsdom": "^30.0.0",
     "tailwindcss": "^4.3.0",
     "typescript": "~5.9.3",
     "vite": "^7.3.6",
     "vitest": "^5.0.0"
+  },
+  "build": {
+    "appId": "com.confidant.app",
+    "productName": "confidant",
+    "directories": {
+      "output": "out/dist"
+    },
+    "files": [
+      "out/**",
+      "package.json"
+    ],
+    "asar": true,
+    "win": {
+      "target": [
+        {
+          "target": "dir",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "artifactName": "confidant-${version}-${arch}.${ext}"
+    }
   }
 }
