@@ -22,6 +22,8 @@ export interface MenuRegistrationApi {
   setLinkRequest: (fn: (r: number) => number) => void;
   setUiTick: (fn: (t: number) => number) => void;
   toggleSidebar: () => void;
+  toggleCodeWrap: () => void;
+  toggleCodeLineNumbers: () => void;
   insertImageViaDialog: () => Promise<void>;
   applyThemeMode: (m: "system" | "light" | "dark") => void;
   openFolderViaDialog: () => Promise<void>;
@@ -33,7 +35,7 @@ export interface MenuRegistrationApi {
 }
 
 export function useMenuBridgeRegistration(api: MenuRegistrationApi): void {
-  const { menuRef, docRef, engineRef, pipelineRef, workspaceRef, selectedRef, setFindOpen, setFindScope, setFindFocus, setLinkRequest, setUiTick, toggleSidebar, insertImageViaDialog, applyThemeMode, openFolderViaDialog, doCreateNote, doDeleteEntry, setPrompt, showNotice, refreshMenuContext } = api;
+  const { menuRef, docRef, engineRef, pipelineRef, workspaceRef, selectedRef, setFindOpen, setFindScope, setFindFocus, setLinkRequest, setUiTick, toggleSidebar, toggleCodeWrap, toggleCodeLineNumbers, insertImageViaDialog, applyThemeMode, openFolderViaDialog, doCreateNote, doDeleteEntry, setPrompt, showNotice, refreshMenuContext } = api;
 
 // ── 菜单桥(03) ──
   useEffect(() => {
@@ -56,6 +58,15 @@ export function useMenuBridgeRegistration(api: MenuRegistrationApi): void {
       () => openFind("workspace"),
     );
     menu.register(Cmd.toggleSidebar, () => true, toggleSidebar);
+    // 设置(28):代码块换行/行号,勾选态由 App 侧经 setChecked 同步
+    menu.register(Cmd.settingsCodeWrap, () => true, () => {
+      toggleCodeWrap();
+      setUiTick((t) => t + 1);
+    });
+    menu.register(Cmd.settingsCodeLineNumbers, () => true, () => {
+      toggleCodeLineNumbers();
+      setUiTick((t) => t + 1);
+    });
     menu.register(Cmd.insertImage, (ctx) => ctx.docOpen, () => void insertImageViaDialog());
     // 行内格式(07):与浮动工具条同一引擎命令面
     const runFormat = (fn: (e: Engine) => boolean): void => {
@@ -162,6 +173,11 @@ export function useMenuBridgeRegistration(api: MenuRegistrationApi): void {
     });
     menu.init();
     refreshMenuContext();
+    // StrictMode 双挂载:清理退订,防命令事件双订阅(28 修复;此前所有菜单命令双触发)
+    return () => {
+      menu.dispose();
+      if (menuRef.current === menu) menuRef.current = null;
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 }

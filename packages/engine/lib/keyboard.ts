@@ -12,12 +12,13 @@ export function makeEditor(
   markdown: string,
   resolveImageUrl: ImageUrlResolver,
   handlePaste?: (event: ClipboardEvent) => boolean,
+  getCodeLineNumbers: () => boolean = () => true,
 ): Editor {
   return new Editor({
     element: host,
     content: markdown,
     contentType: "markdown",
-    extensions: makeExtensions(resolveImageUrl),
+    extensions: makeExtensions(resolveImageUrl, getCodeLineNumbers),
     editorProps: {
       // Tab 语义(09):表格内移下一格;列表项缩进;Shift+Tab 反缩进/上一格
       // Enter 语义(09):表格最后一行回车 → 加行并把光标带入新行同列单元格

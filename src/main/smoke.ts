@@ -1,5 +1,5 @@
 // 自检/冒烟与端到端驱动(dev 辅助;与主进程逻辑隔离,打包后仍可经 CONFIDANT_* 环境门启用)
-import { app, BrowserWindow, ipcMain, Menu } from "electron";
+import { app, BrowserWindow, clipboard, ipcMain, Menu } from "electron";
 import { join } from "node:path";
 import { mkdirSync } from "node:fs";
 import { readFile } from "node:fs/promises";
@@ -114,7 +114,7 @@ export async function runSelfCheck(win: BrowserWindow, notePath: string | null):
       } else {
         // 菜单框架验证:菜单结构 + 启用态 + 经菜单命令通道手动保存
         const topMenus = Menu.getApplicationMenu()?.items.map((i) => i.label) ?? [];
-        const expectTop = ["文件", "编辑", "段落", "格式", "视图", "帮助"];
+        const expectTop = ["文件", "编辑", "段落", "格式", "视图", "设置", "帮助"];
         if (topMenus.join("|") !== expectTop.join("|")) {
           return fail(`menu structure mismatch: ${JSON.stringify(topMenus)}`);
         }
@@ -864,6 +864,85 @@ export async function runWorkspaceSelfCheck(win: BrowserWindow, wsDir: string, e
       return sel.includes("乙") ? true : null;
     });
     if (!anchorSelected) return fail("heading anchor not selected after jump");
+
+    // 6.4) 代码块视图(28):写带语言代码块的夹具 → 打开 → 高亮/行号断言 →
+    //      设置菜单关行号/换行 → 复制按钮 → 剪贴板不含行号
+    const codeDoc = join(wsDir, "code.md");
+    await wf2(codeDoc, "```js\nconst x = 1;\n```\n", "utf8");
+    const codeRow = await poll(() => js<boolean>(q("[data-rel='code.md']")));
+    if (!codeRow) return fail("code.md row missing");
+    await js<void>(`document.querySelector("[data-rel='code.md']").click()`);
+    const codeOpen = await poll(async () => {
+      const headerName = await js<string>(
+        `document.querySelector("header strong")?.textContent ?? ""`,
+      );
+      return headerName === "code.md" ? true : null;
+    });
+    if (!codeOpen) return fail("code.md not opened");
+    const hlOk = await poll(() => js<boolean>(q(".editor-prose pre code .hljs-keyword")));
+    if (!hlOk) return fail("code highlight classes missing");
+    const lnOk = await poll(async () => {
+      const t = await js<string>(
+        `document.querySelector(".editor-prose pre .code-linenums")?.textContent ?? ""`,
+      );
+      return t === "1" ? true : null;
+    });
+    if (!lnOk) return fail("code line numbers missing or wrong");
+    // 设置菜单:关闭行号 → 装饰消失;再开 → 恢复
+    win.webContents.send(IPC.menuCommand, "settings-code-line-numbers");
+    const lnGone = await poll(() => js<boolean>(`!document.querySelector(".editor-prose pre .code-linenums")`));
+    if (!lnGone) {
+      const diag = await js<string>(
+        `JSON.stringify({
+          hostAttr: document.querySelector("[data-testid='editor-prose']")?.dataset.codeLines ?? null,
+          ln: !!document.querySelector(".editor-prose pre .code-linenums"),
+        })`,
+      );
+      return fail(`line numbers did not hide via settings; diag=${diag}`);
+    }
+    win.webContents.send(IPC.menuCommand, "settings-code-line-numbers");
+    const lnBack = await poll(() => js<boolean>(q(".editor-prose pre .code-linenums")));
+    if (!lnBack) return fail("line numbers did not restore via settings");
+    // 设置菜单:关闭自动换行 → host 数据属性切换
+    win.webContents.send(IPC.menuCommand, "settings-code-wrap");
+    const wrapOff = await poll(() =>
+      js<boolean>(`document.querySelector("[data-testid='editor-prose']")?.dataset.codeWrap === "off"`),
+    );
+    if (!wrapOff) return fail("code wrap setting did not apply (data attr)");
+    win.webContents.send(IPC.menuCommand, "settings-code-wrap");
+    const wrapOn = await poll(() =>
+      js<boolean>(`document.querySelector("[data-testid='editor-prose']")?.dataset.codeWrap === "on"`),
+    );
+    if (!wrapOn) return fail("code wrap setting did not restore (data attr)");
+    // 复制按钮:真实鼠标移动到代码块 → 按钮浮现 → 点击复制 → 剪贴板为纯源码(不含行号)
+    const codeRect = await js<{ x: number; y: number } | null>(
+      `(() => {
+        const pre = document.querySelector(".editor-prose pre");
+        const r = pre ? pre.getBoundingClientRect() : null;
+        if (!r || r.width === 0) return null;
+        return { x: r.left + r.width / 2, y: r.top + r.height / 2 };
+      })()`,
+    );
+    if (!codeRect) return fail("code block rect missing");
+    win.webContents.sendInputEvent({ type: "mouseMove", x: codeRect.x, y: codeRect.y });
+    const copyBtn = await poll(() => js<boolean>(q("[data-testid='code-copy-btn']")), 5000);
+    if (!copyBtn) {
+      const diag = await js<string>(
+        `JSON.stringify({
+          btn: !!document.querySelector("[data-testid='code-copy-btn']"),
+          preCount: document.querySelectorAll(".editor-prose pre").length,
+          scroll: !!document.querySelector("[data-testid='editor-scroll']"),
+        })`,
+      );
+      return fail(`copy button not shown on code block hover; diag=${diag}`);
+    }
+    await js<void>(`document.querySelector("[data-testid='code-copy-btn']").click()`);
+    const clipText = await poll<string>(async () => {
+      const t = await clipboard.readText();
+      return t === "const x = 1;" ? t : null;
+    }, 5000);
+    if (clipText !== "const x = 1;") return fail(`copy clipboard wrong: ${JSON.stringify(clipText)}`);
+    console.log("[smoke] code block view ok (highlight/line-numbers/copy)");
 
     await delay(800);
     // 回到 a.md 作为「外部删除」测试对象

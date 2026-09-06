@@ -67,6 +67,9 @@ export const Cmd = {
   themeSystem: "theme-system",
   themeLight: "theme-light",
   themeDark: "theme-dark",
+  // 设置(28)
+  settingsCodeWrap: "settings-code-wrap",
+  settingsCodeLineNumbers: "settings-code-line-numbers",
   // 帮助
   about: "about",
 } as const;
@@ -204,6 +207,22 @@ export function buildMenuTemplate(recent: RecentItem[] = []): MenuItemTemplate[]
       ],
     },
     {
+      id: "menu-settings",
+      type: "submenu",
+      label: "设置",
+      submenu: [
+        {
+          id: "menu-editor",
+          type: "submenu",
+          label: "编辑器",
+          submenu: [
+            disabledItem(Cmd.settingsCodeWrap, "代码块自动换行"),
+            disabledItem(Cmd.settingsCodeLineNumbers, "代码块显示行号"),
+          ],
+        },
+      ],
+    },
+    {
       id: "menu-help",
       type: "submenu",
       label: "帮助",
@@ -229,6 +248,8 @@ export interface MenuBridge {
   setContext(ctx: MenuContext): void;
   /** 执行指定 id 命令(供测试/主进程驱动)。 */
   invoke(id: string): void;
+  /** 释放:退订命令事件并清空注册(StrictMode 双挂载防双订阅,28)。 */
+  dispose(): void;
 }
 
 export function createMenuBridge(): MenuBridge {
@@ -305,7 +326,8 @@ export function createMenuBridge(): MenuBridge {
       for (const s of states) {
         if (lastState.get(s.id) === s.enabled) continue;
         lastState.set(s.id, s.enabled);
-        diff.push({ id: s.id, enabled: s.enabled });
+        // 勾选态与启用态独立维护:全量刷新时带上已设置的 checked(28 设置项)
+        diff.push({ id: s.id, enabled: s.enabled, checked: lastChecked.get(s.id) });
       }
       if (diff.length) window.confidant.updateMenuItems(diff);
     },
@@ -323,6 +345,14 @@ export function createMenuBridge(): MenuBridge {
       if (!h) return;
       if (!h.rule(context)) return;
       void h.run();
+    },
+
+    dispose() {
+      unsubCommand?.();
+      unsubCommand = null;
+      handlers.clear();
+      lastState.clear();
+      lastChecked.clear();
     },
   };
 }

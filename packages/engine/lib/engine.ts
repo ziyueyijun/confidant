@@ -9,6 +9,7 @@ import { linkRangeAt } from "./link-range";
 import type { LinkInfo } from "./link-range";
 import { moveTaskItem, toggleCheckedViaDom } from "./task-list-ops";
 import { makeEditor } from "./keyboard";
+import { CODE_BLOCK_VIEW_META } from "./code-block-view";
 
 export function finalizeMarkdown(md: string): string {
   return md.replace(/\n+$/, "") + "\n";
@@ -106,6 +107,10 @@ export interface Engine {
   /** 插入空表格并把光标带入首个单元格。 */
   insertTable(rows?: number, cols?: number): boolean;
 
+  // ── 代码块视图(28) ──
+  /** 代码块行号开关(默认开)。纯视图态:装饰层,文档与序列化零改动。 */
+  setCodeBlockOptions(opts: { lineNumbers: boolean }): void;
+
   // ── 结构化交互(09) ──
   /** 点击复选框切换任务完成态(渲染层 DOM 事件驱动;更新写盘 - [x]/[ ])。 */
   toggleTaskCheckedAt(domEl: Element): boolean;
@@ -148,6 +153,8 @@ export function createEngine(
   const resolveImageUrl = options.resolveImageUrl ?? IDENTITY_RESOLVER;  // 装载 = 销毁重建,重建时直接以 markdown 内容构造(原型 06 验证路径)。
   // 逐文件切换时历史栈随重建清空——本票范围不承诺跨文件撤销历史。
   let editor: Editor | null = null;
+  /** 代码块行号开关(28);makeExtensions 经闭包读取,切换时发信令强制重算装饰。 */
+  let codeLineNumbers = true;
 
   const wire = (ed: Editor): Editor => {
     ed.on("update", () => callbacks.onUpdate?.());
@@ -175,7 +182,7 @@ export function createEngine(
 
   const attach = (): Editor => {
     if (editor) return editor;
-    editor = wire(makeEditor(host, "", resolveImageUrl, options.handlePaste));
+    editor = wire(makeEditor(host, "", resolveImageUrl, options.handlePaste, () => codeLineNumbers));
     return editor;
   };
 
@@ -186,7 +193,7 @@ export function createEngine(
       const wasFocused = editor?.isFocused ?? false;
       editor?.destroy();
       host.innerHTML = "";
-      editor = wire(makeEditor(host, markdown, resolveImageUrl, options.handlePaste));
+      editor = wire(makeEditor(host, markdown, resolveImageUrl, options.handlePaste, () => codeLineNumbers));
       if (wasFocused) editor.commands.focus();
     },
 
@@ -478,6 +485,15 @@ export function createEngine(
       const ed = editor;
       if (!ed) return false;
       return ed.chain().focus().insertTable({ rows, cols, withHeaderRow: true }).run();
+    },
+
+    setCodeBlockOptions(opts) {
+      if (codeLineNumbers === opts.lineNumbers) return;
+      codeLineNumbers = opts.lineNumbers;
+      const ed = editor;
+      if (!ed) return;
+      // 行号开关不改变文档:空事务携带信令,插件 apply 重算装饰
+      ed.view.dispatch(ed.state.tr.setMeta(CODE_BLOCK_VIEW_META, true));
     },
 
     toggleTaskCheckedAt(domEl) {

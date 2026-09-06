@@ -22,12 +22,14 @@ import { TextPrompt } from "./components/TextPrompt";
 import { SearchPanel } from "./components/SearchPanel";
 import { TopBar } from "./components/TopBar";
 import { Welcome } from "./components/Welcome";
+import { CodeBlockActions } from "./components/CodeBlockActions";
 import { ChangeNoticeToast, DocMissingBanner } from "./components/OverlayBanners";
 import { EmptyWorkspaceGuidance, NotePickHint } from "./components/EmptyStates";
 import { countMdInTree, relPathOf, wsJoin, type Workspace } from "./workspace/workspace";
 import type { OpenNote } from "./session/types";
 import { useAppTheme } from "./hooks/use-app-theme";
 import { useSidebarLayout } from "./hooks/use-sidebar-layout";
+import { useEditorSettings } from "./hooks/use-editor-settings";
 import { useTreeExpansion } from "./hooks/use-tree-expansion";
 import { useDocMissing } from "./hooks/use-doc-missing";
 import { useEditorHost } from "./hooks/use-editor-host";
@@ -78,6 +80,8 @@ export default function App() {
   // ── 外观(18)与侧栏布局(04):独立域抽为 hook(22) ──
   const { applyThemeMode } = useAppTheme(menuRef);
   const { sidebar, setWidth: setSidebarWidth, toggleSidebar, commitSidebar } = useSidebarLayout();
+  // ── 编辑器设置(28):代码块换行/行号,持久化 + 勾选态 ──
+  const { settings, toggleCodeWrap, toggleCodeLineNumbers } = useEditorSettings();
 
   // ── 保存管线(02) ──
   useEffect(() => {
@@ -182,6 +186,23 @@ export default function App() {
       void done.finally(() => window.confidant.flushAck());
     });
   }, []);
+
+  // ── 编辑器设置同步(28):行号 → 引擎装饰;换行/行号 → host 数据属性驱动 CSS;菜单勾选态 ──
+  useEffect(() => {
+    engineRef.current?.setCodeBlockOptions({ lineNumbers: settings.codeLineNumbers });
+  }, [settings.codeLineNumbers]);
+  useEffect(() => {
+    const host = hostRef.current;
+    if (!host) return;
+    host.dataset.codeWrap = settings.codeWrap ? "on" : "off";
+    host.dataset.codeLines = settings.codeLineNumbers ? "on" : "off";
+  }, [settings.codeWrap, settings.codeLineNumbers]);
+  useEffect(() => {
+    const menu = menuRef.current;
+    if (!menu) return;
+    menu.setChecked(Cmd.settingsCodeWrap, settings.codeWrap);
+    menu.setChecked(Cmd.settingsCodeLineNumbers, settings.codeLineNumbers);
+  }, [settings, engine]);
 
   // ── 工作区外部变更处置(12):树刷新 + 当前文件删除/改名横幅 + 内容变更静默重载 ──
   const reloadCurrentFromDisk = useCallback(async () => {
@@ -342,7 +363,8 @@ export default function App() {
   useMenuBridgeRegistration({
     menuRef, docRef, engineRef, pipelineRef, workspaceRef, selectedRef,
     setFindOpen, setFindScope, setFindFocus, setLinkRequest, setUiTick,
-    toggleSidebar, insertImageViaDialog, applyThemeMode, openFolderViaDialog,
+    toggleSidebar, toggleCodeWrap, toggleCodeLineNumbers, insertImageViaDialog,
+    applyThemeMode, openFolderViaDialog,
     doCreateNote, doDeleteEntry, setPrompt, showNotice, refreshMenuContext,
   });
 
@@ -453,6 +475,8 @@ export default function App() {
       </div>
       {/* 浮动格式工具条与链接编辑(07) */}
       <FormatOverlay engine={engine} tick={uiTick} openLinkRequest={linkRequest} />
+      {/* 代码块复制按钮(28):悬停编辑区代码块时浮现 */}
+      <CodeBlockActions />
       {/* 查找面板(14/15) */}
       {findOpen && doc && (
         <SearchPanel

@@ -26,6 +26,16 @@
   --shell-border: var(--border);
   --color-background: var(--app-bg);
   --tree-active-bg: var(--tree-active);
+  /* 代码高亮 token(28):跟随主题的浅色配色 */
+  --code-token-comment: #6a737d;
+  --code-token-keyword: #d73a49;
+  --code-token-string: #032f62;
+  --code-token-number: #005cc5;
+  --code-token-title: #6f42c1;
+  --code-token-builtin: #e36209;
+  --code-token-variable: #e36209;
+  --code-token-operator: #24292e;
+  --code-token-addition: #22863a;
 }
 
 /* 深色:手动深色,或跟随系统且未手动指定浅色 */
@@ -53,6 +63,16 @@
   --shell-border: var(--border);
   --color-background: var(--app-bg);
   --tree-active-bg: var(--tree-active);
+  /* 代码高亮 token(28):跟随主题的深色配色 */
+  --code-token-comment: #8b949e;
+  --code-token-keyword: #ff7b72;
+  --code-token-string: #a5d6ff;
+  --code-token-number: #79c0ff;
+  --code-token-title: #d2a8ff;
+  --code-token-builtin: #ffa657;
+  --code-token-variable: #ffa657;
+  --code-token-operator: #ffa657;
+  --code-token-addition: #7ee787;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -80,6 +100,16 @@
     --shell-border: var(--border);
     --color-background: var(--app-bg);
     --tree-active-bg: var(--tree-active);
+    /* 代码高亮 token(28):跟随主题的深色配色(media 变体) */
+    --code-token-comment: #8b949e;
+    --code-token-keyword: #ff7b72;
+    --code-token-string: #a5d6ff;
+    --code-token-number: #79c0ff;
+    --code-token-title: #d2a8ff;
+    --code-token-builtin: #ffa657;
+    --code-token-variable: #ffa657;
+    --code-token-operator: #ffa657;
+    --code-token-addition: #7ee787;
   }
 }
 
@@ -169,12 +199,87 @@ body {
   border-radius: 3px;
   padding: 0.1em 0.35em;
 }
+/* 代码块(28):默认自动换行;行号列由 data-code-lines 与 .code-linenums 联动 */
 .editor-prose pre {
+  position: relative; /* 行号列定位锚 */
   background: var(--block-bg);
   border: 1px solid var(--block-border);
   border-radius: 6px;
   padding: 12px 14px;
+  white-space: pre-wrap; /* 28:默认换行;关闭时(设置)改横向滚动 */
   overflow-x: auto;
+}
+.editor-prose[data-code-lines="on"] pre {
+  padding-left: 3.2em; /* 行号列让位(与 .code-linenums 同宽) */
+}
+.editor-prose .code-linenums {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 3.2em;
+  box-sizing: border-box;
+  padding: 12px 0.6em 12px 0; /* 垂直与 pre padding 一致,行号右对齐 */
+  text-align: right;
+  color: var(--muted);
+  user-select: none;
+  white-space: pre;
+  overflow: hidden;
+  font: inherit;
+  line-height: inherit;
+}
+.editor-prose[data-code-wrap="off"] pre {
+  white-space: pre;
+}
+/* 代码高亮主题(28):hljs token 常用子集,跟随深浅色变量 */
+.editor-prose .hljs-comment,
+.editor-prose .hljs-quote {
+  color: var(--code-token-comment);
+  font-style: italic;
+}
+.editor-prose .hljs-keyword,
+.editor-prose .hljs-selector-tag,
+.editor-prose .hljs-literal,
+.editor-prose .hljs-type,
+.editor-prose .hljs-tag {
+  color: var(--code-token-keyword);
+}
+.editor-prose .hljs-string,
+.editor-prose .hljs-attr,
+.editor-prose .hljs-attribute,
+.editor-prose .hljs-regexp,
+.editor-prose .hljs-link {
+  color: var(--code-token-string);
+}
+.editor-prose .hljs-number,
+.editor-prose .hljs-symbol,
+.editor-prose .hljs-bullet,
+.editor-prose .hljs-meta {
+  color: var(--code-token-number);
+}
+.editor-prose .hljs-title,
+.editor-prose .hljs-function,
+.editor-prose .hljs-section,
+.editor-prose .hljs-name,
+.editor-prose .hljs-selector-id,
+.editor-prose .hljs-selector-class {
+  color: var(--code-token-title);
+}
+.editor-prose .hljs-built_in,
+.editor-prose .hljs-params {
+  color: var(--code-token-builtin);
+}
+.editor-prose .hljs-variable,
+.editor-prose .hljs-template-variable,
+.editor-prose .hljs-property {
+  color: var(--code-token-variable);
+}
+.editor-prose .hljs-operator,
+.editor-prose .hljs-punctuation {
+  color: var(--code-token-operator);
+}
+.editor-prose .hljs-addition {
+  color: var(--code-token-addition);
 }
 .editor-prose pre code {
   background: transparent;

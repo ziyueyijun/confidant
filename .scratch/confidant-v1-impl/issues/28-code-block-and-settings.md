@@ -2,7 +2,7 @@
 
 **Type:** task
 **Blocked by:** 无。
-**Status:** ready-for-agent
+**Status:** resolved
 
 **What to build:**
 
@@ -47,3 +47,23 @@
 
 - 引擎对代码块(围栏 + 语言属性)的解析/序列化已完整,本票纯渲染层增强。
 - 新增顶级菜单影响 smoke 顶栏断言(现状断言 6 个顶栏:文件/编辑/段落/格式/视图/帮助)。
+
+## 实现记录(28)
+
+- 提交:`feat(28): 代码块高亮/行号/换行/快速复制与「设置 → 编辑器」菜单`。
+- **高亮(自研装饰插件 code-block-view.ts)**:仿官方 lowlight 扩展的 inline 装饰;与官方差异——无语言/未知语言不高亮(28 裁决,官方会对无语言代码块 highlightAuto 自动探测);语言判定用 `registered` 判别名(`listLanguages` 只含主名,如 "js" 主名 "javascript");主题色接 CSS 变量(深浅两套,hljs token 常用子集)。
+- **行号**:inline widget 装饰置于代码文本起点,绝对定位覆盖 pre 左 padding 区(pre `position: relative`;padding-left 由 host `data-code-lines` 属性控制);行号内容随插件重建刷新;复制取码时从克隆 DOM 排除 `.code-linenums`,行号不会混入剪贴板。
+- **换行**:CSS `white-space: pre-wrap` 默认开;`data-code-wrap="off"` 切回 `pre` + 横向滚动。
+- **设置菜单**:新顶级「设置」→「编辑器」子菜单(两个勾选项);state.json 新键 `editorSettings`(不升版本,合并默认 `{codeWrap: true, codeLineNumbers: true}`);勾选态经 `setChecked` 同步;行号开关经 `engine.setCodeBlockOptions` 走插件信令(空事务 meta)强制重算装饰。
+- **复制按钮(CodeBlockActions)**:事件委托于编辑区滚动容器;portal 到滚动容器(PM 视图外)避免污染 PM DOM;`navigator.clipboard.writeText`(clone 去行号);滚动跟随。
+- **顺带修复(探索发现)**:StrictMode 双挂载下 `useMenuBridgeRegistration` 无 cleanup,`unsubCommand ??=` 防不住双订阅(闭包各自持有)——**所有菜单命令此前双触发**(幂等命令与宽松断言掩盖);补 `menu.dispose()` + effect cleanup。
+- **顺带修复**:两个匿名 `Extension.create` 名字均为 `''` 触发 TipTap 重复扩展警告;命名 `searchHighlight`/`codeBlockView`。
+- **规格同步**:§7 菜单清单加「设置」;§12 代码块渲染条款(高亮/行号/换行)。
+- smoke:顶栏断言加「设置」;工作区竖切新增 6.4 代码块步骤(写 code.md → 高亮/行号断言 → 设置菜单开关行号与换行 → 悬停复制 → 剪贴板纯源码校验)。
+- 验证:typecheck ✓;149 单测(新增 8 例:高亮语言判定/无语言不高亮/未知语言不高亮/行号内容与开关/复制去行号/往返不回归)✓;boundaries 0 ✓;工作区竖切(含 6.4)✓;文件竖切(空行探针)✓;首屏冒烟 ✓。
+
+## 验收
+
+- [x] `npm run typecheck` / `npm test`(149)全绿。
+- [x] `npm run lint:boundaries` 0 违规。
+- [x] 工作区竖切(高亮/行号/换行/复制全链路)、文件竖切、首屏冒烟全绿。

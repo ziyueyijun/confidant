@@ -22,6 +22,7 @@
   "type": "commonjs",
   "dependencies": {
     "@tiptap/core": "^3.31.3",
+    "@tiptap/extension-code-block-lowlight": "^3.31.3",
     "@tiptap/extension-image": "^3.31.3",
     "@tiptap/extension-table": "^3.31.3",
     "@tiptap/extension-table-cell": "^3.31.3",
@@ -35,6 +36,7 @@
     "chokidar": "^4.0.3",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
+    "lowlight": "^3.3.0",
     "lucide-react": "^0.544.0",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",

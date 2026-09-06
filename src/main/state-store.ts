@@ -35,6 +35,8 @@ export interface AppStateV1 {
   expanded: Record<string, string[]>;
   theme: "system" | "light" | "dark";
   window: WindowStateV1;
+  /** 编辑器设置(28):代码块自动换行/行号,默认均开。 */
+  editorSettings: { codeWrap: boolean; codeLineNumbers: boolean };
 }
 
 const DEFAULT_STATE: AppStateV1 = {
@@ -45,6 +47,7 @@ const DEFAULT_STATE: AppStateV1 = {
   expanded: {},
   theme: "system",
   window: { maximized: false, bounds: null },
+  editorSettings: { codeWrap: true, codeLineNumbers: true },
 };
 
 export const RECENT_LIMIT = 10;

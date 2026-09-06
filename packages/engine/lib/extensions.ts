@@ -13,6 +13,7 @@ import { TaskList } from "@tiptap/extension-task-list";
 import { TaskItem } from "@tiptap/extension-task-item";
 import { Image } from "@tiptap/extension-image";
 import { createSearchPlugin } from "./search-highlight";
+import { createCodeBlockViewPlugin, LOWLIGHT } from "./code-block-view";
 
 /**
  * 图片显示解析器:markdown 引用(src 原样) → 渲染层可加载的 URL。
@@ -23,7 +24,10 @@ export type ImageUrlResolver = (srcRaw: string) => string;
 
 export const IDENTITY_RESOLVER: ImageUrlResolver = (s) => s;
 
-export function makeExtensions(resolveImageUrl: ImageUrlResolver) {
+export function makeExtensions(
+  resolveImageUrl: ImageUrlResolver,
+  getCodeLineNumbers: () => boolean = () => true,
+) {
   const ImageNodeView = Image.extend({
     addNodeView() {
       return ({ node }) => {
@@ -61,6 +65,16 @@ export function makeExtensions(resolveImageUrl: ImageUrlResolver) {
     TaskItem,
     ImageNodeView,
     Markdown.configure({ markedOptions: { gfm: true } }),
-    Extension.create({ addProseMirrorPlugins: () => [createSearchPlugin()] }),
+    Extension.create({
+      name: "searchHighlight",
+      addProseMirrorPlugins: () => [createSearchPlugin()],
+    }),
+    // 代码块高亮与行号(28):装饰层,文档/序列化零改动
+    Extension.create({
+      name: "codeBlockView",
+      addProseMirrorPlugins: () => [
+        createCodeBlockViewPlugin({ lowlight: LOWLIGHT, getLineNumbers: getCodeLineNumbers }),
+      ],
+    }),
   ];
 }
