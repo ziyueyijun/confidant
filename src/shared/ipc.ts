@@ -72,6 +72,12 @@ export const IPC = {
   workspaceSearch: "workspace:search",
   /** 系统默认程序打开外部链接(16)。 */
   openExternal: "shell:open-external",
+  /** 导出 PDF / 打印(19):主进程开隐藏打印窗,渲染层提供当前文档负载。 */
+  printExport: "print:export",
+  /** 打印窗拉取当前打印负载。 */
+  printDataGet: "print:data-get",
+  /** 打印窗渲染就绪回执。 */
+  printReady: "print:ready",
 } as const;
 
 /** 外部变更原始事件(工作区监听批次内;树推送时一并携带,12 消费)。 */
@@ -166,6 +172,12 @@ export interface ConfidantApi {
   searchWorkspace(root: string, query: string): Promise<Result<WorkspaceSearchFileHit[]>>;
   /** 系统默认浏览器/程序打开链接(16)。 */
   openExternal(url: string): Promise<void>;
+  /** 导出/打印当前文档(mode pdf → {pdfPath};print → 系统对话框)。 */
+  printExport(mode: 'pdf' | 'print', payload: { notePath: string; head: string | null; bodyMd: string }): Promise<Result<{ pdfPath?: string }>>;
+  /** 打印窗:拉取当前打印负载。 */
+  getPrintData(): Promise<{ head: string | null; bodyMd: string } | null>;
+  /** 打印窗:渲染就绪回执。 */
+  printReady(ok: boolean): void;
   /** 上报「某文件已成为当前文档」(主进程记录会话恢复数据)。 */
   noteOpened(path: string): void;
   /** 读取持久状态片段(不存在返回 null)。 */

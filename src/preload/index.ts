@@ -104,6 +104,16 @@ const api: ConfidantApi = {
 
   openExternal: (url: string) => ipcRenderer.invoke(IPC.openExternal, url) as Promise<void>,
 
+  printExport: (mode: 'pdf' | 'print', payload: { notePath: string; head: string | null; bodyMd: string }) =>
+    ipcRenderer.invoke(IPC.printExport, mode, payload) as Promise<Result<{ pdfPath?: string }>>,
+
+  getPrintData: () =>
+    ipcRenderer.invoke(IPC.printDataGet) as Promise<{ head: string | null; bodyMd: string } | null>,
+
+  printReady: (ok: boolean) => {
+    ipcRenderer.send(IPC.printReady, ok);
+  },
+
   noteOpened: (path: string) => {
     ipcRenderer.send(IPC.fileOpened, path);
   },

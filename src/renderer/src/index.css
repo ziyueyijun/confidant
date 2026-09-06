@@ -89,6 +89,17 @@ body,
   height: 100%;
 }
 
+/* 打印宿主(19):页面内容自然分页,不随窗口滚动裁剪 */
+html.confidant-print,
+html.confidant-print body,
+html.confidant-print #root {
+  height: auto;
+  overflow: visible;
+}
+html.confidant-print body {
+  background: var(--app-bg);
+}
+
 body {
   margin: 0;
   overflow: hidden;

@@ -91,8 +91,13 @@ export default function App() {
     | { type: "new-folder"; dirRel: string }
     | null
   >(null);
-  /** 变更通知条(单步撤销;最近一次操作)。 */
-  const [notice, setNotice] = useState<{ id: number; label: string; undo: () => void } | null>(null);
+  /** 变更通知条(单步撤销/动作按钮;最近一次操作)。 */
+  const [notice, setNotice] = useState<{
+    id: number;
+    label: string;
+    undo?: () => void;
+    action?: { label: string; run: () => void };
+  } | null>(null);
   /** 正在编辑文件被外部删除(12:不静默重建,提供恢复/放弃)。 */
   const [docMissing, setDocMissing] = useState(false);
   const docMissingRef = useRef(false);
@@ -514,6 +519,35 @@ export default function App() {
     menu.register(Cmd.strike, (ctx) => ctx.docOpen, () => runFormat((e) => e.toggleStrike()));
     menu.register(Cmd.clearFormat, (ctx) => ctx.docOpen, () => runFormat((e) => e.clearFormat()));
     menu.register(Cmd.link, (ctx) => ctx.docOpen, () => setLinkRequest((r) => r + 1));
+    // 导出/打印(19):当前文档渲染通道(与磁盘 mtime 无关)
+    const runExport = (kind: "pdf" | "print"): void => {
+      const doc = docRef.current;
+      const ed = engineRef.current;
+      if (!doc || !ed) return;
+      void (async () => {
+        const res = await window.confidant.printExport(kind, {
+          notePath: doc.path,
+          head: doc.head,
+          bodyMd: ed.getMarkdown(),
+        });
+        if (!res.ok) {
+          if (res.error.code !== "PRINT_CANCELED") {
+            await window.confidant.infoDialog(`导出失败:${res.error.message}`);
+          }
+          return;
+        }
+        if (kind === "pdf" && res.value.pdfPath) {
+          showNotice(`已导出 PDF:${basename(res.value.pdfPath)}`, {
+            action: {
+              label: "打开所在文件夹",
+              run: () => void window.confidant.showItemInFolder(res.value.pdfPath!),
+            },
+          });
+        }
+      })();
+    };
+    menu.register(Cmd.exportPdf, (ctx) => ctx.docOpen, () => runExport("pdf"));
+    menu.register(Cmd.print, (ctx) => ctx.docOpen, () => runExport("print"));
     // 块级段落命令(08):标题/正文/列表/引用/代码块/表格,表格内置灰
     const blockRule = (ctx: MenuContext) => ctx.docOpen && !ctx.inTable;
     const runBlock = (kind: Parameters<Engine["setBlockKind"]>[0]): void => {
@@ -803,11 +837,18 @@ export default function App() {
   };
 
   const noticeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const pushNotice = useCallback((label: string, undo: () => void) => {
-    setNotice({ id: Date.now(), label, undo });
-    if (noticeTimer.current) clearTimeout(noticeTimer.current);
-    noticeTimer.current = setTimeout(() => setNotice(null), 8000);
-  }, []);
+  const showNotice = useCallback(
+    (label: string, opts?: { undo?: () => void; action?: { label: string; run: () => void } }) => {
+      setNotice({ id: Date.now(), label, ...opts });
+      if (noticeTimer.current) clearTimeout(noticeTimer.current);
+      noticeTimer.current = setTimeout(() => setNotice(null), 8000);
+    },
+    [],
+  );
+  const pushNotice = useCallback(
+    (label: string, undo: () => void) => showNotice(label, { undo }),
+    [showNotice],
+  );
   const dismissNotice = useCallback(() => {
     if (noticeTimer.current) clearTimeout(noticeTimer.current);
     setNotice(null);
@@ -1524,22 +1565,43 @@ export default function App() {
           }}
         >
           <span>{notice.label}</span>
-          <button
-            type="button"
-            style={{
-              border: "none",
-              background: "transparent",
-              color: "#9ec9f5",
-              cursor: "pointer",
-              fontSize: 13,
-            }}
-            onClick={() => {
-              notice.undo();
-              dismissNotice();
-            }}
-          >
-            撤销
-          </button>
+          {notice.undo && (
+            <button
+              type="button"
+              style={{
+                border: "none",
+                background: "transparent",
+                color: "#9ec9f5",
+                cursor: "pointer",
+                fontSize: 13,
+              }}
+              onClick={() => {
+                notice.undo?.();
+                dismissNotice();
+              }}
+            >
+              撤销
+            </button>
+          )}
+          {notice.action && (
+            <button
+              type="button"
+              data-testid="notice-action"
+              style={{
+                border: "none",
+                background: "transparent",
+                color: "#9ec9f5",
+                cursor: "pointer",
+                fontSize: 13,
+              }}
+              onClick={() => {
+                notice.action?.run();
+                dismissNotice();
+              }}
+            >
+              {notice.action.label}
+            </button>
+          )}
           <button
             type="button"
             aria-label="关闭"

@@ -643,6 +643,32 @@ async function runWorkspaceSelfCheck(win: BrowserWindow, wsDir: string, emptyDir
     });
     if (!systemApplied) return fail("system theme mode not applied");
 
+    // 5.7) 导出 PDF(19):菜单命令 → 同目录同名 .pdf(覆盖);提示条出现
+    await js<void>(`document.querySelector("[data-rel='a.md']").click()`);
+    const expBase = await poll(async () => {
+      const headerName = await js<string>(
+        `document.querySelector("header strong")?.textContent ?? ""`,
+      );
+      return headerName === "a.md" ? true : null;
+    });
+    if (!expBase) return fail("export base note reopen failed");
+    win.webContents.send(IPC.menuCommand, "export-pdf");
+    const pdfPath = join(wsDir, "a.pdf");
+    const pdfDone = await poll(async () => {
+      try {
+        const bytes = await readFile(pdfPath);
+        const head = bytes.subarray(0, 5).toString("latin1");
+        return head === "%PDF-" ? true : null;
+      } catch {
+        return null;
+      }
+    }, 20000);
+    if (!pdfDone) return fail("pdf export did not produce a.pdf");
+    const pdfNotice = await poll(() =>
+      js<boolean>(`document.body.innerText.includes("已导出 PDF")`),
+    );
+    if (!pdfNotice) return fail("export success notice missing");
+
     // 6) 外部删除当前文件(12):横幅出现;不自动重建;「放弃」清空编辑态
     await js<void>(`document.querySelector("[data-rel='a.md']").click()`);
     const aOpen = await poll(async () => {
@@ -1150,6 +1176,82 @@ function registerIpc(): void {
   ipcMain.handle(IPC.openExternal, async (_e, url: string) => {
     await shell.openExternal(url);
   });
+
+  // ── 导出 PDF / 打印(19):恒浅色隐藏打印窗,同渲染通道 ──
+  let printWin: BrowserWindow | null = null;
+  let pendingPrintPayload: { head: string | null; bodyMd: string } | null = null;
+  const createPrintWindow = (): BrowserWindow => {
+    const win = new BrowserWindow({
+      width: 900,
+      height: 1200,
+      show: false,
+      webPreferences: {
+        preload: join(__dirname, "../preload/index.js"),
+        contextIsolation: true,
+        sandbox: true,
+        nodeIntegration: false,
+      },
+    });
+    printWin = win;
+    win.on("closed", () => {
+      if (printWin === win) printWin = null;
+    });
+    if (isDev) {
+      void win.loadURL(`${process.env["ELECTRON_RENDERER_URL"]}#print`);
+    } else {
+      void win.loadFile(join(__dirname, "../renderer/index.html"), { hash: "print" });
+    }
+    return win;
+  };
+
+  ipcMain.handle(IPC.printDataGet, async () => pendingPrintPayload);
+
+  ipcMain.handle(
+    IPC.printExport,
+    async (_e, mode: "pdf" | "print", payload: { notePath: string; head: string | null; bodyMd: string }): Promise<Result<{ pdfPath?: string }>> => {
+      try {
+        pendingPrintPayload = { head: payload.head, bodyMd: payload.bodyMd };
+        const existed = printWin && !printWin.isDestroyed();
+        const win = existed ? printWin : createPrintWindow();
+        if (existed) {
+          // 复用窗口:重载以触发 PrintHost 重新拉取
+          win!.webContents.reload();
+        }
+        await new Promise<void>((resolve) => {
+          win!.webContents.once("did-finish-load", () => resolve());
+        });
+        const w = win!;
+        // 渲染就绪(PrintHost 拉取负载并完成装载后回执)
+        const ready = new Promise<void>((resolveReady, rejectReady) => {
+          const timer = setTimeout(() => rejectReady(new Error("打印窗渲染超时")), 20000);
+          ipcMain.once(IPC.printReady, (_ev, ok: boolean) => {
+            clearTimeout(timer);
+            if (ok) resolveReady();
+            else rejectReady(new Error("打印窗渲染失败"));
+          });
+        });
+        await ready;
+        if (mode === "pdf") {
+          const data = await w.webContents.printToPDF({ pageSize: "A4", printBackground: true });
+          const pdfPath = payload.notePath.replace(/\.md$/i, ".pdf");
+          const { writeFile: pwf } = await import("node:fs/promises");
+          await pwf(pdfPath, data);
+          return { ok: true, value: { pdfPath } };
+        }
+        const result = await new Promise<{ success: boolean }>((resolve) => {
+          w.webContents.print({ silent: false }, (success) => resolve({ success }));
+        });
+        if (!result.success) {
+          return { ok: false, error: { code: "PRINT_CANCELED", message: "打印已取消或失败" } };
+        }
+        return { ok: true, value: {} };
+      } catch (err) {
+        return { ok: false, error: toError(err) };
+      } finally {
+        pendingPrintPayload = null;
+      }
+    },
+  );
 
   ipcMain.handle(IPC.imageCopyToClipboard, async (_e, path: string): Promise<Result<void>> => {
     try {
