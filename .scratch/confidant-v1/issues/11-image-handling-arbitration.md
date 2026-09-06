@@ -1,7 +1,7 @@
 # 图片粘贴与存放仲裁
 
 Type: grilling
-Status: open
+Status: claimed
 
 ## Question
 
