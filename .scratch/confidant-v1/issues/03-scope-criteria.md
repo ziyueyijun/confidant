@@ -1,7 +1,7 @@
 # 范围裁决标准
 
 Type: grilling
-Status: open
+Status: claimed
 
 ## Question
 
