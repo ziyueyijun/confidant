@@ -1,7 +1,7 @@
 # 编辑引擎现状研究
 
 Type: research
-Status: open
+Status: claimed
 
 ## Question
 
