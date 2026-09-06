@@ -1,28 +1,57 @@
 {
   "name": "confidant",
-  "version": "1.0.0",
-  "description": "知己笔记",
-  "main": "index.js",
-  "directories": {
-    "doc": "docs"
-  },
+  "version": "0.1.0",
+  "private": true,
+  "description": "知己笔记——本地优先、所见即所得的 Markdown 桌面笔记",
+  "main": "./out/main/index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
-    "lint:boundaries": "depcruise \"packages/**/*.ts\""
+    "dev": "electron-vite dev",
+    "build": "electron-vite build",
+    "start": "electron-vite preview",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "lint:boundaries": "depcruise \"packages/**/*.ts\" \"src/**/*.ts\" \"src/**/*.tsx\""
   },
   "repository": {
     "type": "git",
     "url": "git+https://github.com/ziyueyijun/confidant.git"
   },
-  "keywords": [],
-  "author": "",
   "license": "ISC",
   "type": "commonjs",
-  "bugs": {
-    "url": "https://github.com/ziyueyijun/confidant/issues"
+  "dependencies": {
+    "@tiptap/core": "^3.31.3",
+    "@tiptap/extension-image": "^3.31.3",
+    "@tiptap/extension-table": "^3.31.3",
+    "@tiptap/extension-table-cell": "^3.31.3",
+    "@tiptap/extension-table-header": "^3.31.3",
+    "@tiptap/extension-table-row": "^3.31.3",
+    "@tiptap/extension-task-item": "^3.31.3",
+    "@tiptap/extension-task-list": "^3.31.3",
+    "@tiptap/markdown": "^3.31.3",
+    "@tiptap/react": "^3.31.3",
+    "@tiptap/starter-kit": "^3.31.3",
+    "chokidar": "^4.0.3",
+    "class-variance-authority": "^0.7.1",
+    "clsx": "^2.1.1",
+    "lucide-react": "^0.544.0",
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0",
+    "tailwind-merge": "^3.3.1"
   },
-  "homepage": "https://github.com/ziyueyijun/confidant#readme",
   "devDependencies": {
-    "dependency-cruiser": "^18.2.0"
+    "@tailwindcss/vite": "^4.3.0",
+    "@types/node": "^24.0.0",
+    "@types/react": "^19.2.0",
+    "@types/react-dom": "^19.2.0",
+    "@vitejs/plugin-react": "^5.0.0",
+    "dependency-cruiser": "^18.2.0",
+    "electron": "^44.0.0",
+    "electron-vite": "^5.0.0",
+    "jsdom": "^30.0.0",
+    "tailwindcss": "^4.3.0",
+    "typescript": "~5.9.3",
+    "vite": "^7.3.6",
+    "vitest": "^5.0.0"
   }
 }

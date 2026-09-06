@@ -14,11 +14,19 @@
 
 **Status:** ready-for-agent
 
-- [ ] 应用启动显示桌面窗口,关闭/退出干净(单实例语义不在此票,仅窗口生命周期)。
-- [ ] 「打开文件夹」→ 选 .md → 编辑区显示文档的所见即所得渲染(标题、段落、列表、引用、代码、表格、任务列表等结构可读),不是源码。
-- [ ] 键入内容后保存,磁盘上的 .md 文件出现对应改动,内容仍为合法 Markdown,可被任意编辑器打开。
-- [ ] 打开含 YAML front matter 的笔记不崩溃、能编辑正文;front matter 区域不参与格式语义(字节保真承诺与等宽呈现由 02 验收,此票只保证不因加载即破坏——打开→保存后该块可读且结构完整)。
-- [ ] 打开含图片语法的笔记,保存后图片引用不丢(Image 显式注册生效;渲染解析在 06)。
-- [ ] Enter 换行产生新块,Shift+Enter 为段内硬换行。
-- [ ] 引擎包为独立 deep module,入口点边界清晰,`lint:boundaries` 通过;测试可从入口点导入运行(TipTap 扩展注册与基本往返有冒烟测试)。
-- [ ] 依赖锁定:TipTap、@tiptap/markdown 锁定小版本号。
+- [x] 应用启动显示桌面窗口,关闭/退出干净(单实例语义不在此票,仅窗口生命周期)。
+- [x] 「打开文件夹」→ 选 .md → 编辑区显示文档的所见即所得渲染(标题、段落、列表、引用、代码、表格、任务列表等结构可读),不是源码。
+- [x] 键入内容后保存,磁盘上的 .md 文件出现对应改动,内容仍为合法 Markdown,可被任意编辑器打开。
+- [x] 打开含 YAML front matter 的笔记不崩溃、能编辑正文;front matter 区域不参与格式语义(字节保真承诺与等宽呈现由 02 验收,此票只保证不因加载即破坏——打开→保存后该块可读且结构完整)。
+- [x] 打开含图片语法的笔记,保存后图片引用不丢(Image 显式注册生效;渲染解析在 06)。
+- [x] Enter 换行产生新块,Shift+Enter 为段内硬换行。
+- [x] 引擎包为独立 deep module,入口点边界清晰,`lint:boundaries` 通过;测试可从入口点导入运行(TipTap 扩展注册与基本往返有冒烟测试)。
+- [x] 依赖锁定:TipTap、@tiptap/markdown 锁定小版本号。
+
+## 实现记录(01)
+
+- 提交:`feat(01): 应用骨架…`(分支 impl/confidant-v1)。
+- 技术基线落定:electron-vite 5 + Electron 44 + React 19 + TS 5.9 + vitest(jsdom)+ Tailwind 4。
+- 包:`packages/engine`(入口 index.ts:createEngine/Engine + splitFrontMatter;扩展显式清单 = StarterKit(3.31 含 Link/Underline)+ Table/Row/Cell/Header + TaskList/TaskItem + Image + @tiptap/markdown(gfm),锁 ^3.31.3);`packages/files`(原子写 writeTextFileAtomic,fs 适配器可注入)。
+- 自动化证据:40 单测通过;`npm run lint:boundaries` 0 违规;Electron 真机自检 `CONFIDANT_SMOKE=1`(首屏探针 + 截图)与 `CONFIDANT_E2E_FILE=<fixture>`(打开→键入→点保存→磁盘校验:front matter 头字节不变、标记落盘、单换行结尾)通过。
+- 人工复核项(观感/真 IME 手感/原生对话框)登记至 20;硬换行/图片语法往返由引擎单测覆盖。
