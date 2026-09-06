@@ -28,6 +28,7 @@
 - [编辑引擎选型](issues/07-engine-selection.md):引擎定 TipTap(实测 3.31);源文保真承诺 = 语义级(字节级不设硬约束,CM6 出局);能力基线 = 官方扩展表格/任务/图片(Image 须显式注册)+ 往返语义保真;风险登记(markdown 桥锁版本、math 无官方待 08 重估、IME 等未验转实现首验)。
 - [编辑区内容能力仲裁](issues/08-editor-content-arbitration.md):v1 编辑区 = 07 基线 + front matter 原样保留规则(保真防御,补测入实现首验);数学公式延后(无官方 math);脚注/TOC 块/Callouts/图表/块级 HTML/高亮/上下标/emoji 补全/媒体嵌入/源码模式/智能标点/自动成对 = 出(全表留痕);防御规则:不支持语法不得静默丢内容。
 - [导航与辅助能力仲裁](issues/09-navigation-aids-arbitration.md):v1 导航 = 05 文件树 + 全文搜索进(树顶面板、全工作区/当前文件双作用域、结果点击跳转);文内替换/拼写/聚焦/打字机/快速打开 = 出;大纲面板、字数统计 = 延后(待长文档假设与应用壳);多窗口移交应用壳 fog。
+- [外观与主题仲裁](issues/10-appearance-theme-arbitration.md):v1 外观 = 深浅两套观感(跟随系统,shadcn 变量 + 渲染 CSS)+ 默认排版设计(无用户开关);自定义主题全套/排版开关/i18n(02 单语言)/RTL 竖排/高级微配 = 出;字号设置 = 延后(DPI 已覆盖);浮动格式工具栏移交 13;状态栏与菜单栏移交应用壳。
 
 ## Not yet specified
 
