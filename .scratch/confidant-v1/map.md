@@ -18,6 +18,8 @@
 
 <!-- 索引:每个已关闭票一行——名称(链接)+ 一行要点。决议只活在票里,这里只做指引。 -->
 
+- [编辑引擎现状研究](issues/04-engine-survey.md):候选八项均 MIT(TOAST UI 已归档),建议原型验证 TipTap(首选)+ Milkdown(备选);「源文 1:1 保真」若成硬约束则 CM6 路线反转。详见 docs/research/engine-survey.md。
+
 ## Not yet specified
 
 <!-- 在途 fog:朝向目的地、尚不足以精确成票的部分;frontier 推进后逐块毕业成票,毕业一块清一块。 -->

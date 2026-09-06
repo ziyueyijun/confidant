@@ -1,7 +1,7 @@
 # 编辑引擎现状研究
 
 Type: research
-Status: claimed
+Status: resolved
 
 ## Question
 
@@ -18,3 +18,7 @@ Status: claimed
 ## 决议
 
 (由 research 子代理执行并记录;本票可在建图会话内直接开火。)
+
+## Answer
+
+候选池八项(CM6/ProseMirror/TipTap/Milkdown/Lexical/MarkText/Vditor/TOAST UI,均 MIT,TOAST UI 已归档),全部结论已标【已核实】/【推测】/【未验证】;建议进入原型验证 TipTap(首选,官方 @tiptap/markdown 双向桥 2025-10)+ Milkdown(备选对照,同属 ProseMirror 族,官方定位即 Typora 式 WYSIWYG markdown);CM6+自研渲染与 Lexical 列观察位,若「源文 1:1 不重排」定为硬约束则优先级反转。详见 docs/research/engine-survey.md。
