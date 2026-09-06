@@ -1,7 +1,7 @@
 # 平台范围
 
 Type: grilling
-Status: open
+Status: claimed
 
 ## Question
 
