@@ -1,7 +1,7 @@
 # 编辑引擎选型
 
 Type: grilling
-Status: open
+Status: claimed
 
 ## Question
 
