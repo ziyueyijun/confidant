@@ -1,7 +1,7 @@
 # 导航与辅助能力仲裁
 
 Type: grilling
-Status: open
+Status: claimed
 
 ## Question
 
