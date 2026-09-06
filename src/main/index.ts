@@ -1,14 +1,17 @@
-// 主进程:窗口生命周期与 IPC 承载(01 票最小竖切;菜单/工作区/监听随票补齐)。
+// 主进程:窗口生命周期、IPC 承载与自检驱动。
+// 单窗口形态(无托盘/无状态栏);Windows 平台规则:窗口全关即退出。
 
 import { app, BrowserWindow, dialog, ipcMain } from "electron";
 import { join } from "node:path";
 import { mkdirSync } from "node:fs";
+import { readFile } from "node:fs/promises";
 import { IPC, type ErrorInfo, type Result } from "@shared/ipc";
 import { readTextFile, writeTextFileAtomic } from "../../packages/files";
 
 const isDev = !!process.env["ELECTRON_RENDERER_URL"];
 const smoke = process.env["CONFIDANT_SMOKE"] === "1";
 const e2eFile = process.env["CONFIDANT_E2E_FILE"];
+const e2eFlushOnClose = process.env["CONFIDANT_E2E_FLUSHONCLOSE"] === "1";
 
 function toError(err: unknown): ErrorInfo {
   const e = err as { code?: string; message?: string };
@@ -19,7 +22,73 @@ function delay(ms: number): Promise<void> {
   return new Promise((r) => setTimeout(r, ms));
 }
 
-/** 冒烟/竖切自检:首屏探针(截图存档)或「打开→键入→保存→磁盘校验」端到端。 */
+/**
+ * 窗口关闭前的数据保护(规格 §9.3):close 时先请求渲染层 flush 未落盘内容,
+ * 收到回执(或 2s 超时,渲染层卡死不阻塞退出)后再销毁窗口。
+ */
+function armCloseFlush(win: BrowserWindow): void {
+  let flushing = false;
+  win.on("close", (e) => {
+    if (flushing) return;
+    e.preventDefault();
+    flushing = true;
+    const acked = new Promise<void>((resolve) => {
+      const ack = () => resolve();
+      ipcMain.once(IPC.flushAck, ack);
+      try {
+        win.webContents.send(IPC.flushRequest);
+      } catch {
+        resolve();
+        return;
+      }
+      setTimeout(() => {
+        ipcMain.removeListener(IPC.flushAck, ack);
+        resolve();
+      }, 2000);
+    });
+    void acked.finally(() => win.destroy());
+  });
+}
+
+/** 在渲染层编辑区末尾键入一段文本(自检驱动用)。 */
+async function typeAtEnd(win: BrowserWindow, text: string): Promise<{ ok: boolean; detail: string }> {
+  const marker = text.replace(/\\/g, "\\\\").replace(/"/g, '\\"');
+  return win.webContents.executeJavaScript(
+    `(async () => {
+      const el = document.querySelector('[contenteditable="true"]');
+      if (!el) return { ok: false, detail: "no-editor" };
+      el.focus();
+      const range = document.createRange();
+      range.selectNodeContents(el);
+      range.collapse(false);
+      const sel = window.getSelection();
+      if (!sel) return { ok: false, detail: "no-selection" };
+      sel.removeAllRanges();
+      sel.addRange(range);
+      const before = el.textContent ?? "";
+      const done = document.execCommand("insertText", false, "\\n\\n${marker}");
+      return { ok: done, detail: before.slice(0, 40) };
+    })()`,
+  ) as Promise<{ ok: boolean; detail: string }>;
+}
+
+/** 等待状态文案出现「已保存」(自动保存落盘)或失败文案,≤6s。 */
+async function waitSaved(win: BrowserWindow): Promise<"saved" | "failed" | "timeout"> {
+  for (let i = 0; i < 30; i++) {
+    await delay(200);
+    const text = (await win.webContents.executeJavaScript("document.body.innerText")) as string;
+    if (text.includes("已保存")) return "saved";
+    if (text.includes("保存失败") || text.includes("无法写入")) return "failed";
+  }
+  return "timeout";
+}
+
+/**
+ * 自检(dev 辅助):
+ * - 首屏冒烟:探针 + 截图后退出;
+ * - 端到端竖切:打开夹具 → 编辑区键入 → 自动保存落盘 → 磁盘校验;
+ *   开启 CONFIDANT_E2E_FLUSHONCLOSE 时再键入一段并直接关窗,验证关闭前 flush 不丢。
+ */
 async function runSelfCheck(win: BrowserWindow, notePath: string | null): Promise<void> {
   const issues: string[] = [];
   win.webContents.on("console-message", (event) => {
@@ -28,10 +97,11 @@ async function runSelfCheck(win: BrowserWindow, notePath: string | null): Promis
       issues.push(`console[${String(level)}]: ${event.message}`);
     }
   });
+  let failed = false;
   const fail = async (reason: string): Promise<void> => {
+    failed = true;
     console.error(`[smoke] FAILED: ${reason}`);
     if (issues.length) console.error("[smoke] renderer issues:", issues);
-    process.exitCode = 1;
   };
 
   const js = <T>(code: string): Promise<T> => win.webContents.executeJavaScript(code) as Promise<T>;
@@ -39,86 +109,49 @@ async function runSelfCheck(win: BrowserWindow, notePath: string | null): Promis
   await delay(1200);
   try {
     if (notePath) {
-      // ── 端到端竖切:打开夹具 → 编辑区键入 → 点击保存 → 磁盘校验 ──
-      const head = (await import("node:fs/promises")).readFile(notePath, "utf8");
-      const fixture = await head;
+      const fixture = await readFile(notePath, "utf8");
       const fmPrefix = fixture.slice(0, fixture.indexOf("\n#"));
+      const mark1 = `自动保存-${Date.now()}`;
+      const mark2 = `关窗落盘-${Date.now()}`;
       win.webContents.send(IPC.openFileRequest, notePath);
-      await delay(700);
-      const marker = `E2E冒烟-${Date.now()}`;
-      const typed = await js<{ ok: boolean; detail: string }>(
-        `(async () => {
-          const el = document.querySelector('[contenteditable="true"]');
-          if (!el) {
-            return {
-              ok: false,
-              detail: "no-editor; " + JSON.stringify({
-                bridge: typeof window.confidant,
-                body: document.body.innerText.slice(0, 160),
-              }),
-            };
-          }
-          el.focus();
-          const range = document.createRange();
-          range.selectNodeContents(el);
-          range.collapse(false);
-          const sel = window.getSelection();
-          if (!sel) return { ok: false, detail: "no-selection" };
-          sel.removeAllRanges();
-          sel.addRange(range);
-          const before = el.textContent ?? "";
-          const done = document.execCommand("insertText", false, "\\n\\n插入-${marker}");
-          return { ok: done, detail: before.slice(0, 40) };
-        })()`,
-      );
+      await delay(800);
+      const typed = await typeAtEnd(win, mark1);
       if (!typed.ok) return fail(`typing failed: ${JSON.stringify(typed)}`);
 
-      // 等「保存」按钮启用(dirty 状态已置)后点击,再轮询保存结果文案(≤5s)
-      let outcome = "";
-      let clicked = false;
-      for (let i = 0; i < 30; i++) {
-        await delay(200);
-        const state = await js<{ disabled: boolean; text: string }>(
-          `(() => {
-            const btns = [...document.querySelectorAll("button")];
-            const saveBtn = btns.find((b) => b.textContent?.trim() === "保存");
-            return { disabled: saveBtn ? saveBtn.disabled : true, text: document.body.innerText };
-          })()`,
-        );
-        if (!clicked && !state.disabled) {
-          clicked = true;
-          await js<void>(
-            `(() => {
-              const btns = [...document.querySelectorAll("button")];
-              const saveBtn = btns.find((b) => b.textContent?.trim() === "保存");
-              if (saveBtn) saveBtn.click();
-            })()`,
-          );
-          continue;
-        }
-        if (state.text.includes("已保存")) {
-          outcome = "saved";
-          break;
-        }
-        if (state.text.includes("保存失败") || state.text.includes("无法写入")) {
-          outcome = "failed";
-          break;
-        }
-      }
-      if (outcome !== "saved") return fail(`save state not reached (${outcome}, clicked=${clicked})`);
+      // 不点保存:证明停顿后自动写盘
+      const outcome = await waitSaved(win);
+      if (outcome !== "saved") return fail(`autosave not reached (${outcome})`);
 
-      const saved = await (await import("node:fs/promises")).readFile(notePath, "utf8");
-      const checks = [
-        saved.startsWith(fmPrefix) || "front matter head changed",
-        saved.includes(marker) || "typed marker missing on disk",
-        saved.endsWith("\n") || "missing trailing newline",
-        !saved.endsWith("\n\n") || "multiple trailing newlines",
-      ];
-      const firstBad = checks.find((c) => typeof c === "string");
-      if (firstBad) return fail(`disk check: ${firstBad}`);
-      console.log(`[smoke] e2e ok — typed & saved marker: ${marker}`);
+      if (e2eFlushOnClose) {
+        // 关闭前 flush 竖切:再键入一段,不做任何保存,直接关窗
+        const typed2 = await typeAtEnd(win, mark2);
+        if (!typed2.ok) return fail(`second typing failed: ${JSON.stringify(typed2)}`);
+        await delay(500);
+        const closed = new Promise<void>((r) => win.once("closed", () => r()));
+        win.close();
+        await closed;
+        const saved2 = await readFile(notePath, "utf8");
+        const checks = [
+          saved2.includes(mark2) || "close-flush marker missing on disk",
+          saved2.startsWith(fmPrefix) || "front matter head changed after close-flush",
+          saved2.endsWith("\n") || "missing trailing newline after close-flush",
+        ];
+        const firstBad = checks.find((c) => typeof c === "string");
+        if (firstBad) return fail(`close-flush disk check: ${firstBad}`);
+        console.log(`[smoke] e2e ok — autosave ${mark1}; close-flush ${mark2}`);
+      } else {
+        const saved = await readFile(notePath, "utf8");
+        const checks = [
+          saved.startsWith(fmPrefix) || "front matter head changed",
+          saved.includes(mark1) || "autosave marker missing on disk",
+          saved.endsWith("\n") || "missing trailing newline",
+          !saved.endsWith("\n\n") || "multiple trailing newlines",
+        ];
+        const firstBad = checks.find((c) => typeof c === "string");
+        if (firstBad) return fail(`disk check: ${firstBad}`);
+        console.log(`[smoke] e2e ok — autosave marker: ${mark1}`);
+      }
     } else {
-      // ── 首屏冒烟 ──
       const probe = await js<{ rootChildren: number; bodyText: string; title: string }>(
         `({
           rootChildren: document.getElementById('root')?.children.length ?? -1,
@@ -132,17 +165,23 @@ async function runSelfCheck(win: BrowserWindow, notePath: string | null): Promis
       }
     }
     if (issues.length) return fail("renderer console issues present");
-    console.log("[smoke] ok");
+    if (!failed) console.log("[smoke] ok");
   } catch (err) {
     await fail(`self-check threw: ${String(err)}`);
   } finally {
+    if (failed) process.exitCode = 1;
+    // 窗口可能已被关闭流程销毁(close-flush 分支);截图失败不影响判定
     try {
-      const { mkdirSync } = await import("node:fs");
-      mkdirSync(join(__dirname, "../../out/smoke"), { recursive: true });
-      const { writeFileSync } = await import("node:fs");
-      writeFileSync(join(__dirname, "../../out/smoke/smoke.png"), (await win.webContents.capturePage()).toPNG());
+      if (!win.isDestroyed()) {
+        mkdirSync(join(__dirname, "../../out/smoke"), { recursive: true });
+        const { writeFileSync } = await import("node:fs");
+        writeFileSync(
+          join(__dirname, "../../out/smoke/smoke.png"),
+          (await win.webContents.capturePage()).toPNG(),
+        );
+      }
     } catch {
-      // 截图失败不影响判定
+      // ignore
     }
     app.quit();
   }
@@ -167,6 +206,7 @@ function createWindow(): BrowserWindow {
   });
 
   win.once("ready-to-show", () => win.show());
+  armCloseFlush(win);
 
   if (process.env["CONFIDANT_DEVTOOLS"] === "1") {
     win.webContents.openDevTools({ mode: "detach" });

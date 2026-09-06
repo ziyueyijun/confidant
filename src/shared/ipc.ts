@@ -7,6 +7,10 @@ export const IPC = {
   writeTextFile: "files:write-text",
   /** 主进程请求渲染层打开指定文件(冒烟驱动 / 外部唤入共用通道)。 */
   openFileRequest: "app:open-file-request",
+  /** 主进程请求渲染层 flush 未落盘内容(窗口关闭前,02 票)。 */
+  flushRequest: "app:flush-request",
+  /** 渲染层 flush 完成回执。 */
+  flushAck: "app:flush-ack",
 } as const;
 
 export interface ErrorInfo {
@@ -24,6 +28,10 @@ export interface ConfidantApi {
   writeTextFile(path: string, content: string): Promise<Result<void>>;
   /** 订阅主进程的「打开文件」请求(冒烟驱动与菜单打开共用)。返回退订函数。 */
   onOpenFile(cb: (path: string) => void): () => void;
+  /** 订阅主进程的「关闭前 flush」请求;处理完后必须调 flushAck。 */
+  onFlushRequest(cb: () => void): () => void;
+  /** 通知主进程 flush 已完成。 */
+  flushAck(): void;
 }
 
 declare global {

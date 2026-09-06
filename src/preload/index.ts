@@ -18,6 +18,18 @@ const api: ConfidantApi = {
       ipcRenderer.removeListener(IPC.openFileRequest, listener);
     };
   },
+
+  onFlushRequest: (cb: () => void) => {
+    const listener = () => cb();
+    ipcRenderer.on(IPC.flushRequest, listener);
+    return () => {
+      ipcRenderer.removeListener(IPC.flushRequest, listener);
+    };
+  },
+
+  flushAck: () => {
+    ipcRenderer.send(IPC.flushAck);
+  },
 };
 
 contextBridge.exposeInMainWorld("confidant", api);

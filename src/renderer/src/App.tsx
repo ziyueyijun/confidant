@@ -1,10 +1,12 @@
-// 01 票应用骨架:欢迎占位页 → 打开 .md → 所见即所得编辑 → Ctrl+S/按钮保存。
-// 会话编排保持轻薄;自动保存/写盘管线在 02 票重构为防抖管线。
+// 应用视图层:欢迎占位页(01 过渡态)→ 打开笔记 → 所见即所得编辑。
+// 保存语义全部经 save-pipeline(02):停顿 ~1s 自动写盘、Ctrl+S/按钮立即、
+// IME 组合期不写、关闭窗口前 flush(主进程拦截 → 本页应答)。
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { createEngine, type Engine } from "../../../packages/engine";
 import { basename } from "@shared/path";
 import { composeNoteText, parseNoteText } from "./editor/note-document";
+import { createSavePipeline, type SaveState } from "./editor/save-pipeline";
 
 interface OpenNote {
   path: string;
@@ -12,10 +14,8 @@ interface OpenNote {
   head: string | null;
 }
 
-const IS_DEV_FALLBACK = true; // 菜单栏(03)落定前,渲染层自行接 Ctrl+S
-
-function describeWriteError(error: { code: string; message: string } | null): string {
-  if (!error) return "";
+function describeWriteError(error: { code: string; message: string } | null): string | null {
+  if (!error) return null;
   switch (error.code) {
     case "ENOENT":
       return "文件不存在或已被移动,无法保存。";
@@ -28,50 +28,98 @@ function describeWriteError(error: { code: string; message: string } | null): st
   }
 }
 
+function toThrownError(res: { ok: false; error: { code: string; message: string } }): Error {
+  return Object.assign(new Error(res.error.message), { code: res.error.code });
+}
+
+const EMPTY_SAVE_STATE: SaveState = {
+  dirty: false,
+  saving: false,
+  savedAt: null,
+  error: null,
+};
+
 export default function App() {
   const hostRef = useRef<HTMLDivElement>(null);
   const engineRef = useRef<Engine | null>(null);
   const docRef = useRef<OpenNote | null>(null);
-  const savingRef = useRef(false);
+  const pipelineRef = useRef<ReturnType<typeof createSavePipeline> | null>(null);
 
   const [doc, setDoc] = useState<OpenNote | null>(null);
-  const [dirty, setDirty] = useState(false);
-  const [status, setStatus] = useState<"idle" | "saving" | "saved" | "error">("idle");
-  const [errorText, setErrorText] = useState<string | null>(null);
-  const [savedAt, setSavedAt] = useState<string | null>(null);
+  const [saveState, setSaveState] = useState<SaveState>(EMPTY_SAVE_STATE);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
-  // 引擎生命周期(装载/编辑回调用 ref 保持最新闭包)
+  // 保存管线:io = 把「head + 引擎正文」原子写回当前文件
+  useEffect(() => {
+    const pipeline = createSavePipeline(
+      {
+        async write() {
+          const current = docRef.current;
+          const engine = engineRef.current;
+          if (!current || !engine) return;
+          const res = await window.confidant.writeTextFile(
+            current.path,
+            composeNoteText({ head: current.head, bodyMd: engine.getMarkdown() }),
+          );
+          if (!res.ok) throw toThrownError(res);
+        },
+      },
+      { onState: (s) => setSaveState({ ...s }) },
+    );
+    pipelineRef.current = pipeline;
+    return () => {
+      pipeline.dispose();
+      pipelineRef.current = null;
+    };
+  }, []);
+
+  // 引擎生命周期 + IME 组合门控(DOM 组合事件经 host 冒泡,规格 §9.1)
   useEffect(() => {
     const host = hostRef.current;
     if (!host) return;
     const engine = createEngine(host, {
       onUpdate: () => {
-        docRef.current && setDirty(true);
+        if (docRef.current) pipelineRef.current?.notifyEdit();
       },
     });
     engineRef.current = engine;
+    const start = () => pipelineRef.current?.setComposing(true);
+    const end = () => pipelineRef.current?.setComposing(false);
+    host.addEventListener("compositionstart", start);
+    host.addEventListener("compositionend", end);
+    host.addEventListener("compositioncancel", end);
     return () => {
       engine.destroy();
       engineRef.current = null;
+      host.removeEventListener("compositionstart", start);
+      host.removeEventListener("compositionend", end);
+      host.removeEventListener("compositioncancel", end);
     };
+  }, []);
+
+  // 主进程关闭前 flush:先落盘再回执,保证无「未保存内容」态
+  useEffect(() => {
+    return window.confidant.onFlushRequest(() => {
+      const p = pipelineRef.current;
+      const done = p ? p.flush() : Promise.resolve();
+      void done.finally(() => window.confidant.flushAck());
+    });
   }, []);
 
   // 打开指定路径
   const openPath = useCallback(async (path: string) => {
     const res = await window.confidant.readTextFile(path);
     if (!res.ok) {
-      setErrorText(describeWriteError(res.error));
+      setLoadError(res.error.code === "ENOENT" ? "文件不存在或已被移动。" : `打开失败:${res.error.message}`);
       return;
     }
     const docModel = parseNoteText(res.value);
     const next: OpenNote = { path, name: basename(path), head: docModel.head };
     docRef.current = next;
     setDoc(next);
-    setDirty(false);
-    setStatus("idle");
-    setErrorText(null);
-    setSavedAt(null);
+    setLoadError(null);
     engineRef.current?.loadMarkdown(docModel.bodyMd);
+    pipelineRef.current?.resetClean();
     document.title = `${next.name} · confidant`;
   }, []);
 
@@ -81,62 +129,35 @@ export default function App() {
     if (path) await openPath(path);
   }, [openPath]);
 
-  const save = useCallback(async () => {
-    const current = docRef.current;
-    const engine = engineRef.current;
-    if (!current || !engine || savingRef.current) return;
-    savingRef.current = true;
-    setStatus("saving");
-    setErrorText(null);
-    try {
-      const bodyMd = engine.getMarkdown();
-      const text = composeNoteText({ head: current.head, bodyMd });
-      const res = await window.confidant.writeTextFile(current.path, text);
-      if (res.ok) {
-        setDirty(false);
-        setStatus("saved");
-        setSavedAt(new Date().toLocaleTimeString("zh-CN", { hour12: false }));
-      } else {
-        setStatus("error");
-        setErrorText(describeWriteError(res.error));
-      }
-    } finally {
-      savingRef.current = false;
-    }
-  }, []);
-
-  // Ctrl+S(菜单栏落定前的过渡接线)
+  // Ctrl+S(菜单栏落定前的过渡接线;03 后由原生菜单快捷键接管)
   useEffect(() => {
-    if (!IS_DEV_FALLBACK) return;
     const onKey = (e: KeyboardEvent) => {
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "s") {
         e.preventDefault();
-        void save();
+        void pipelineRef.current?.flush();
       }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [save]);
+  }, []);
 
   // 主进程请求打开文件(冒烟驱动/菜单打开)
   useEffect(() => {
     return window.confidant.onOpenFile((path) => void openPath(path));
   }, [openPath]);
 
-  const engineHost = (
-    <div ref={hostRef} className="editor-prose" data-testid="editor-prose" />
-  );
+  const engineHost = <div ref={hostRef} className="editor-prose" data-testid="editor-prose" />;
 
-  const statusText =
-    status === "saving"
-      ? "保存中…"
-      : status === "saved" && savedAt
-        ? `已保存 ${savedAt}`
-        : dirty
+  const errorText = saveState.error ? describeWriteError(saveState.error) : loadError;
+  const statusText = saveState.saving
+    ? "保存中…"
+    : errorText
+      ? errorText
+      : saveState.savedAt
+        ? `已保存 ${new Date(saveState.savedAt).toLocaleTimeString("zh-CN", { hour12: false })}`
+        : saveState.dirty
           ? "有未保存的修改"
-          : savedAt
-            ? `已保存 ${savedAt}`
-            : "已打开";
+          : "已打开";
 
   return (
     <div style={{ height: "100%", position: "relative", display: "flex", flexDirection: "column" }}>
@@ -154,10 +175,13 @@ export default function App() {
           }}
         >
           <strong style={{ fontSize: 14 }}>{doc.name}</strong>
-          <span style={{ color: status === "error" ? "#c0392b" : "#888" }}>{statusText}</span>
-          {errorText && <span style={{ color: "#c0392b" }}>{errorText}</span>}
+          <span style={{ color: errorText ? "#c0392b" : "#888" }}>{statusText}</span>
           <span style={{ flex: 1 }} />
-          <button type="button" onClick={() => void save()} disabled={!dirty || status === "saving"}>
+          <button
+            type="button"
+            onClick={() => void pipelineRef.current?.flush()}
+            disabled={!saveState.dirty || saveState.saving}
+          >
             保存
           </button>
         </header>
@@ -192,7 +216,7 @@ export default function App() {
           <p style={{ margin: 0, color: "#777" }}>
             confidant · 像写字板一样,直接写在你的文件夹里
           </p>
-          {errorText && <p style={{ color: "#c0392b" }}>{errorText}</p>}
+          {loadError && <p style={{ color: "#c0392b" }}>{loadError}</p>}
           <button
             type="button"
             onClick={() => void openNote()}
