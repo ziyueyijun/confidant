@@ -23,10 +23,15 @@ describe("classifyLink", () => {
     expect(t.anchor).toBe("上周小结");
   });
 
-  it("盘符绝对与 ./ 相对解析;UNC 亦视为本地", () => {
+  it("盘符绝对解析;UNC 视为本地;相对路径按工作区判定", () => {
     expect(classifyLink(DOC, WS, "D:/x.md")).toMatchObject({ kind: "local", hrefPath: "D:/x.md" });
-    expect(classifyLink(DOC, WS, "./a.md")).toMatchObject({ kind: "local" });
     expect(classifyLink(DOC, WS, "//server/share/a.md")).toMatchObject({ kind: "local" });
+    // 工作区内相对 .md(含 ./ )→ note
+    const rel = classifyLink(DOC, WS, "./a.md");
+    expect(rel.kind).toBe("note");
+    expect(rel.abs).toBe("C:/notes/sub/a.md");
+    // 工作区外 .md → local
+    expect(classifyLink(DOC, WS, "D:/notes/x.md")).toMatchObject({ kind: "local" });
   });
 
   it("工作区内 .md 绝对路径识别为 note", () => {

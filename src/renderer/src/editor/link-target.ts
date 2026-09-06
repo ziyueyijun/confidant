@@ -21,6 +21,10 @@ export interface LinkTarget {
 }
 
 export function classifyLink(docPath: string, wsRoot: string | null, rawHref: string): LinkTarget {
+  // web 分流在拆锚点前判定(URL fragment 属网址本身,非标题锚点)
+  if (WEB_SCHEME.test(rawHref.trim())) {
+    return { kind: "web", hrefPath: rawHref.trim(), anchor: null };
+  }
   const [hrefPart, rawAnchor] = splitAnchor(rawHref);
   const anchor = rawAnchor ? decodeURIComponent(rawAnchor.replace(/\+/g, " ")).trim() : null;
   const href = hrefPart.trim();
@@ -28,9 +32,6 @@ export function classifyLink(docPath: string, wsRoot: string | null, rawHref: st
   // 纯锚点 = 本文档内跳转
   if (href === "" && anchor) {
     return { kind: "note", hrefPath: href, anchor, abs: docPath };
-  }
-  if (WEB_SCHEME.test(href)) {
-    return { kind: "web", hrefPath: href, anchor: null };
   }
   // 本地路径解析:绝对(盘符/UNC)或相对当前笔记目录
   let abs: string;
