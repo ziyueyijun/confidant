@@ -2,7 +2,6 @@
 
 Type: grilling
 Status: open
-Blocked by: 06
 
 ## Question
 
@@ -18,4 +17,4 @@ Blocked by: 06
 
 产出:引擎定名 + 一句话理由 + 风险登记(选中方案的已知弱点与缓解),并为规格「编辑面深层交互」fog 的毕业钉下能力基线。
 
-Blocked by 06:裁决必须以原型证据为准,不得绕过 06 先行。
+前置(06 已决):原型证据已入库(见 06 编辑引擎原型验证的 Answer 与 docs/research/engine-prototype-findings.md)——两候选语义级保真 6/6、字节级均不成立;TipTap 需显式注册 Image。06 的未验清单(真 IME、表格手感、渲染观感、长文滚动)并入本票会话补试:原型与 dev server 均在,先试后裁。本票裁决不再重复验证动作,以证据为准。
