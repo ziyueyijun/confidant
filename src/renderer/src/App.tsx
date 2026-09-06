@@ -74,8 +74,9 @@ export default function App() {
   /** 引擎 UI 节拍:编辑/选区/命令后递增,驱动浮动条重算。 */
   const [uiTick, setUiTick] = useState(0);
   const [linkRequest, setLinkRequest] = useState(0);
-  /** 查找面板(14):打开态与焦点请求。 */
+  /** 查找面板(14/15):打开态、作用域与焦点请求。 */
   const [findOpen, setFindOpen] = useState(false);
+  const [findScope, setFindScope] = useState<"file" | "workspace">("file");
   const [findFocus, setFindFocus] = useState(0);
   const [engine, setEngine] = useState<Engine | null>(null);
 
@@ -380,12 +381,18 @@ export default function App() {
     menu.register(Cmd.save, (ctx) => ctx.docOpen, () => void pipelineRef.current?.flush());
     menu.register(Cmd.undo, (ctx) => ctx.docOpen && ctx.canUndo, () => engineRef.current?.undo());
     menu.register(Cmd.redo, (ctx) => ctx.docOpen && ctx.canRedo, () => engineRef.current?.redo());
-    // 查找(14):Ctrl+F 唤起当前文件面板
-    const openFind = (): void => {
+    // 查找(14/15):Ctrl+F 当前文件;Ctrl+Shift+F 全工作区
+    const openFind = (scope: "file" | "workspace"): void => {
+      setFindScope(scope);
       setFindOpen(true);
       setFindFocus((f) => f + 1);
     };
-    menu.register(Cmd.find, (ctx) => ctx.docOpen, openFind);
+    menu.register(Cmd.find, (ctx) => ctx.docOpen, () => openFind("file"));
+    menu.register(
+      Cmd.workspaceSearch,
+      (ctx) => ctx.hasWorkspace,
+      () => openFind("workspace"),
+    );
     menu.register(Cmd.toggleSidebar, () => !!workspaceRef.current, toggleSidebar);
     menu.register(Cmd.insertImage, (ctx) => ctx.docOpen, () => void insertImageViaDialog());
     // 行内格式(07):与浮动工具条同一引擎命令面
@@ -1162,6 +1169,7 @@ export default function App() {
             onDropEntry={onDropEntry}
             onSearchBoxClick={() => {
               if (!docRef.current) return;
+              setFindScope("file");
               setFindOpen(true);
               setFindFocus((f) => f + 1);
             }}
@@ -1295,11 +1303,26 @@ export default function App() {
       </div>
       {/* 浮动格式工具条与链接编辑(07) */}
       <FormatOverlay engine={engine} tick={uiTick} openLinkRequest={linkRequest} />
-      {/* 查找面板(14) */}
+      {/* 查找面板(14/15) */}
       {findOpen && doc && (
         <SearchPanel
           engine={engine}
           focusRequest={findFocus}
+          initialScope={findScope}
+          workspaceRoot={workspace?.root ?? null}
+          onOpenWorkspaceHit={(absPath, q) => {
+            void (async () => {
+              await openPath(absPath);
+              const ed = engineRef.current;
+              const found = ed?.findInDoc(q);
+              if (ed && found && found.length > 0) {
+                ed.setSearchHighlights(found, 0);
+                ed.revealRange(found[0]!.from, found[0]!.to);
+              }
+              // openPath 会关面板;命中跳转后保持工作区搜索可用
+              setFindOpen(true);
+            })();
+          }}
           onClose={() => {
             engine?.clearSearchHighlights();
             setFindOpen(false);

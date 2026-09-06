@@ -68,6 +68,8 @@ export const IPC = {
   fsRenamePath: "fs:rename-path",
   /** 移动(含改名)文件/文件夹,返回新路径。 */
   fsMovePath: "fs:move-path",
+  /** 全工作区搜索(15):全部 .md 行内子串命中。 */
+  workspaceSearch: "workspace:search",
 } as const;
 
 /** 外部变更原始事件(工作区监听批次内;树推送时一并携带,12 消费)。 */
@@ -78,6 +80,15 @@ export interface WorkspaceFsEvent {
 }
 
 /** 工作区树更新负载。 */
+/** 全工作区搜索命中条目。 */
+export interface WorkspaceSearchFileHit {
+  /** 绝对路径。 */
+  path: string;
+  relPath: string;
+  name: string;
+  lines: Array<{ line: number; text: string }>;
+}
+
 export interface WorkspaceTreeUpdate {
   tree: TreeEntry[];
   events: WorkspaceFsEvent[];
@@ -149,6 +160,8 @@ export interface ConfidantApi {
   renamePath(path: string, newName: string): Promise<Result<{ path: string }>>;
   /** 移动文件/文件夹进目录(可带新名)。 */
   movePath(path: string, targetDir: string, newName?: string): Promise<Result<{ path: string }>>;
+  /** 全工作区搜索(全部 .md;行内子串)。 */
+  searchWorkspace(root: string, query: string): Promise<Result<WorkspaceSearchFileHit[]>>;
   /** 上报「某文件已成为当前文档」(主进程记录会话恢复数据)。 */
   noteOpened(path: string): void;
   /** 读取持久状态片段(不存在返回 null)。 */

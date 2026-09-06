@@ -15,16 +15,26 @@ import {
 import { basename, join } from "node:path";
 import { mkdirSync } from "node:fs";
 import { access, readFile } from "node:fs/promises";
-import { IPC, type ErrorInfo, type MenuItemState, type MenuItemTemplate, type Result } from "@shared/ipc";
 import {
+  IPC,
+  type ErrorInfo,
+  type MenuItemState,
+  type MenuItemTemplate,
+  type Result,
+  type WorkspaceSearchFileHit,
+} from "@shared/ipc";
+import {
+  collectMarkdownPaths,
   createNoteFile,
   extForImageMime,
+  findLineHits,
   makeFolder,
   moveInto,
   readTextFile,
   renameEntry,
   saveImageBytes,
   saveImageCopy,
+  scanWorkspaceTree,
   writeTextFileAtomic,
   type TreeEntry,
 } from "../../packages/files";
@@ -638,6 +648,45 @@ async function runWorkspaceSelfCheck(win: BrowserWindow, wsDir: string, emptyDir
     if (!panelClosed) return fail("search panel did not close on Esc");
     const hlCleared = await poll(() => js<boolean>(`document.querySelectorAll(".search-hit").length === 0`));
     if (!hlCleared) return fail("search highlights not cleared on close");
+
+    // 6.2) 全工作区搜索(15):Ctrl+Shift+F → 跨文件命中 → 点击打开并高亮首个命中
+    win.webContents.send(IPC.menuCommand, "workspace-search");
+    const wsPanel = await poll(() => js<boolean>(q("[data-testid='scope-workspace']")));
+    if (!wsPanel) return fail("workspace scope button missing");
+    await js<void>(`(() => {
+      const input = document.querySelector("[data-testid='search-input']");
+      const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, "value")?.set;
+      setter?.call(input, "外部新增标记");
+      input.dispatchEvent(new Event("input", { bubbles: true }));
+    })()`);
+    const wsRow = await poll(async () => {
+      const rows = await js<number>(`document.querySelectorAll("[data-testid='ws-hit-row']").length`);
+      return rows > 0 ? rows : null;
+    }, 10000);
+    if (!wsRow) return fail("workspace search produced no rows");
+    await js<void>(`document.querySelector("[data-testid='ws-hit-row']").click()`);
+    const wsOpened = await poll(async () => {
+      const headerName = await js<string>(
+        `document.querySelector("header strong")?.textContent ?? ""`,
+      );
+      return headerName.startsWith("外部新增-") ? true : null;
+    });
+    if (!wsOpened) return fail("workspace hit did not open file");
+    const wsHl = await poll(() => js<boolean>(q(".search-hit-active")));
+    if (!wsHl) return fail("workspace hit highlight missing");
+    const panelStill = await poll(() => js<boolean>(q("[data-testid='search-panel']")));
+    if (!panelStill) return fail("search panel closed unexpectedly after hit");
+
+    // 回到 a.md(外部删除测试的前提文档)
+    await js<void>(`document.querySelector("[data-rel='a.md']").click()`);
+    const aOpen2 = await poll(async () => {
+      const headerName = await js<string>(
+        `document.querySelector("header strong")?.textContent ?? ""`,
+      );
+      return headerName === "a.md" ? true : null;
+    });
+    if (!aOpen2) return fail("a.md reopen after ws search failed");
+
     await delay(800);
     const { unlink, writeFile: wf } = await import("node:fs/promises");
     await unlink(aPath);
@@ -1073,6 +1122,33 @@ function registerIpc(): void {
       return true;
     } catch {
       return false;
+    }
+  });
+
+  // ── 全工作区搜索(15) ──
+  ipcMain.handle(IPC.workspaceSearch, async (_e, root: string, query: string): Promise<Result<WorkspaceSearchFileHit[]>> => {
+    try {
+      const q = query.trim();
+      if (!q) return { ok: true, value: [] };
+      const tree = await scanWorkspaceTree(root);
+      const rels = collectMarkdownPaths(tree);
+      const hits: WorkspaceSearchFileHit[] = [];
+      for (const rel of rels) {
+        const abs = join(root, rel);
+        try {
+          const text = await readTextFile(abs);
+          const lines = findLineHits(text, q, 6);
+          if (lines.length > 0) {
+            hits.push({ path: abs, relPath: rel, name: basename(abs), lines });
+          }
+        } catch {
+          // 读失败(并发删除等)跳过该文件
+        }
+        if (hits.length >= 200) break;
+      }
+      return { ok: true, value: hits };
+    } catch (err) {
+      return { ok: false, error: toError(err) };
     }
   });
 

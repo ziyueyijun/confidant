@@ -116,3 +116,14 @@ export function collectMarkdownPaths(entries: TreeEntry[], out: string[] = []): 
   }
   return out;
 }
+
+/** 行内子串命中(大小写不敏感;返回行号 1 基与整行文本)。 */
+export function findLineHits(text: string, query: string, limit = 50): Array<{ line: number; text: string }> {
+  const q = query.toLowerCase();
+  const out: Array<{ line: number; text: string }> = [];
+  const lines = text.split("\n");
+  for (let i = 0; i < lines.length && out.length < limit; i++) {
+    if (lines[i]!.toLowerCase().includes(q)) out.push({ line: i + 1, text: lines[i]! });
+  }
+  return out;
+}

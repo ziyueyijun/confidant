@@ -8,6 +8,7 @@ import {
   type MenuItemTemplate,
   type Result,
   type TreeEntry,
+  type WorkspaceSearchFileHit,
   type WorkspaceTreeUpdate,
 } from "@shared/ipc";
 
@@ -97,6 +98,9 @@ const api: ConfidantApi = {
 
   movePath: (path: string, targetDir: string, newName?: string) =>
     ipcRenderer.invoke(IPC.fsMovePath, path, targetDir, newName) as Promise<Result<{ path: string }>>,
+
+  searchWorkspace: (root: string, query: string) =>
+    ipcRenderer.invoke(IPC.workspaceSearch, root, query) as Promise<Result<WorkspaceSearchFileHit[]>>,
 
   noteOpened: (path: string) => {
     ipcRenderer.send(IPC.fileOpened, path);
