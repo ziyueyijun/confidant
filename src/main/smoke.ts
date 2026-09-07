@@ -1422,6 +1422,35 @@ export async function runWorkspaceSelfCheck(win: BrowserWindow, wsDir: string, e
       return count === 4 ? count : null;
     });
     if (!outlineCollapsed) return fail("outline collapse did not hide children");
+    // 06 补:打字机文末光标探针(outline.md 长文档)——40vh 收紧为 96px 后,
+    // 文末光标仍完整落在视口内(不被余量推出屏)
+    win.webContents.send(IPC.menuCommand, "typewriter-mode");
+    await delay(600);
+    await js<void>(`(() => {
+      const el = document.querySelector('[contenteditable="true"]');
+      const ps = [...el.querySelectorAll("p")];
+      const last = ps[ps.length - 1];
+      last.scrollIntoView({ block: "end" });
+      const tn = last.firstChild;
+      const range = document.createRange();
+      range.setStart(tn, (tn?.textContent ?? "").length);
+      range.collapse(true);
+      const sel = window.getSelection();
+      sel?.removeAllRanges();
+      sel?.addRange(range);
+      document.dispatchEvent(new Event("selectionchange"));
+      el.focus();
+    })()`);
+    await delay(900); // 等 PM 自动滚动落定
+    const caretInView = await js<boolean>(`(() => {
+      const sc = document.querySelector("[data-testid='editor-scroll']");
+      const sr = sc.getBoundingClientRect();
+      const r = window.getSelection()?.getRangeAt(0)?.getBoundingClientRect();
+      return r ? r.top >= sr.top - 2 && r.bottom <= sr.bottom + 2 : false;
+    })()`);
+    if (!caretInView) return fail("typewriter caret out of view at doc end");
+    win.webContents.send(IPC.menuCommand, "typewriter-mode"); // 关闭,还原现场
+    await delay(600);
     // 源码模式:大纲禁用占位
     win.webContents.send(IPC.menuCommand, "source-mode");
     const outlineDisabled = await poll(() =>

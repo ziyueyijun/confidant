@@ -15,3 +15,14 @@
 - [ ] 模式互斥状态逻辑单测通过
 - [ ] smoke：专注/打字机类名断言
 - [ ] 三主题下两模式观感截图存档（night 淡出色 #686868 系生效）
+
+## Answer
+
+已实施并实机复验(smoke:专注色值断言/失焦保持/打字机 padding 过渡后断言/源码互斥恢复/F11 进出全绿;引擎 focus-block 单测 3 例)。
+
+- 专注模式(F8):非焦点块整段文字覆盖为 `--blur-text`(github #C8C8C8/night #686868/newsprint #c9c3b8,可读残影)、非焦点图片 opacity .2、焦点块恢复正色、不随编辑器失焦退出。
+- **焦点块标记实现路径(实施中验证并修正)**:渲染层直写 `data-focus-block` 属性在 jsdom 探针下存活但 Chromium 实测被 PM 观察器抹掉(jsdom 假阴性,记录于 `engine-doc-seam` 测试的替代探针探索)——改为引擎 selection 跟随装饰插件(`packages/engine/lib/focus-block.ts`,纯视图态,与行号/语言标签/查找高亮同机制;CSS 用 `.focus-block` 类)。新引擎测试覆盖跟随/移块/序列化零改动。
+- 打字机模式(F9):内容容器 padding-top 50%(光标行推至视口垂直中点,基线 §5.2 同构)+ 0.4s 过渡;底部 40vh 余量收紧为 96px(实施微调;文末光标探针确认不推出屏)。
+- 两模式可叠加、与源码模式互斥:进入源码自动退出(记住原态),退出恢复勾选态;源码模式下菜单项置灰。
+- 视图菜单新增专注(F8)/打字机(F9)/全屏(F11),勾选态双向联动;页脚左按钮(04 接线)完整生效。
+- 全屏:F11 → 新 IPC 通道 `window:fullscreen-toggle`(main `setFullScreen`)。

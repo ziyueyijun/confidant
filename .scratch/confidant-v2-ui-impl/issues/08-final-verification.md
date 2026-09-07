@@ -14,3 +14,17 @@
 - [ ] 引擎回归矩阵（front matter 字节/源文不改写/不静默丢内容）全绿
 - [ ] 领域词汇表术语更新落地（设置菜单 → 偏好设置窗口；外观子菜单删除、主题菜单新增）
 - [ ] 收尾记录（待确认项结论、截图存档路径）写入票内 Answer
+
+## Answer
+
+收尾完成,结论如下(验证记录截至 2026-09-08):
+
+- **newsprint 代码高亮 token**:实测 Typora `themes/newsprint.css` 无 cm-s 覆盖(仅代码背景纸灰 #dadada),继承 codemirror.css 共享亮色板——newsprint 落地为「亮色 token + 纸灰背景」(01 已入库,无需二次提取)。
+- **待确认快捷键(实机确认完成)**:从 Typora 42.2.0 `resources/app.asar` 提取菜单 accelerator 字符串为硬证据——侧栏显隐 `CmdOrCtrl+Shift+L`(Toggle Sidebar)、任务列表 `Ctrl+Shift+X`(Task List)、清除格式 `CmdOrCtrl+\`(Clear Format)、偏好设置 `CmdOrCtrl+,`(Preferences)、专注 F8/F9 打字机/F11 全屏。均已对齐落地(07);「任务列表疑似 Ctrl+Shift+M」推断作废(实测为 Math Block)。
+- **偏好设置窗口快捷键 Ctrl+,**:落地(07,文件 → 偏好设置…)。
+- **打字机模式 40vh 收紧**:收紧为 96px;smoke 长文档探针确认文末光标完整落在视口内(不推出屏)。
+- **蓝图附录 A 对照清单核验**:A1 新增 9 项(悬浮格式工具栏/偏好设置窗口/主题菜单三主题/专注模式/打字机模式/大纲双 tab/字数统计+页脚按钮/全屏 F11/代码块语言标签)全部落地并有 smoke 断言或引擎单测;A2 对齐 10 项(内容宽度分级/标题体系/搜索顶部通栏+作用域下拉/琥珀高亮+黑底白字/文件大纲双 tab/侧栏激活 4px 左边框/七菜单/偏好设置窗口/快捷键对齐/代码块圆角 3px+语言标签)全部落地;A3 独有保留 10 项(源码模式字节直写/链接面板/复制按钮/代码块两设置/findInDoc/工作区防抖搜索/拖拽移动/撤销 Toast/40vh 余量/行高 1.7)全部保留,既有 smoke 探针持续守护。
+- **引擎回归矩阵**:front matter 字节原样/源文不改写/无静默丢内容矩阵全绿(26 文件 181 测试);引擎仅新增只读 `getDoc()` 与两个纯视图装饰(focus-block 类/语言标签 widget,不进文档不参与序列化)。
+- **术语更新**:CONTEXT.md「设置菜单」→「偏好设置窗口」;「主题」菜单新增条目;新增格式工具栏/大纲面板/页脚状态条/视图模式条目;侧栏快捷键改 Ctrl+Shift+L。
+- **截图存档**:`out/smoke/theme-{github,night,newsprint}.png`(每主题一屏);smoke 探针覆盖搜索条几何/专注色值/打字机 padding 等计算值断言。
+- **实施中排障记录**:① 渲染层直写编辑区 DOM 属性被 PM 观察器抹掉(语言标签、焦点块两处)→ 改引擎 widget/selection 装饰(jsdom 探针假阴性,以 Chromium 实测为准);② 工作区命中跳转高亮竞态 → 面板 `jump` prop 顺序确定;③ use-outline rAF 守卫重建后卡死 → cleanup 置空;④ smoke 探针判空缺陷(空串被 poll 当有效值)→ `?? null`。

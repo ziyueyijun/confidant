@@ -13,3 +13,13 @@
 - [ ] 主题状态机单测通过（三态切换、持久化读写）
 - [ ] smoke 断言：`data-theme` 三值分别可设；三主题各截一屏存档
 - [ ] 现有功能无回归（菜单、打开/保存、侧边栏照常）
+
+## Answer
+
+已实施并实机复验(workspace E2E 全绿,三主题切换断言 + 每主题截图存档 `out/smoke/theme-{github,night,newsprint}.png`)。
+
+- `data-theme` 三值(github 默认/night/newsprint),三组 CSS 变量整体覆盖;变量集沿用既有语义体系、按需补充(`--blur-text`、`--tree-active-*`、`--search-hit-*`、`--toolbar-*`、`--footer-*`、`--banner-*`、`--toast-*`、`--code-ln`、`--lang-tag`、`--heading-border`、`--font-body/ui/code`、`--link`)。色值依据 research/typora-visual-baseline.md §1 三主题表;newsprint 代码高亮 token 复用亮色(08 实测依据)。
+- 「跟随系统」彻底移除:`prefers-color-scheme` 逻辑删除、「视图 → 外观」子菜单不存在;`use-app-theme` 改三态 + 持久化迁移(light→github、dark→night、system/非法→github,`normalizeTheme` 单测守护)。
+- 「视图 → 主题」子菜单三勾选(setChecked 联动);07 提级为顶级菜单。
+- 主题状态机纯函数 `theme/theme-state.ts` + 单测 5 例;smoke 5.6 段改三主题断言。
+- 无回归:打开/保存/侧边栏/查找/代码块等全部既有探针绿。

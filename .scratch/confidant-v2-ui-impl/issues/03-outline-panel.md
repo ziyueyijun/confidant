@@ -15,3 +15,13 @@
 - [ ] 编辑后 300–500ms 防抖重建（连续输入不抖）
 - [ ] 大纲提取纯函数单测通过（doc 树 → 标题列表）
 - [ ] 数千行文档下大纲刷新不卡顿
+
+## Answer
+
+已实施并实机复验(smoke 6.4b:双 tab/空态/5 条渲染/点击跳转/滚动跟随/折叠/源码禁用全绿;提取与折叠纯函数单测 7 例)。
+
+- 侧边栏顶部「文件 / 大纲」双 tab:宽 84px、激活加粗 + 底部 4px currentColor 色条、下方 1px 分隔线;宽度记忆两 tab 共享;点击条目不收起侧边栏。
+- 大纲数据:渲染层经 `Engine.getDoc()`(只读访问器,02 引入)提取 h1–h6(层级/文本/位置),`extractOutline` 纯函数;不改引擎行为。
+- 交互:每级 1em 缩进、点击 = 滚动定位 + 光标置入标题 + 编辑器聚焦(setSelection + revealRange)、滚动跟随高亮(rAF 节流,DOM 序 ↔ 大纲序 zip)、层级折叠(箭头,`outlineVisibility` O(n) 栈扫描)、无标题空态、「源码模式下大纲不可用」占位、doc 变化 350ms 防抖重建。
+- 侧栏激活态改「背景 + 4px 左边框」(`--tree-active-bg/border/fg`,蓝图 A2 对齐项)。
+- 排障记录:`use-outline` rAF 守卫在 effect 重建(防抖 setItems)后 rafRef 未置空导致滚动事件被永久丢弃——cleanup 补 `rafRef.current = null`;smoke 探针判空缺陷(空串被 poll 当有效值立即返回)改 `?? null`。
