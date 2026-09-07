@@ -130,7 +130,7 @@ export function LinkPanel({ engine, openLinkRequest }: LinkPanelProps) {
           <button
             type="button"
             data-testid="link-commit"
-            style={{ ...ghostBtn, background: "var(--accent-soft)", borderColor: "#9cc1e5" }}
+            style={{ ...ghostBtn, background: "var(--accent-soft)", borderColor: "var(--accent)" }}
             onClick={commit}
           >
             {editing ? "更新" : "设置"}

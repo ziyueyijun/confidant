@@ -15,12 +15,13 @@ const btnSmall: CSSProperties = {
 const ghostAction: CSSProperties = {
   border: "none",
   background: "transparent",
-  color: "#9ec9f5",
+  color: "var(--toast-action)",
   cursor: "pointer",
   fontSize: 13,
 };
 
-/** 正在编辑的文件被外部删除(12):恢复重建(救回键入)或放弃,不静默。 */
+/** 正在编辑的文件被外部删除(12):恢复重建(救回键入)或放弃,不静默。
+ *  颜色吃主题变量(05:三主题各自适配)。 */
 export function DocMissingBanner(props: { onRecover: () => void; onAbandon: () => void }) {
   return (
     <div
@@ -35,8 +36,8 @@ export function DocMissingBanner(props: { onRecover: () => void; onAbandon: () =
         alignItems: "center",
         gap: 10,
         padding: "7px 14px",
-        background: "#fdf1e7",
-        border: "1px solid #e8b98a",
+        background: "var(--banner-bg)",
+        border: "1px solid var(--banner-border)",
         borderRadius: 8,
         fontSize: 13,
       }}
@@ -73,8 +74,8 @@ export function ChangeNoticeToast(props: {
         alignItems: "center",
         gap: 12,
         padding: "8px 16px",
-        background: "rgba(20,20,20,.92)",
-        color: "var(--surface)",
+        background: "var(--toast-bg)", // 05:深色底改主题变量表达(night 同系)
+        color: "var(--toast-fg)",
         borderRadius: 8,
         fontSize: 13,
       }}

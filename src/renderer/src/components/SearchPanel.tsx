@@ -1,5 +1,6 @@
-// 查找面板(14/15):作用域「当前文件 / 整个工作区」;输入即实时匹配,
-// 命中行摘要点击 → 打开/定位并高亮(decoration 临时态);Esc/✕ 关闭清除。
+// 查找面板(14/15 → 05):Typora 式顶部通栏——作用域 76px 下拉 + 26px 直角输入框;
+// 行为全保留(当前文件实时匹配、工作区 180ms 防抖、Enter 下一个/Shift+Enter 上一个/
+// Esc 关闭并清除高亮);命中高亮琥珀 + 当前项黑底白字(CSS 变量,01 落地)。
 
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import type { Engine } from "../../../../packages/engine";
@@ -124,21 +125,44 @@ export function SearchPanel({
       data-testid="search-panel"
       style={{
         position: "fixed",
-        top: 12,
-        right: 14,
-        width: 400,
-        maxHeight: "60vh",
+        top: 0,
+        left: 0,
+        right: 0,
+        zIndex: 50,
         display: "flex",
         flexDirection: "column",
-        background: "var(--surface)",
-        border: "1px solid var(--border)",
-        borderRadius: 8,
-        boxShadow: "0 3px 14px var(--overlay)",
-        zIndex: 50,
-        overflow: "hidden",
+        background: "var(--app-bg)",
+        borderBottom: "1px solid var(--border)",
+        boxShadow: "0 2px 10px var(--shadow)",
+        fontSize: 12,
       }}
     >
-      <div style={{ display: "flex", alignItems: "center", gap: 6, padding: "8px 10px" }}>
+      {/* 顶部通栏行(05:约 39px 高;输入框 26px 直角透明;作用域 76px 下拉) */}
+      <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "5px 12px 6px", maxHeight: 39 }}>
+        <select
+          data-testid="search-scope-select"
+          value={scope}
+          disabled={scope === "workspace" && !workspaceRoot}
+          onChange={(e) => setScope(e.target.value as SearchScope)}
+          style={{
+            width: 76,
+            flexShrink: 0,
+            height: 26,
+            fontSize: 12,
+            border: "none",
+            background: "transparent",
+            color: "inherit",
+            outline: "none",
+            cursor: "pointer",
+          }}
+        >
+          <option data-testid="scope-file" value="file">
+            当前文件
+          </option>
+          <option data-testid="scope-workspace" value="workspace" disabled={!workspaceRoot}>
+            整个工作区
+          </option>
+        </select>
         <input
           ref={inputRef}
           data-testid="search-input"
@@ -155,45 +179,21 @@ export function SearchPanel({
           }}
           style={{
             flex: 1,
-            padding: "5px 8px",
-            fontSize: 13,
-            borderRadius: 6,
-            border: "1px solid var(--border)",
+            minWidth: 0,
+            height: 26,
+            padding: "0 8px",
+            fontSize: 12,
+            border: "none",
+            borderRadius: 0, // 05:直角(基线 §4.2)
+            background: "transparent",
             outline: "none",
+            color: "inherit",
           }}
         />
-        <button
-          type="button"
-          aria-label="关闭查找"
-          onClick={onClose}
-          style={{ border: "none", background: "transparent", cursor: "pointer", color: "var(--muted)" }}
+        <span
+          data-testid="search-count"
+          style={{ color: "var(--muted)", flexShrink: 0, whiteSpace: "nowrap" }}
         >
-          ✕
-        </button>
-      </div>
-      <div style={{ display: "flex", gap: 4, padding: "0 12px 8px" }}>
-        {(["file", "workspace"] as const).map((s) => (
-          <button
-            key={s}
-            type="button"
-            data-testid={`scope-${s}`}
-            disabled={s === "workspace" && !workspaceRoot}
-            onClick={() => setScope(s)}
-            style={{
-              fontSize: 12,
-              padding: "3px 10px",
-              borderRadius: 12,
-              border: "none",
-              cursor: "pointer",
-              background: scope === s ? "var(--accent)" : "var(--panel)",
-              color: scope === s ? "var(--surface)" : "var(--quote-fg)",
-            }}
-          >
-            {s === "file" ? "当前文件" : "整个工作区"}
-          </button>
-        ))}
-        <span style={{ flex: 1 }} />
-        <span data-testid="search-count" style={{ fontSize: 12, color: "var(--muted)", alignSelf: "center" }}>
           {query.trim() === ""
             ? ""
             : wsSearching
@@ -206,56 +206,74 @@ export function SearchPanel({
                   ? `${wsHits.length} 个文件 / ${wsCount} 处`
                   : ""}
         </span>
+        <button
+          type="button"
+          aria-label="关闭查找"
+          onClick={onClose}
+          style={{
+            border: "none",
+            background: "transparent",
+            cursor: "pointer",
+            color: "var(--muted)",
+            padding: "2px 6px",
+            fontSize: 13,
+          }}
+        >
+          ✕
+        </button>
       </div>
-      <div style={{ overflowY: "auto", padding: "0 6px 8px" }}>
-        {empty && (
-          <div style={{ padding: "10px 8px", color: "var(--muted)", fontSize: 13 }}>无结果</div>
-        )}
-        {scope === "file" &&
-          hits.map((h, i) => (
-            <button
-              key={`${h.from}-${h.to}`}
-              type="button"
-              data-testid={`search-hit-row-${i}`}
-              onClick={() => applyActive(i)}
-              onMouseEnter={() => applyActive(i)}
-              style={rowStyle(i === active)}
-            >
-              {summary(h.text)}
-            </button>
-          ))}
-        {scope === "workspace" &&
-          wsHits.map((f) => (
-            <div key={f.path} style={{ marginBottom: 6 }}>
-              <div
-                style={{
-                  fontSize: 12,
-                  fontWeight: 600,
-                  color: "var(--quote-fg)",
-                  padding: "2px 6px",
-                  overflow: "hidden",
-                  textOverflow: "ellipsis",
-                  whiteSpace: "nowrap",
-                }}
-                title={f.relPath}
+      {/* 命中列表(05:顶部条下方展开) */}
+      {query.trim() !== "" && (
+        <div style={{ overflowY: "auto", maxHeight: "45vh", padding: "0 6px 8px", borderTop: "1px solid var(--border)" }}>
+          {empty && (
+            <div style={{ padding: "10px 8px", color: "var(--muted)", fontSize: 13 }}>无结果</div>
+          )}
+          {scope === "file" &&
+            hits.map((h, i) => (
+              <button
+                key={`${h.from}-${h.to}`}
+                type="button"
+                data-testid={`search-hit-row-${i}`}
+                onClick={() => applyActive(i)}
+                onMouseEnter={() => applyActive(i)}
+                style={rowStyle(i === active)}
               >
-                {f.name}
-              </div>
-              {f.lines.map((l) => (
-                <button
-                  key={`${f.path}:${l.line}`}
-                  type="button"
-                  data-testid="ws-hit-row"
-                  onClick={() => onOpenWorkspaceHit(f.path, query)}
-                  style={{ ...rowStyle(false), fontFamily: "Consolas, monospace", fontSize: 12 }}
+                {summary(h.text)}
+              </button>
+            ))}
+          {scope === "workspace" &&
+            wsHits.map((f) => (
+              <div key={f.path} style={{ marginBottom: 6 }}>
+                <div
+                  style={{
+                    fontSize: 12,
+                    fontWeight: 600,
+                    color: "var(--quote-fg)",
+                    padding: "2px 6px",
+                    overflow: "hidden",
+                    textOverflow: "ellipsis",
+                    whiteSpace: "nowrap",
+                  }}
+                  title={f.relPath}
                 >
-                  <span style={{ color: "var(--muted)", marginRight: 6, userSelect: "none" }}>{l.line}</span>
-                  {summary(l.text)}
-                </button>
-              ))}
-            </div>
-          ))}
-      </div>
+                  {f.name}
+                </div>
+                {f.lines.map((l) => (
+                  <button
+                    key={`${f.path}:${l.line}`}
+                    type="button"
+                    data-testid="ws-hit-row"
+                    onClick={() => onOpenWorkspaceHit(f.path, query)}
+                    style={{ ...rowStyle(false), fontFamily: "var(--font-code)", fontSize: 12 }}
+                  >
+                    <span style={{ color: "var(--muted)", marginRight: 6, userSelect: "none" }}>{l.line}</span>
+                    {summary(l.text)}
+                  </button>
+                ))}
+              </div>
+            ))}
+        </div>
+      )}
     </div>
   );
 }
@@ -268,7 +286,7 @@ function rowStyle(active: boolean): CSSProperties {
     border: "none",
     background: active ? "var(--tree-active-bg, var(--accent-soft))" : "transparent",
     padding: "4px 8px",
-    borderRadius: 6,
+    borderRadius: 4,
     cursor: "pointer",
     fontSize: 12.5,
     color: "inherit",

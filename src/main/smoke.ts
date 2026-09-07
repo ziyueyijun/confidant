@@ -957,6 +957,16 @@ export async function runWorkspaceSelfCheck(win: BrowserWindow, wsDir: string, e
     win.webContents.send(IPC.menuCommand, "find");
     const panelShown = await poll(() => js<boolean>(q("[data-testid='search-panel']")));
     if (!panelShown) return fail("search panel not shown via find");
+    // 05:顶部通栏几何(贴顶 + 输入框 26px)
+    const sbRect = await js<{ top: number; inputH: number }>(
+      `({
+        top: document.querySelector("[data-testid='search-panel']").getBoundingClientRect().top,
+        inputH: document.querySelector("[data-testid='search-input']").getBoundingClientRect().height,
+      })`,
+    );
+    if (sbRect.top !== 0 || Math.abs(sbRect.inputH - 26) > 1) {
+      return fail(`search topbar geometry wrong: ${JSON.stringify(sbRect)}`);
+    }
     await js<void>(`(() => {
       const input = document.querySelector("[data-testid='search-input']");
       const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, "value")?.set;
