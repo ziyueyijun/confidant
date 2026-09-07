@@ -10,7 +10,7 @@
    - `src/renderer/src/App.tsx`:1669 → 537 行,按域抽 `hooks/`(use-app-theme、
      use-sidebar-layout、use-tree-expansion、use-doc-missing、use-editor-host、
      use-file-operations、use-menu-bridge-registration、use-recent-folders、
-     use-startup-recovery)+ `components/`(TopBar/Welcome/OverlayBanners/EmptyStates)
+     use-startup-recovery)+ `components/`(Welcome/OverlayBanners/EmptyStates)
      + `session/`(types/ops-shared)。行为 smoke/E2E 复验(票 22)。
    - `packages/engine/lib/engine.ts`:1009 → 631 行,抽同包私有模块
      search-highlight/extensions/keyboard/link-range/task-list-ops(票 23)。

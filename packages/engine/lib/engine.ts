@@ -15,6 +15,11 @@ export function finalizeMarkdown(md: string): string {
   return md.replace(/\n+$/, "") + "\n";
 }
 
+import type { Node as ProseMirrorNode } from "@tiptap/pm/model";
+/** 当前文档的 ProseMirror 节点树(只读)。渲染层派生数据(大纲标题/代码块语言)经
+ *  `Engine.getDoc()` 获取;本类型供渲染层以引擎入口点引用,不直连 @tiptap/pm。 */
+export type ProseMirrorDoc = ProseMirrorNode;
+
 export interface EngineCallbacks {
   /** 文档内容(含撤销/重做影响的结构)发生变更。 */
   onUpdate?: () => void;
@@ -86,6 +91,11 @@ export interface Engine {
   docSize(): number;
   /** 区间纯文本(doc.textBetween;定位/测试)。 */
   textBetween(from: number, to: number): string;
+  /**
+   * 当前文档 ProseMirror 节点树(只读引用,勿改)。大纲标题提取(03)、代码块语言
+   * 标签(02)等渲染层派生数据源;引擎不感知这些派生逻辑。
+   */
+  getDoc(): ProseMirrorDoc | null;
 
   // ── 查找(14/15):子串匹配 + 临时高亮(decoration,不落盘/不进入导出) ──
   /** 文档内子串匹配(大小写不敏感;单文本节点内),返回区间与行文本上下文。 */
@@ -201,6 +211,10 @@ export function createEngine(
       const ed = editor;
       if (!ed) return "";
       return finalizeMarkdown(ed.getMarkdown());
+    },
+
+    getDoc() {
+      return editor?.state.doc ?? null;
     },
 
     focus() {

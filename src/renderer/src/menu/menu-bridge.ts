@@ -67,9 +67,9 @@ export const Cmd = {
   toggleSidebar: "toggle-sidebar",
   sourceMode: "source-mode",
   workspaceSearch: "workspace-search",
-  themeSystem: "theme-system",
-  themeLight: "theme-light",
-  themeDark: "theme-dark",
+  themeGithub: "theme-github",
+  themeNight: "theme-night",
+  themeNewsprint: "theme-newsprint",
   // 设置(28)
   settingsCodeWrap: "settings-code-wrap",
   settingsCodeLineNumbers: "settings-code-line-numbers",
@@ -194,18 +194,20 @@ export function buildMenuTemplate(recent: RecentItem[] = []): MenuItemTemplate[]
       type: "submenu",
       label: "视图",
       submenu: [
-        disabledItem(Cmd.toggleSidebar, "侧栏显示/隐藏"),
+        disabledItem(Cmd.toggleSidebar, "侧栏显示/隐藏", "Ctrl+Shift+B"),
         disabledItem(Cmd.sourceMode, "源码模式", "Ctrl+/"),
         disabledItem(Cmd.workspaceSearch, "全工作区搜索", "Ctrl+Shift+F"),
         sep(),
+        // 01:「外观」子菜单(跟随系统/浅色/深色)删除;「主题」子菜单三勾选占位
+        // (07 提级为顶级菜单)
         {
-          id: "menu-appearance",
+          id: "menu-theme",
           type: "submenu",
-          label: "外观",
+          label: "主题",
           submenu: [
-            disabledItem(Cmd.themeSystem, "跟随系统"),
-            disabledItem(Cmd.themeLight, "浅色"),
-            disabledItem(Cmd.themeDark, "深色"),
+            disabledItem(Cmd.themeGithub, "GitHub"),
+            disabledItem(Cmd.themeNight, "Night"),
+            disabledItem(Cmd.themeNewsprint, "Newsprint"),
           ],
         },
       ],

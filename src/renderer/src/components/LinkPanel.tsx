@@ -69,7 +69,7 @@ export function LinkPanel({ engine, openLinkRequest }: LinkPanelProps) {
       style={{
         position: "fixed",
         left: "50%",
-        top: 96,
+        top: 12,
         transform: "translateX(-50%)",
         display: "flex",
         flexDirection: "column",

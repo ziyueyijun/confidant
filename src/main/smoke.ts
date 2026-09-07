@@ -36,15 +36,28 @@ export async function typeAtEnd(win: BrowserWindow, text: string): Promise<{ ok:
   ) as Promise<{ ok: boolean; detail: string }>;
 }
 
-/** 等待状态文案出现「已保存」(自动保存落盘)或失败文案,≤6s。 */
-export async function waitSaved(win: BrowserWindow): Promise<"saved" | "failed" | "timeout"> {
-  for (let i = 0; i < 30; i++) {
+/** 等待磁盘文件包含标记文本(自动保存落盘真相源;顶栏「已保存」文案已移除),≤8s。 */
+export async function waitDiskContains(
+  filePath: string,
+  marker: string,
+  timeoutMs = 8000,
+): Promise<boolean> {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    try {
+      const content = await readFile(filePath, "utf8");
+      if (content.includes(marker)) return true;
+    } catch {
+      // 读写竞态,重试
+    }
     await delay(200);
-    const text = (await win.webContents.executeJavaScript("document.body.innerText")) as string;
-    if (text.includes("已保存")) return "saved";
-    if (text.includes("保存失败") || text.includes("无法写入")) return "failed";
   }
-  return "timeout";
+  return false;
+}
+
+/** 顶栏移除后文档名探针改用窗口标题(有文档时 title = `${name} · confidant`)。 */
+export async function docTitleIs(win: BrowserWindow, name: string): Promise<boolean> {
+  return (await win.webContents.executeJavaScript("document.title")) === `${name} · confidant`;
 }
 
 /**
@@ -90,9 +103,8 @@ export async function runSelfCheck(win: BrowserWindow, notePath: string | null):
       const typed = await typeAtEnd(win, mark1);
       if (!typed.ok) return fail(`typing failed: ${JSON.stringify(typed)}`);
 
-      // 不点保存:证明停顿后自动写盘
-      const outcome = await waitSaved(win);
-      if (outcome !== "saved") return fail(`autosave not reached (${outcome})`);
+      // 不点保存:证明停顿后自动写盘(顶栏状态条已移除,以磁盘真相为判据)
+      if (!(await waitDiskContains(notePath, mark1))) return fail("autosave not reached");
 
       if (e2eFlushOnClose) {
         // 关闭前 flush 竖切:再键入一段,不做任何保存,直接关窗
@@ -137,8 +149,7 @@ export async function runSelfCheck(win: BrowserWindow, notePath: string | null):
         if (!typed2.ok) return fail(`second typing failed: ${JSON.stringify(typed2)}`);
         // 模拟 native 菜单点击:同一 command 通道(菜单 accelerator 为 OS 级,不可脚本触发)
         win.webContents.send(IPC.menuCommand, "save");
-        const outcome2 = await waitSaved(win);
-        if (outcome2 !== "saved") return fail(`menu-command save not reached (${outcome2})`);
+        if (!(await waitDiskContains(notePath, mark2))) return fail("menu-command save not reached");
 
         const saved = await readFile(notePath, "utf8");
         const checks = [
@@ -171,18 +182,13 @@ export async function runSelfCheck(win: BrowserWindow, notePath: string | null):
               body: document.body.innerText.slice(0, 200),
               sidebar: !!document.querySelector("[data-testid='sidebar']"),
               rels: [...document.querySelectorAll("[data-rel]")].map((el) => el.getAttribute("data-rel")),
-              err: document.querySelector("[data-testid='load-error']")?.textContent ?? null,
               title: document.title,
             })`,
           );
           return fail(`empty-line click probe: workspace not opened (${probeDir}); diag=${diag}`);
         }
         win.webContents.send(IPC.openFileRequest, notePath);
-        const probeFileOpen = await pollUntil(
-          async () =>
-            (await js<string>(`document.querySelector("header strong")?.textContent ?? ""`)) === probeName,
-          8000,
-        );
+        const probeFileOpen = await pollUntil(() => docTitleIs(win, probeName), 8000);
         if (!probeFileOpen) return fail(`empty-line click probe: file not opened (${probeName})`);
         const probePoints = await js<{ ok: boolean; detail: string }>(
           `(() => {
@@ -343,13 +349,13 @@ export async function runSelfCheck(win: BrowserWindow, notePath: string | null):
         return fail("welcome view not rendered");
       }
       if (!probe.bodyText.includes("最懂你的笔记软件")) return fail("welcome subtitle missing");
-      // 27:无工作区时侧栏空态框体默认显示,开关可点、可隐可还原
+      // 27:无工作区时侧栏空态框体默认显示;开关经「视图 → 侧栏显示/隐藏」菜单命令通道可隐可还原
       const emptyInit = await pollUntil(() => js<boolean>(`!!document.querySelector("[data-testid='sidebar-empty']")`), 5000);
       if (!emptyInit) return fail("sidebar empty state not shown without workspace");
-      await js<void>(`document.querySelector("[data-testid='sidebar-toggle']").click()`);
+      Menu.getApplicationMenu()?.getMenuItemById("toggle-sidebar")?.click();
       const emptyGone = await pollUntil(() => js<boolean>(`!document.querySelector("[data-testid='sidebar-empty']")`), 5000);
       if (!emptyGone) return fail("sidebar empty state did not hide on toggle");
-      await js<void>(`document.querySelector("[data-testid='sidebar-toggle']").click()`);
+      Menu.getApplicationMenu()?.getMenuItemById("toggle-sidebar")?.click();
       const emptyBack = await pollUntil(() => js<boolean>(`!!document.querySelector("[data-testid='sidebar-empty']")`), 5000);
       if (!emptyBack) return fail("sidebar empty state did not restore on toggle");
       console.log("[smoke] sidebar empty-state toggle ok");
@@ -435,7 +441,6 @@ export async function runWorkspaceSelfCheck(win: BrowserWindow, wsDir: string, e
         const diag = await js<string>(
           `JSON.stringify({
             guidance: document.querySelector("[data-testid='empty-workspace-guidance']") !== null,
-            error: document.querySelector("[data-testid='load-error']")?.textContent ?? null,
             body: document.body.innerText.slice(0, 300),
           })`,
         );
@@ -460,12 +465,80 @@ export async function runWorkspaceSelfCheck(win: BrowserWindow, wsDir: string, e
     });
     if (!editorLive) return fail("a.md did not open in editor");
 
+    // 02:编辑区排版探针——标题体系(h1 2.25em/bold/下边框)、块间距 0.8em、
+    // 内容宽度分级(默认视口 → 860px 上限)
+    const typo = await js<string>(
+      `JSON.stringify({
+        h1Size: getComputedStyle(document.querySelector(".editor-prose h1")).fontSize,
+        h1Weight: getComputedStyle(document.querySelector(".editor-prose h1")).fontWeight,
+        h1Border: getComputedStyle(document.querySelector(".editor-prose h1")).borderBottomWidth,
+        pMargin: getComputedStyle(document.querySelector(".editor-prose p")).marginTop,
+        width: document.querySelector(".editor-prose").getBoundingClientRect().width,
+        maxWidth: getComputedStyle(document.querySelector(".editor-prose")).maxWidth,
+      })`,
+    );
+    const t = JSON.parse(typo) as {
+      h1Size: string; h1Weight: string; h1Border: string; pMargin: string; width: number; maxWidth: string;
+    };
+    // 高分屏下 1px CSS 边框的 used value 可为小数(缩放伪影),按 0.5–1.5px 判界
+    const h1BorderPx = parseFloat(t.h1Border);
+    const typoChecks = [
+      t.h1Size === "36px" || `h1 size ${t.h1Size} (expect 36px)`,
+      t.h1Weight === "700" || `h1 weight ${t.h1Weight} (expect 700)`,
+      (h1BorderPx >= 0.5 && h1BorderPx <= 1.5) || `h1 border ${t.h1Border} (expect ~1px)`,
+      t.pMargin === "12.8px" || `p margin ${t.pMargin} (expect 12.8px = 0.8em)`,
+      t.width <= 860 || `prose width ${t.width} (expect <=860)`,
+    ];
+    const firstTypoBad = typoChecks.find((c) => typeof c === "string");
+    if (firstTypoBad) return fail(`typography probe: ${firstTypoBad} (${typo})`);
+    console.log(`[smoke] typography probe ok (h1 36px/bold/border, p 0.8em, width ${t.width}px)`);
+
+    // 02:宽度分级探针(视口 ≥1400 → 1024px;≥1800 → 1200px;侧栏 260px 让位)
+    for (const [w, expect] of [
+      [1500, 1024],
+      [1900, 1200],
+    ] as const) {
+      win.setSize(w, 800);
+      await delay(500);
+      const pw = await js<number>(
+        `document.querySelector(".editor-prose").getBoundingClientRect().width`,
+      );
+      if (Math.abs(pw - expect) > 2) return fail(`width tier ${w}px: got ${pw} expect ${expect}`);
+    }
+    win.setSize(1200, 800);
+    await delay(500);
+    const pwBack = await js<number>(
+      `document.querySelector(".editor-prose").getBoundingClientRect().width`,
+    );
+    if (Math.abs(pwBack - 860) > 2) return fail(`width tier 1200px: got ${pwBack} expect 860`);
+    console.log("[smoke] width tiers ok (860/1024/1200)");
+
+    // 02:字体资产落地(Open Sans 随 UI 文本已用;PT Serif 需主动 load 触发)
+    const fontsOk = await poll(async () => {
+      const ok = await js<boolean>(
+        `document.fonts.load('16px "PT Serif"').then(() =>
+          document.fonts.check('16px "Open Sans"') && document.fonts.check('16px "PT Serif"'))`,
+      );
+      return ok ? true : null;
+    });
+    if (!fontsOk) {
+      const diag = await js<string>(
+        `JSON.stringify({
+          status: document.fonts.status,
+          faces: [...document.fonts].map((f) => f.family + "@" + f.weight + ":" + f.status),
+          osLoad: document.fonts.check('16px "Open Sans"'),
+          ptLoad: document.fonts.check('16px "PT Serif"'),
+          fontUrls: performance.getEntriesByType("resource").filter((r) => r.name.includes("woff2")).map((r) => r.name),
+        })`,
+      );
+      return fail(`font assets not loaded; diag=${diag}`);
+    }
+
     const mark1 = `工作区保存-${Date.now()}`;
     const typed = await typeAtEnd(win, mark1);
     if (!typed.ok) return fail(`typing failed: ${JSON.stringify(typed)}`);
-    const saved = await waitSaved(win);
-    if (saved !== "saved") return fail(`autosave not reached (${saved})`);
     const aPath = join(wsDir, "a.md");
+    if (!(await waitDiskContains(aPath, mark1))) return fail("autosave not reached");
     const diskA = await readFile(aPath, "utf8");
     if (!diskA.includes(mark1)) return fail("workspace note marker missing on disk");
     if (!diskA.startsWith("---\ntitle: a")) return fail("a.md front matter changed");
@@ -483,7 +556,7 @@ export async function runWorkspaceSelfCheck(win: BrowserWindow, wsDir: string, e
       return text.includes(mark1) ? true : null;
     });
     if (!redone) return fail("redo after undo failed");
-    await waitSaved(win);
+    await waitDiskContains(aPath, mark1);
 
     // 2.5) 粘贴位图(截图通道)→ 落盘同目录 → 相对引用写入并自动保存
     const pasteOk = await js<boolean>(
@@ -670,48 +743,37 @@ export async function runWorkspaceSelfCheck(win: BrowserWindow, wsDir: string, e
     );
     if (!externalRow) return fail("external new file not reflected in tree");
     await js<void>(`document.querySelector(${JSON.stringify(`[data-rel='${externalName}']`)}).click()`);
-    // 等待头部文件名切换为外部文件(避免树内旧行文本误判)
-    const extOpen = await poll(async () => {
-      const headerName = await js<string>(
-        `document.querySelector("header strong")?.textContent ?? ""`,
-      );
-      return headerName === externalName ? true : null;
-    });
+    // 等待窗口标题切换为外部文件(避免树内旧行文本误判;顶栏文档名已移除)
+    const extOpen = await poll(() => docTitleIs(win, externalName));
     if (!extOpen) return fail("external file did not open");
     const mark2 = `外部新增标记-${Date.now()}`;
     const typed2 = await typeAtEnd(win, mark2);
     if (!typed2.ok) return fail(`typing2 failed: ${JSON.stringify(typed2)}`);
-    const saved2 = await waitSaved(win);
-    if (saved2 !== "saved") {
+    if (!(await waitDiskContains(externalAbs, mark2))) {
       const diag = await js<string>(
         `JSON.stringify({
           text: document.body.innerText.slice(0, 300),
           html: document.getElementById('root')?.innerHTML.slice(0, 900) ?? 'no-root',
         })`,
       );
-      return fail(`autosave2 not reached (${saved2}); diag=${diag}`);
+      return fail(`autosave2 not reached; diag=${diag}`);
     }
     const diskExt = await readFile(externalAbs, "utf8");
     if (!diskExt.includes(mark2)) return fail("external note marker missing on disk");
 
-    // 4) 侧栏折叠/还原(可见按钮,不依赖快捷键)
+    // 4) 侧栏折叠/还原(顶栏开关已移除:经「视图 → 侧栏显示/隐藏」菜单命令通道)
     const before = await js<boolean>(q("[data-testid='sidebar']"));
     if (!before) return fail("sidebar missing");
-    await js<void>(`document.querySelector("[data-testid='sidebar-toggle']").click()`);
+    Menu.getApplicationMenu()?.getMenuItemById("toggle-sidebar")?.click();
     const collapsed = await poll(() => js<boolean>(`document.querySelector("[data-testid='sidebar']") === null`));
     if (!collapsed) return fail("sidebar did not collapse");
-    await js<void>(`document.querySelector("[data-testid='sidebar-toggle']").click()`);
+    Menu.getApplicationMenu()?.getMenuItemById("toggle-sidebar")?.click();
     const restored = await poll(() => js<boolean>(q("[data-testid='sidebar']")));
     if (!restored) return fail("sidebar did not restore");
 
     // 5) 文件操作(10):先回 a.md(确定性上下文),菜单「新建笔记」→ 落盘并打开
     await js<void>(`document.querySelector("[data-rel='a.md']").click()`);
-    const baseOpen = await poll(async () => {
-      const headerName = await js<string>(
-        `document.querySelector("header strong")?.textContent ?? ""`,
-      );
-      return headerName === "a.md" ? true : null;
-    });
+    const baseOpen = await poll(() => docTitleIs(win, "a.md"));
     if (!baseOpen) return fail("base note reopen before new-note failed");
     win.webContents.send(IPC.menuCommand, "new-note");
     const nnRow = await poll(async () => {
@@ -721,18 +783,12 @@ export async function runWorkspaceSelfCheck(win: BrowserWindow, wsDir: string, e
       return content.length >= 0 ? true : null;
     });
     if (!nnRow) return fail("new-note via menu failed");
-    const nnOpen = await poll(async () => {
-      const headerName = await js<string>(
-        `document.querySelector("header strong")?.textContent ?? ""`,
-      );
-      return headerName === "未命名笔记.md" ? true : null;
-    }, 12000);
+    const nnOpen = await poll(() => docTitleIs(win, "未命名笔记.md"), 12000);
     if (!nnOpen) {
       const diag = await js<string>(
         `JSON.stringify({
-          header: document.querySelector("header strong")?.textContent ?? "",
-          body: document.body.innerText.slice(0, 150),
           title: document.title,
+          body: document.body.innerText.slice(0, 150),
         })`,
       );
       return fail(`new note not opened in editor; diag=${diag}`);
@@ -789,38 +845,37 @@ export async function runWorkspaceSelfCheck(win: BrowserWindow, wsDir: string, e
     });
     if (!movedBack) return fail("undo of move did not restore b.md");
 
-    // 5.6) 外观(18):深色/浅色即时生效(computed 校验)
-    win.webContents.send(IPC.menuCommand, "theme-dark");
-    const darkApplied = await poll(async () => {
-      const theme = await js<string>(`document.documentElement.dataset.theme ?? ""`);
-      if (theme !== "dark") return null;
-      const bg = await js<string>(`getComputedStyle(document.body).backgroundColor`);
-      return bg.includes("31, 31, 31") ? true : null;
-    });
-    if (!darkApplied) return fail("dark theme not applied");
-    win.webContents.send(IPC.menuCommand, "theme-light");
-    const lightApplied = await poll(async () => {
-      const theme = await js<string>(`document.documentElement.dataset.theme ?? ""`);
-      if (theme !== "light") return null;
-      const bg = await js<string>(`getComputedStyle(document.body).backgroundColor`);
-      return bg.includes("255, 255, 255") ? true : null;
-    });
-    if (!lightApplied) return fail("light theme not applied");
-    win.webContents.send(IPC.menuCommand, "theme-system");
-    const systemApplied = await poll(async () => {
-      const theme = await js<string>(`document.documentElement.dataset.theme ?? ""`);
-      return theme === "light" || theme === "dark" ? true : null;
-    });
-    if (!systemApplied) return fail("system theme mode not applied");
+    // 5.6) 主题(01):三主题即时生效(computed 校验)+ 每主题截图存档
+    const themes: Array<{ cmd: string; name: string; bg: string }> = [
+      { cmd: "theme-github", name: "github", bg: "255, 255, 255" },
+      { cmd: "theme-night", name: "night", bg: "54, 59, 64" },
+      { cmd: "theme-newsprint", name: "newsprint", bg: "243, 242, 238" },
+    ];
+    for (const t of themes) {
+      win.webContents.send(IPC.menuCommand, t.cmd);
+      const applied = await poll(async () => {
+        const theme = await js<string>(`document.documentElement.dataset.theme ?? ""`);
+        if (theme !== t.name) return null;
+        const bg = await js<string>(`getComputedStyle(document.body).backgroundColor`);
+        return bg.includes(t.bg) ? true : null;
+      });
+      if (!applied) return fail(`theme ${t.name} not applied`);
+      await delay(300);
+      try {
+        mkdirSync(join(__dirname, "../../out/smoke"), { recursive: true });
+        const { writeFileSync } = await import("node:fs");
+        writeFileSync(
+          join(__dirname, `../../out/smoke/theme-${t.name}.png`),
+          (await win.webContents.capturePage()).toPNG(),
+        );
+      } catch {
+        // 截图失败不判定失败(与收尾截图同一兜底口径)
+      }
+    }
 
     // 5.7) 导出 PDF(19):菜单命令 → 同目录同名 .pdf(覆盖);提示条出现
     await js<void>(`document.querySelector("[data-rel='a.md']").click()`);
-    const expBase = await poll(async () => {
-      const headerName = await js<string>(
-        `document.querySelector("header strong")?.textContent ?? ""`,
-      );
-      return headerName === "a.md" ? true : null;
-    });
+    const expBase = await poll(() => docTitleIs(win, "a.md"));
     if (!expBase) return fail("export base note reopen failed");
     win.webContents.send(IPC.menuCommand, "export-pdf");
     const pdfPath = join(wsDir, "a.pdf");
@@ -841,12 +896,7 @@ export async function runWorkspaceSelfCheck(win: BrowserWindow, wsDir: string, e
 
     // 6) 外部删除当前文件(12):横幅出现;不自动重建;「放弃」清空编辑态
     await js<void>(`document.querySelector("[data-rel='a.md']").click()`);
-    const aOpen = await poll(async () => {
-      const headerName = await js<string>(
-        `document.querySelector("header strong")?.textContent ?? ""`,
-      );
-      return headerName === "a.md" ? true : null;
-    });
+    const aOpen = await poll(() => docTitleIs(win, "a.md"));
     if (!aOpen) return fail("a.md reopen failed");
     // 6.1) 查找(14):Ctrl+F(菜单通道)→ 输入 → 命中行 → 点击定位高亮 → Esc 关闭清高亮
     win.webContents.send(IPC.menuCommand, "find");
@@ -894,25 +944,28 @@ export async function runWorkspaceSelfCheck(win: BrowserWindow, wsDir: string, e
     if (!wsRow) return fail("workspace search produced no rows");
     await js<void>(`document.querySelector("[data-testid='ws-hit-row']").click()`);
     const wsOpened = await poll(async () => {
-      const headerName = await js<string>(
-        `document.querySelector("header strong")?.textContent ?? ""`,
-      );
-      return headerName.startsWith("外部新增-") ? true : null;
+      const title = await js<string>("document.title");
+      return title.startsWith("外部新增-") ? true : null;
     });
     if (!wsOpened) return fail("workspace hit did not open file");
     const wsHl = await poll(() => js<boolean>(q(".search-hit-active")));
-    if (!wsHl) return fail("workspace hit highlight missing");
+    if (!wsHl) {
+      const diag = await js<string>(
+        `JSON.stringify({
+          hits: document.querySelectorAll(".search-hit").length,
+          active: document.querySelectorAll(".search-hit-active").length,
+          panelOpen: !!document.querySelector("[data-testid='search-panel']"),
+          body: document.body.innerText.slice(0, 120),
+        })`,
+      );
+      return fail(`workspace hit highlight missing; diag=${diag}`);
+    }
     const panelStill = await poll(() => js<boolean>(q("[data-testid='search-panel']")));
     if (!panelStill) return fail("search panel closed unexpectedly after hit");
 
     // 回到 a.md(外部删除测试的前提文档)
     await js<void>(`document.querySelector("[data-rel='a.md']").click()`);
-    const aOpen2 = await poll(async () => {
-      const headerName = await js<string>(
-        `document.querySelector("header strong")?.textContent ?? ""`,
-      );
-      return headerName === "a.md" ? true : null;
-    });
+    const aOpen2 = await poll(() => docTitleIs(win, "a.md"));
     if (!aOpen2) return fail("a.md reopen after ws search failed");
 
     // 6.3) 跨文件链接与锚点(16):c.md 内 Ctrl+单击 → b.md 打开并定位标题
@@ -922,12 +975,7 @@ export async function runWorkspaceSelfCheck(win: BrowserWindow, wsDir: string, e
     const cRow = await poll(() => js<boolean>(q("[data-rel='c.md']")));
     if (!cRow) return fail("c.md row missing after write");
     await js<void>(`document.querySelector("[data-rel='c.md']").click()`);
-    const cOpen = await poll(async () => {
-      const headerName = await js<string>(
-        `document.querySelector("header strong")?.textContent ?? ""`,
-      );
-      return headerName === "c.md" ? true : null;
-    });
+    const cOpen = await poll(() => docTitleIs(win, "c.md"));
     if (!cOpen) return fail("c.md not opened");
     const ctrlOk = await js<{ ok: boolean; detail: string }>(
       `(() => {
@@ -945,12 +993,7 @@ export async function runWorkspaceSelfCheck(win: BrowserWindow, wsDir: string, e
       })()`,
     );
     if (!ctrlOk.ok) return fail(`ctrl-click dispatch failed: ${JSON.stringify(ctrlOk)}`);
-    const bOpen = await poll(async () => {
-      const headerName = await js<string>(
-        `document.querySelector("header strong")?.textContent ?? ""`,
-      );
-      return headerName === "b.md" ? true : null;
-    });
+    const bOpen = await poll(() => docTitleIs(win, "b.md"));
     if (!bOpen) return fail("ctrl-click did not open b.md");
     const anchorSelected = await poll(async () => {
       const sel = await js<string>(`window.getSelection()?.toString() ?? ""`);
@@ -965,15 +1008,24 @@ export async function runWorkspaceSelfCheck(win: BrowserWindow, wsDir: string, e
     const codeRow = await poll(() => js<boolean>(q("[data-rel='code.md']")));
     if (!codeRow) return fail("code.md row missing");
     await js<void>(`document.querySelector("[data-rel='code.md']").click()`);
-    const codeOpen = await poll(async () => {
-      const headerName = await js<string>(
-        `document.querySelector("header strong")?.textContent ?? ""`,
-      );
-      return headerName === "code.md" ? true : null;
-    });
+    const codeOpen = await poll(() => docTitleIs(win, "code.md"));
     if (!codeOpen) return fail("code.md not opened");
     const hlOk = await poll(() => js<boolean>(q(".editor-prose pre code .hljs-keyword")));
     if (!hlOk) return fail("code highlight classes missing");
+    // 02:语言标签 widget(js → pre 内 .code-lang 文本)
+    const langTag = await poll(() =>
+      js<boolean>(`document.querySelector(".editor-prose pre .code-lang")?.textContent === "js"`),
+    );
+    if (!langTag) {
+      const diag = await js<string>(
+        `JSON.stringify({
+          preCount: document.querySelectorAll(".editor-prose pre").length,
+          langTags: [...document.querySelectorAll(".editor-prose pre .code-lang")].map((p) => p.textContent),
+          hasHost: !!document.querySelector("[data-testid='editor-prose']"),
+        })`,
+      );
+      return fail(`code block language label missing; diag=${diag}`);
+    }
     const lnOk = await poll(async () => {
       const t = await js<string>(
         `document.querySelector(".editor-prose pre .code-linenums")?.textContent ?? ""`,
@@ -1040,12 +1092,7 @@ export async function runWorkspaceSelfCheck(win: BrowserWindow, wsDir: string, e
     await delay(800);
     // 回到 a.md 作为「外部删除」测试对象
     await js<void>(`document.querySelector("[data-rel='a.md']").click()`);
-    const aOpen3 = await poll(async () => {
-      const headerName = await js<string>(
-        `document.querySelector("header strong")?.textContent ?? ""`,
-      );
-      return headerName === "a.md" ? true : null;
-    });
+    const aOpen3 = await poll(() => docTitleIs(win, "a.md"));
     if (!aOpen3) return fail("a.md reopen before external delete failed");
     const { unlink, writeFile: wf } = await import("node:fs/promises");
     await unlink(aPath);
@@ -1087,7 +1134,7 @@ export async function runWorkspaceSelfCheck(win: BrowserWindow, wsDir: string, e
   } catch (err) {
     const diag = await js<string>(
       `JSON.stringify({
-        header: document.querySelector("header strong")?.textContent ?? "",
+        title: document.title,
         rels: [...document.querySelectorAll("[data-rel]")].map((el) => el.getAttribute("data-rel")),
         sidebar: !!document.querySelector("[data-testid='sidebar']"),
         body: document.body.innerText.slice(0, 200),
@@ -1126,16 +1173,12 @@ export async function runRestoreSeed(win: BrowserWindow, wsDir: string): Promise
     const row = await pollUntil(() => js<boolean>(`!!document.querySelector("[data-rel='a.md']")`), 10000);
     if (!row) return fail("a.md row missing");
     await js<void>(`document.querySelector("[data-rel='a.md']").click()`);
-    const opened = await pollUntil(
-      async () => (await js<string>(`document.querySelector("header strong")?.textContent ?? ""`)) === "a.md",
-      10000,
-    );
+    const opened = await pollUntil(() => docTitleIs(win, "a.md"), 10000);
     if (!opened) return fail("a.md not opened");
     const marker = `恢复标记-${Date.now()}`;
     const typed = await typeAtEnd(win, marker);
     if (!typed.ok) return fail(`typing failed: ${typed.detail}`);
-    const saved = await waitSaved(win);
-    if (saved !== "saved") return fail(`autosave not reached (${saved})`);
+    if (!(await waitDiskContains(join(wsDir, "a.md"), marker))) return fail("autosave not reached");
     console.log(`[smoke] seed ok marker=${marker}`);
   } catch (err) {
     await fail(`seed threw: ${String(err)}`);
@@ -1173,18 +1216,14 @@ export async function runRestoreCheck(win: BrowserWindow, expectFile: string): P
         `(async () => JSON.stringify({
           body: document.body.innerText.slice(0, 220),
           sidebar: !!document.querySelector("[data-testid='sidebar']"),
-          err: document.querySelector("[data-testid='load-error']")?.textContent ?? null,
           last: await window.confidant.stateGet("lastSession"),
           dbg: window.__dbg ?? null,
         }))()`,
       );
       return fail(`welcome page shown instead of restore; diag=${diag}`);
     }
-    const header = await pollUntil(
-      async () => (await js<string>(`document.querySelector("header strong")?.textContent ?? ""`)) === expectFile,
-      10000,
-    );
-    if (!header) return fail(`restored file header mismatch (expect ${expectFile})`);
+    const header = await pollUntil(() => docTitleIs(win, expectFile), 10000);
+    if (!header) return fail(`restored file title mismatch (expect ${expectFile})`);
     const wsDir = process.env["CONFIDANT_E2E_WS_DIR"];
     if (wsDir) {
       const content = await readFile(join(wsDir, expectFile), "utf8");

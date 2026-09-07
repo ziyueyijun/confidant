@@ -1,32 +1,70 @@
 @import "tailwindcss";
 
-/* ── 同源色板(深浅各一套;壳与正文渲染区共用,规格 §12 单点维护) ── */
+/* ── 主题系统(01):data-theme 三值 github(亮,默认)/night(暗)/newsprint(纸感) ──
+   变量集沿用既有语义体系、按需补充;「跟随系统」已取消(prefers-color-scheme
+   逻辑删除)。色值依据:research/typora-visual-baseline.md §1 三主题表。 */
+
+/* github(亮,默认;参照基线) */
 :root,
-:root[data-theme="light"] {
+:root[data-theme="github"] {
   color-scheme: light;
   --app-bg: #ffffff;
-  --app-fg: #1b1b1b;
-  --muted: #8a8a8a;
-  --panel: #f6f6f6;
+  --app-fg: #333333;
+  --muted: #777777;
+  --panel: #fafafa;
   --surface: #ffffff;
   --border: #dedede;
   --input-bg: #ffffff;
-  --accent: #1f6fcf;
+  --accent: #4183c4;
   --accent-soft: #dbe9f8;
-  --tree-active: #dbe9f8;
-  --code-bg: #f2f2f2;
-  --block-bg: #f6f8fa;
-  --block-border: #e1e4e8;
-  --quote-bar: #c8c8c8;
-  --quote-fg: #666666;
+  --link: var(--accent);
   --danger: #c0392b;
   --overlay: rgba(0, 0, 0, 0.15);
   --shadow: rgba(0, 0, 0, 0.12);
   --shell-bg: var(--panel);
   --shell-border: var(--border);
   --color-background: var(--app-bg);
-  --tree-active-bg: var(--tree-active);
-  /* 代码高亮 token(28):跟随主题的浅色配色 */
+  /* 侧边栏激活项:背景 + 4px 左边框(基线规律 5) */
+  --tree-active-bg: #eeeeee;
+  --tree-active-border: #777777;
+  --tree-active-fg: #333333;
+  /* 专注模式淡出色(可读残影) */
+  --blur-text: #c8c8c8;
+  /* 查找命中(琥珀 + 当前项黑底白字,基线 §4.2) */
+  --search-hit-bg: rgba(248, 192, 116, 0.3);
+  --search-hit-active-bg: #000000;
+  --search-hit-active-fg: #ffffff;
+  /* 页脚状态条 */
+  --footer-border: #dddddd;
+  --footer-btn-active: #1868ad;
+  --footer-btn-hover: #eeeeee;
+  /* 底部悬浮格式工具栏(基线 §3.3) */
+  --toolbar-bg: #ffffff;
+  --toolbar-border: rgba(127, 127, 127, 0.22);
+  --toolbar-fg: var(--app-fg);
+  --toolbar-btn-hover: rgba(127, 127, 127, 0.16);
+  --toolbar-btn-active: rgba(127, 127, 127, 0.22);
+  /* 横幅 / 通知 / 对话框 */
+  --banner-bg: #fdf1e7;
+  --banner-border: #e8b98a;
+  --toast-bg: rgba(20, 20, 20, 0.92);
+  --toast-fg: #ffffff;
+  --toast-action: #9ec9f5;
+  /* 代码块:背景/边框/行号/语言标签(基线 §1.1) */
+  --code-bg: #f2f2f2;
+  --block-bg: #f8f8f8;
+  --block-border: #e7eaed;
+  --code-ln: #999999;
+  --lang-tag: #b4654d;
+  --quote-bar: #dfe2e5;
+  --quote-fg: #777777;
+  /* 标题下边框(h1/h2,基线 §2.2) */
+  --heading-border: #eeeeee;
+  /* 字体:西文 Open Sans(github/night)/PT Serif(newsprint),中文微软雅黑体系 */
+  --font-body: "Open Sans", "Segoe UI", "Microsoft YaHei UI", "Microsoft YaHei", system-ui, sans-serif;
+  --font-ui: "Segoe UI", "Microsoft YaHei UI", "Microsoft YaHei", system-ui, sans-serif;
+  --font-code: Consolas, "Microsoft YaHei", monospace;
+  /* 代码高亮 token:亮色配色 */
   --code-token-comment: #6a737d;
   --code-token-keyword: #d73a49;
   --code-token-string: #032f62;
@@ -38,32 +76,57 @@
   --code-token-addition: #22863a;
 }
 
-/* 深色:手动深色,或跟随系统且未手动指定浅色 */
-:root[data-theme="dark"] {
+/* night(暗;基线 §1.2) */
+:root[data-theme="night"] {
   color-scheme: dark;
-  --app-bg: #1f1f1f;
-  --app-fg: #d6d6d6;
-  --muted: #949494;
-  --panel: #262626;
-  --surface: #2b2b2b;
-  --border: #3c3c3c;
+  --app-bg: #363b40;
+  --app-fg: #b8bfc6;
+  --muted: #b7b7b7;
+  --panel: #2e3033;
+  --surface: #3c4147;
+  --border: #474d54;
   --input-bg: #333333;
   --accent: #6aa9f2;
   --accent-soft: #23446b;
-  --tree-active: #2c4258;
-  --code-bg: #333333;
-  --block-bg: #2c2c2c;
-  --block-border: #3f3f3f;
-  --quote-bar: #555555;
-  --quote-fg: #b5b5b5;
+  --link: #e0e0e0;
   --danger: #e06c5c;
   --overlay: rgba(0, 0, 0, 0.5);
   --shadow: rgba(0, 0, 0, 0.5);
   --shell-bg: var(--panel);
   --shell-border: var(--border);
   --color-background: var(--app-bg);
-  --tree-active-bg: var(--tree-active);
-  /* 代码高亮 token(28):跟随主题的深色配色 */
+  --tree-active-bg: #222222;
+  --tree-active-border: #8d8df0;
+  --tree-active-fg: #e0e0e0;
+  --blur-text: #686868;
+  --search-hit-bg: rgba(199, 140, 60, 0.81);
+  --search-hit-active-bg: #428bca;
+  --search-hit-active-fg: #ffffff;
+  --footer-border: #474d54;
+  --footer-btn-active: #1868ad;
+  --footer-btn-hover: #333333;
+  --toolbar-bg: #2d3033;
+  --toolbar-border: rgba(127, 127, 127, 0.5);
+  --toolbar-fg: #e8f2fb;
+  --toolbar-btn-hover: rgba(127, 127, 127, 0.16);
+  --toolbar-btn-active: rgba(127, 127, 127, 0.22);
+  --banner-bg: #403a33;
+  --banner-border: #6b6355;
+  --toast-bg: rgba(20, 20, 20, 0.92);
+  --toast-fg: #e8e8e8;
+  --toast-action: #9ec9f5;
+  --code-bg: #3f464c;
+  --block-bg: #333333;
+  --block-border: #3f3f3f;
+  --code-ln: #999999;
+  --lang-tag: #d98e6f;
+  --quote-bar: #474d54;
+  --quote-fg: #9da2a6;
+  --heading-border: #474d54;
+  --font-body: "Open Sans", "Segoe UI", "Microsoft YaHei UI", "Microsoft YaHei", system-ui, sans-serif;
+  --font-ui: "Segoe UI", "Microsoft YaHei UI", "Microsoft YaHei", system-ui, sans-serif;
+  --font-code: Consolas, "Microsoft YaHei", monospace;
+  /* 代码高亮 token:暗色配色 */
   --code-token-comment: #8b949e;
   --code-token-keyword: #ff7b72;
   --code-token-string: #a5d6ff;
@@ -75,42 +138,98 @@
   --code-token-addition: #7ee787;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) {
-    color-scheme: dark;
-    --app-bg: #1f1f1f;
-    --app-fg: #d6d6d6;
-    --muted: #949494;
-    --panel: #262626;
-    --surface: #2b2b2b;
-    --border: #3c3c3c;
-    --input-bg: #333333;
-    --accent: #6aa9f2;
-    --accent-soft: #23446b;
-    --tree-active: #2c4258;
-    --code-bg: #333333;
-    --block-bg: #2c2c2c;
-    --block-border: #3f3f3f;
-    --quote-bar: #555555;
-    --quote-fg: #b5b5b5;
-    --danger: #e06c5c;
-    --overlay: rgba(0, 0, 0, 0.5);
-    --shadow: rgba(0, 0, 0, 0.5);
-    --shell-bg: var(--panel);
-    --shell-border: var(--border);
-    --color-background: var(--app-bg);
-    --tree-active-bg: var(--tree-active);
-    /* 代码高亮 token(28):跟随主题的深色配色(media 变体) */
-    --code-token-comment: #8b949e;
-    --code-token-keyword: #ff7b72;
-    --code-token-string: #a5d6ff;
-    --code-token-number: #79c0ff;
-    --code-token-title: #d2a8ff;
-    --code-token-builtin: #ffa657;
-    --code-token-variable: #ffa657;
-    --code-token-operator: #ffa657;
-    --code-token-addition: #7ee787;
-  }
+/* newsprint(纸感;基线 §1.3;代码高亮 token 与亮色共用——08 实测
+   Typora newsprint.css 无 cm-s 覆盖,继承共享亮色板,仅代码背景纸灰) */
+:root[data-theme="newsprint"] {
+  color-scheme: light;
+  --app-bg: #f3f2ee;
+  --app-fg: #1f0909;
+  --muted: #444444;
+  --panel: #f3f2ee;
+  --surface: #f7f6f2;
+  --border: #cfccc2;
+  --input-bg: #f7f6f2;
+  --accent: #065588;
+  --accent-soft: #e3ded2;
+  --link: #065588;
+  --danger: #9b5146;
+  --overlay: rgba(31, 9, 9, 0.15);
+  --shadow: rgba(31, 9, 9, 0.18);
+  --shell-bg: var(--panel);
+  --shell-border: var(--border);
+  --color-background: var(--app-bg);
+  --tree-active-bg: rgba(32, 43, 51, 0.63);
+  --tree-active-border: rgba(32, 43, 51, 0.63);
+  --tree-active-fg: #f3f2ee;
+  --blur-text: #c9c3b8;
+  --search-hit-bg: rgba(248, 192, 116, 0.45);
+  --search-hit-active-bg: #000000;
+  --search-hit-active-fg: #ffffff;
+  --footer-border: #cfccc2;
+  --footer-btn-active: #065588;
+  --footer-btn-hover: #e8e5dc;
+  --toolbar-bg: #f7f6f2;
+  --toolbar-border: rgba(127, 127, 127, 0.25);
+  --toolbar-fg: var(--app-fg);
+  --toolbar-btn-hover: rgba(31, 9, 9, 0.08);
+  --toolbar-btn-active: rgba(31, 9, 9, 0.12);
+  --banner-bg: #f6e9dc;
+  --banner-border: #c9a36b;
+  --toast-bg: rgba(40, 36, 30, 0.92);
+  --toast-fg: #f3f2ee;
+  --toast-action: #d9c9a8;
+  --code-bg: #dadada;
+  --block-bg: #dadada;
+  --block-border: #cdcabc;
+  --code-ln: #999999;
+  --lang-tag: #9b5146;
+  --quote-bar: #bababa;
+  --quote-fg: #656565;
+  --heading-border: #c5c5c5;
+  --font-body: "PT Serif", "Segoe UI", "Microsoft YaHei UI", "Microsoft YaHei", serif;
+  --font-ui: "Segoe UI", "Microsoft YaHei UI", "Microsoft YaHei", system-ui, sans-serif;
+  --font-code: Consolas, "Microsoft YaHei", monospace;
+  /* 代码高亮 token:与亮色共用(08 实测依据) */
+  --code-token-comment: #6a737d;
+  --code-token-keyword: #d73a49;
+  --code-token-string: #032f62;
+  --code-token-number: #005cc5;
+  --code-token-title: #6f42c1;
+  --code-token-builtin: #e36209;
+  --code-token-variable: #e36209;
+  --code-token-operator: #24292e;
+  --code-token-addition: #22863a;
+}
+
+/* 西文字体资产(02):Open Sans / PT Serif(Google Fonts 官方源,Sil OFL;
+   Open Sans 为可变字体,单文件覆盖 400–700 字重) */
+@font-face {
+  font-family: "Open Sans";
+  font-style: normal;
+  font-weight: 300 800;
+  font-display: swap;
+  src: url("./assets/fonts/OpenSans-400.woff2") format("woff2");
+}
+@font-face {
+  font-family: "PT Serif";
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("./assets/fonts/PTSerif-400.woff2") format("woff2");
+}
+@font-face {
+  font-family: "PT Serif";
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url("./assets/fonts/PTSerif-700.woff2") format("woff2");
+}
+@font-face {
+  font-family: "PT Serif";
+  font-style: italic;
+  font-weight: 400;
+  font-display: swap;
+  src: url("./assets/fonts/PTSerif-400-italic.woff2") format("woff2");
 }
 
 html,
@@ -133,12 +252,7 @@ html.confidant-print body {
 body {
   margin: 0;
   overflow: hidden;
-  font-family:
-    "Segoe UI",
-    "Microsoft YaHei UI",
-    "Microsoft YaHei",
-    system-ui,
-    sans-serif;
+  font-family: var(--font-ui);
   background: var(--app-bg);
   color: var(--app-fg);
   -webkit-font-smoothing: antialiased;
@@ -151,15 +265,27 @@ body {
 }
 
 .editor-prose {
-  /* 27/修:内容列自适应窗口(左右留白 ≈20%,60vw),窄窗留白下限 16px;
-     不再固定 860px 上限(用户实测「没有自适应撑满」) */
-  max-width: min(60vw, 100% - 32px);
+  /* 02:宽度分级限宽(基线 §2.2)——860px 起步,≥1400px 视口 1024px、
+     ≥1800px 视口 1200px;窄窗两侧 ≥16px 留白 */
+  max-width: min(860px, 100% - 32px);
   margin: 0 auto;
   padding: 32px 0 40vh; /* 左右留白由 max-width 承担,内部不再设 padding */
   font-size: 16px;
+  font-family: var(--font-body);
   line-height: 1.7;
   word-break: break-word;
   outline: none;
+  transition: padding-top 0.4s ease-out; /* 06:打字机模式平滑过渡 */
+}
+@media (min-width: 1400px) {
+  .editor-prose {
+    max-width: min(1024px, 100% - 32px);
+  }
+}
+@media (min-width: 1800px) {
+  .editor-prose {
+    max-width: min(1200px, 100% - 32px);
+  }
 }
 /* 编辑区焦点环(31/修):PM 根(contenteditable)不在 .editor-prose 本身,
    UA 对 [contenteditable]:focus 的 outline:auto 细白环会透出;Blink 对
@@ -174,52 +300,63 @@ body {
 }
 
 .editor-prose :is(h1, h2, h3, h4, h5, h6) {
-  font-weight: 600;
+  /* 02:标题体系对齐基线(§2.2)——统一 bold;h1/h2 带 1px 下边框(主题变量) */
+  font-weight: 700;
   line-height: 1.3;
   margin: 1.4em 0 0.6em;
 }
 .editor-prose h1 {
-  font-size: 1.7em;
+  font-size: 2.25em;
+  border-bottom: 1px solid var(--heading-border);
+  padding-bottom: 0.3em;
 }
 .editor-prose h2 {
-  font-size: 1.45em;
+  font-size: 1.75em;
+  border-bottom: 1px solid var(--heading-border);
+  padding-bottom: 0.3em;
 }
 .editor-prose h3 {
-  font-size: 1.25em;
+  font-size: 1.5em;
 }
 .editor-prose h4 {
-  font-size: 1.1em;
+  font-size: 1.25em;
 }
 .editor-prose h5,
 .editor-prose h6 {
   font-size: 1em;
 }
+.editor-prose h6 {
+  color: var(--muted);
+}
 
 .editor-prose p {
-  margin: 0.6em 0;
+  margin: 0.8em 0; /* 02:块间距 0.6em → 0.8em(基线 github p margin) */
 }
 .editor-prose blockquote {
   margin: 0.8em 0;
   padding: 0.1em 1em;
-  border-left: 3px solid var(--quote-bar);
+  border-left: 4px solid var(--quote-bar); /* 02:4px 左边框(基线) */
   color: var(--quote-fg);
 }
 .editor-prose code {
-  font-family: Consolas, "Courier New", monospace;
+  font-family: var(--font-code);
   font-size: 0.9em;
   background: var(--code-bg);
   border-radius: 3px;
   padding: 0.1em 0.35em;
 }
-/* 代码块(28):默认自动换行;行号列由 data-code-lines 与 .code-linenums 联动 */
+/* 代码块(28/02):默认自动换行;圆角 3px、字号 0.9em(基线 §5.3);
+   行号列由 data-code-lines 与 .code-linenums 联动 */
 .editor-prose pre {
-  position: relative; /* 行号列定位锚 */
+  position: relative; /* 行号列与语言标签定位锚 */
   background: var(--block-bg);
   border: 1px solid var(--block-border);
-  border-radius: 6px;
+  border-radius: 3px;
   padding: 12px 14px;
   white-space: pre-wrap; /* 28:默认换行;关闭时(设置)改横向滚动 */
   overflow-x: auto;
+  font-family: var(--font-code);
+  font-size: 0.9em;
 }
 .editor-prose[data-code-lines="on"] pre {
   padding-left: 3.2em; /* 行号列让位(与 .code-linenums 同宽) */
@@ -236,11 +373,25 @@ body {
   flex-direction: column;
   align-items: flex-end; /* 右对齐(替代 text-align,flex 布局) */
   justify-content: flex-start;
-  color: var(--muted);
+  color: var(--code-ln); /* 02:#999 系(主题变量) */
   user-select: none;
   overflow: hidden;
   font: inherit;
   line-height: inherit;
+}
+/* 代码块语言标签(02):widget 装饰(纯视图态,与行号同机制),砖红小字左上
+   (票 04 裁决;基线 .md-lang #b4654d 系);行号开启时让位到行号列右侧 */
+.editor-prose pre .code-lang {
+  position: absolute;
+  top: 6px;
+  left: 14px;
+  font-size: 0.78em;
+  color: var(--lang-tag);
+  pointer-events: none;
+  user-select: none;
+}
+.editor-prose[data-code-lines="on"] pre .code-lang {
+  left: 3.4em;
 }
 /* 行号每行块级 span:单列渲染不依赖 white-space(修复「行号折成两列」) */
 .editor-prose .code-linenums .code-ln {
@@ -347,8 +498,11 @@ body {
   text-align: left;
 }
 .editor-prose th {
-  background: var(--panel);
+  background: var(--block-bg); /* 02:表头底色(基线 #f8f8f8 系) */
   font-weight: 600;
+}
+.editor-prose tr:nth-child(even) td {
+  background: var(--block-bg); /* 02:偶数行底色(基线) */
 }
 .editor-prose img {
   max-width: 100%;
@@ -369,7 +523,7 @@ body {
   border-radius: 2px;
 }
 .editor-prose a {
-  color: var(--accent);
+  color: var(--link);
   text-decoration: underline;
   cursor: pointer;
 }
@@ -387,7 +541,7 @@ body {
   accent-color: currentColor;
 }
 
-/* 源码模式(30):全文件原始 Markdown 文本区,与 WYSIWYG 同宽约束 */
+/* 源码模式(30):全文件原始 Markdown 文本区,与 WYSIWYG 同宽约束(02 分级) */
 .source-editor {
   flex: 1;
   min-height: 0;
@@ -401,35 +555,58 @@ body {
   resize: none;
   background: transparent;
   color: var(--app-fg);
-  font-family: Consolas, "Courier New", monospace;
+  font-family: var(--font-code);
   font-size: 13px;
   line-height: 1.7;
   white-space: pre;
   overflow: auto;
 }
+@media (min-width: 1400px) {
+  .source-editor {
+    max-width: min(1024px, 100% - 32px);
+  }
+}
+@media (min-width: 1800px) {
+  .source-editor {
+    max-width: min(1200px, 100% - 32px);
+  }
+}
 
-/* 查找高亮(14):临时视图态,不落盘 */
+/* 查找高亮(14):临时视图态,不落盘;颜色吃主题变量(05:琥珀 + 当前项黑底白字) */
 .search-hit {
-  background: rgba(255, 220, 80, 0.55);
+  background: var(--search-hit-bg);
   border-radius: 2px;
   box-decoration-break: clone;
 }
 .search-hit-active {
-  background: rgba(255, 160, 40, 0.75);
+  background: var(--search-hit-active-bg);
+  color: var(--search-hit-active-fg);
 }
 .fm-block {
-  max-width: min(60vw, 100% - 32px);
+  /* 02:与编辑区同宽分级(留白观感连续) */
+  max-width: min(860px, 100% - 32px);
   margin: 0 auto;
   padding: 12px 0 0;
+}
+@media (min-width: 1400px) {
+  .fm-block {
+    max-width: min(1024px, 100% - 32px);
+  }
+}
+@media (min-width: 1800px) {
+  .fm-block {
+    max-width: min(1200px, 100% - 32px);
+  }
 }
 .fm-block pre {
   margin: 0;
   padding: 10px 14px;
-  font-family: Consolas, "Courier New", monospace;
+  font-family: var(--font-code);
   font-size: 0.85em;
+  color: var(--muted); /* 02:front matter 灰字进主题(字节行为不变) */
   background: var(--block-bg);
   border: 1px solid var(--block-border);
-  border-radius: 6px;
+  border-radius: 3px;
   overflow-x: auto;
   user-select: text;
   white-space: pre;

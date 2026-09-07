@@ -29,7 +29,7 @@ export function DocMissingBanner(props: { onRecover: () => void; onAbandon: () =
         position: "fixed",
         left: "50%",
         transform: "translateX(-50%)",
-        top: 44,
+        top: 12,
         zIndex: 55,
         display: "flex",
         alignItems: "center",

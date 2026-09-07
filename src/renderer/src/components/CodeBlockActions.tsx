@@ -79,7 +79,9 @@ export function CodeBlockActions() {
     const code = pre.querySelector("code");
     if (!code) return;
     const clone = code.cloneNode(true) as HTMLElement;
+    // 视图装饰剥离:行号列 + 语言标签(纯视图态,不入剪贴板)
     clone.querySelector(".code-linenums")?.remove();
+    clone.querySelector(".code-lang")?.remove();
     try {
       await navigator.clipboard.writeText(clone.textContent ?? "");
       setCopied(true);

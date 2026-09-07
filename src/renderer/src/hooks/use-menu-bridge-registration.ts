@@ -30,7 +30,7 @@ export interface MenuRegistrationApi {
   toggleCodeWrap: () => void;
   toggleCodeLineNumbers: () => void;
   insertImageViaDialog: () => Promise<void>;
-  applyThemeMode: (m: "system" | "light" | "dark") => void;
+  applyTheme: (t: "github" | "night" | "newsprint") => void;
   openFolderViaDialog: () => Promise<void>;
   doCreateNote: (dirRel: string) => Promise<void>;
   doDeleteEntry: (entry: { relPath: string; kind: "dir" | "md" }) => Promise<void>;
@@ -40,7 +40,7 @@ export interface MenuRegistrationApi {
 }
 
 export function useMenuBridgeRegistration(api: MenuRegistrationApi): void {
-  const { menuRef, docRef, engineRef, pipelineRef, workspaceRef, selectedRef, sourceModeRef, saveCurrent, toggleSourceMode, setFindOpen, setFindScope, setFindFocus, setLinkRequest, setUiTick, toggleSidebar, toggleCodeWrap, toggleCodeLineNumbers, insertImageViaDialog, applyThemeMode, openFolderViaDialog, doCreateNote, doDeleteEntry, setPrompt, showNotice, refreshMenuContext } = api;
+  const { menuRef, docRef, engineRef, pipelineRef, workspaceRef, selectedRef, sourceModeRef, saveCurrent, toggleSourceMode, setFindOpen, setFindScope, setFindFocus, setLinkRequest, setUiTick, toggleSidebar, toggleCodeWrap, toggleCodeLineNumbers, insertImageViaDialog, applyTheme, openFolderViaDialog, doCreateNote, doDeleteEntry, setPrompt, showNotice, refreshMenuContext } = api;
 
 // ── 菜单桥(03) ──
   useEffect(() => {
@@ -163,10 +163,10 @@ export function useMenuBridgeRegistration(api: MenuRegistrationApi): void {
     });
     menu.register(Cmd.about, () => true, () => void window.confidant.showAbout());
     menu.register(Cmd.quit, () => true, () => window.confidant.closeWindow());
-    // 外观三态(18)
-    menu.register(Cmd.themeSystem, () => true, () => applyThemeMode("system"));
-    menu.register(Cmd.themeLight, () => true, () => applyThemeMode("light"));
-    menu.register(Cmd.themeDark, () => true, () => applyThemeMode("dark"));
+    // 主题三态(01):勾选态由 useAppTheme 经 setChecked 同步
+    menu.register(Cmd.themeGithub, () => true, () => applyTheme("github"));
+    menu.register(Cmd.themeNight, () => true, () => applyTheme("night"));
+    menu.register(Cmd.themeNewsprint, () => true, () => applyTheme("newsprint"));
     // 文件操作命令(10):文件菜单(工作区/选中态驱动)
     const wsRule = (ctx: MenuContext) => ctx.hasWorkspace;
     const selRule = (ctx: MenuContext) => ctx.hasWorkspace && ctx.hasSelection;

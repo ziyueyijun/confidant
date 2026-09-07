@@ -13,6 +13,7 @@ export type {
   ImageUrlResolver,
   LinkInfo,
   BlockKind,
+  ProseMirrorDoc,
 } from "./lib/engine";
 
 export { splitFrontMatter } from "./lib/frontmatter";

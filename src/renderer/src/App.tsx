@@ -6,13 +6,12 @@ import type { Engine } from "../../../packages/engine";
 import { basename } from "@shared/path";
 import type { TreeEntry } from "@shared/ipc";
 import { composeNoteText, parseNoteText } from "./editor/note-document";
-import { createSavePipeline, type SaveState } from "./editor/save-pipeline";
+import { createSavePipeline } from "./editor/save-pipeline";
 import { classifyLink } from "./editor/link-target";
 import { Cmd, createMenuBridge, type MenuContext } from "./menu/menu-bridge";
 import {
   createOwnOpGuard,
   describeWriteError,
-  EMPTY_SAVE_STATE,
   showFileOpError,
   toThrownError,
 } from "./session/ops-shared";
@@ -20,7 +19,6 @@ import { Sidebar, SidebarEmpty } from "./components/Sidebar";
 import { LinkPanel } from "./components/LinkPanel";
 import { TextPrompt } from "./components/TextPrompt";
 import { SearchPanel } from "./components/SearchPanel";
-import { TopBar } from "./components/TopBar";
 import { Welcome } from "./components/Welcome";
 import { CodeBlockActions } from "./components/CodeBlockActions";
 import { ChangeNoticeToast, DocMissingBanner } from "./components/OverlayBanners";
@@ -48,10 +46,10 @@ export default function App() {
   const menuRef = useRef<ReturnType<typeof createMenuBridge> | null>(null);
 
   const [doc, setDoc] = useState<OpenNote | null>(null);
-  const [saveState, setSaveState] = useState<SaveState>(EMPTY_SAVE_STATE);
+  /** 打开/切换工作区或文档失败(界面不再展示,仅记录日志)。 */
   const [loadError, setLoadError] = useState<string | null>(null);
-  /** 引擎 UI 节拍:编辑/选区/命令后递增,驱动浮动条重算。 */
-  const [, setUiTick] = useState(0);
+  /** 引擎 UI 节拍:编辑/选区/命令后递增,驱动浮动条重算与派生视图(语言标签/大纲)。 */
+  const [uiTick, setUiTick] = useState(0);
   const [linkRequest, setLinkRequest] = useState(0);
   /** 源码模式(30):全屏原始 Markdown 文本编辑;文本区为磁盘字节级真相源。 */
   const [sourceMode, setSourceMode] = useState(false);
@@ -62,6 +60,8 @@ export default function App() {
   const [findOpen, setFindOpen] = useState(false);
   const [findScope, setFindScope] = useState<"file" | "workspace">("file");
   const [findFocus, setFindFocus] = useState(0);
+  /** 工作区命中跳转后的文件内高亮(08:交面板应用,见 SearchPanel)。 */
+  const [wsJump, setWsJump] = useState<{ ranges: Array<{ from: number; to: number }>; active: number } | null>(null);
   /** 编辑区焦点环(31/修):仅键盘(Tab)进入时显示——Blink 对 contenteditable
       的 :focus-visible 恒真(鼠标点击也匹配),纯 CSS 无法区分输入设备。 */
   const [focusViaKeyboard, setFocusViaKeyboard] = useState(false);
@@ -85,8 +85,8 @@ export default function App() {
   // ── 树展开集合(04/13):按工作区记忆 + 当前文档自动展开,toggle 即持久化(22) ──
   const { expanded, toggleDir } = useTreeExpansion(workspace, doc);
 
-  // ── 外观(18)与侧栏布局(04):独立域抽为 hook(22) ──
-  const { applyThemeMode } = useAppTheme(menuRef);
+  // ── 外观(01)与侧栏布局(04):独立域抽为 hook(22) ──
+  const { applyTheme } = useAppTheme(menuRef);
   const { sidebar, setWidth: setSidebarWidth, toggleSidebar, commitSidebar } = useSidebarLayout();
   // ── 编辑器设置(28):代码块换行/行号,持久化 + 勾选态 ──
   const { settings, toggleCodeWrap, toggleCodeLineNumbers } = useEditorSettings();
@@ -108,7 +108,10 @@ export default function App() {
           if (!res.ok) throw toThrownError(res);
         },
       },
-      { onState: (s) => setSaveState({ ...s }) },
+      { onState: (s) => {
+        // 顶栏移除后写盘失败不再展示,仅记录日志(冒烟经 console 通道捕获)
+        if (s.error) console.error(`[save] ${describeWriteError(s.error)}`);
+      } },
     );
     pipelineRef.current = pipeline;
     return () => {
@@ -195,7 +198,7 @@ export default function App() {
     if (docMissingRef.current) return; // 文件已被外部删除:不静默重建(12)
     ownOp.markOwnOp(cur.path);
     const res = await window.confidant.writeTextFile(cur.path, ta.value);
-    if (!res.ok) console.error("[source] save failed:", res.error);
+    if (!res.ok) console.error(`[source] save failed: ${res.error.code} ${res.error.message}`);
   }, []);
   const scheduleSourceSave = useCallback((): void => {
     if (sourceSaveTimer.current) clearTimeout(sourceSaveTimer.current);
@@ -453,7 +456,7 @@ export default function App() {
     saveCurrent, toggleSourceMode,
     setFindOpen, setFindScope, setFindFocus, setLinkRequest, setUiTick,
     toggleSidebar, toggleCodeWrap, toggleCodeLineNumbers, insertImageViaDialog,
-    applyThemeMode, openFolderViaDialog,
+    applyTheme, openFolderViaDialog,
     doCreateNote, doDeleteEntry, setPrompt, showNotice, refreshMenuContext,
   });
 
@@ -494,20 +497,10 @@ export default function App() {
     [workspace, doc],
   );
 
-  const errorText = saveState.error ? describeWriteError(saveState.error) : loadError;
-  const statusText = saveState.saving
-    ? "保存中…"
-    : errorText
-      ? errorText
-      : saveState.savedAt
-        ? `已保存 ${new Date(saveState.savedAt).toLocaleTimeString("zh-CN", { hour12: false })}`
-        : saveState.dirty
-          ? "有未保存的修改"
-          : doc
-            ? "已打开"
-            : workspace
-              ? ""
-              : "";
+  // 打开/切换失败不再展示(顶栏已移除):loadError 变化仅记录日志
+  useEffect(() => {
+    if (loadError) console.error(`[load] ${loadError}`);
+  }, [loadError]);
 
   const showEditorArea = !!doc;
   const guidanceVisible = !!workspace && !doc && mdCount === 0;
@@ -515,17 +508,6 @@ export default function App() {
   return (
     <div style={{ height: "100%", position: "relative", display: "flex", flexDirection: "column" }}
     >
-      <TopBar
-        workspace={workspace}
-        doc={doc}
-        sidebarVisible={sidebar.visible}
-        onToggleSidebar={toggleSidebar}
-        statusText={statusText}
-        errorText={errorText}
-        dirty={saveState.dirty}
-        saving={saveState.saving}
-        onSave={() => void pipelineRef.current?.flush()}
-      />
       <div style={{ display: "flex", flex: 1, minHeight: 0 }}>
         {sidebar.visible &&
           (workspace ? (
@@ -603,22 +585,20 @@ export default function App() {
           focusRequest={findFocus}
           initialScope={findScope}
           workspaceRoot={workspace?.root ?? null}
+          jump={wsJump}
           onOpenWorkspaceHit={(absPath, q) => {
             void (async () => {
               await openPath(absPath);
               const ed = engineRef.current;
-              const found = ed?.findInDoc(q);
-              if (ed && found && found.length > 0) {
-                ed.setSearchHighlights(found, 0);
-                ed.revealRange(found[0]!.from, found[0]!.to);
-              }
-              // openPath 会关面板;命中跳转后保持工作区搜索可用
+              const found = ed?.findInDoc(q) ?? [];
+              setWsJump(found.length > 0 ? { ranges: found, active: 0 } : null);
               setFindOpen(true);
             })();
           }}
           onClose={() => {
             engine?.clearSearchHighlights();
             setFindOpen(false);
+            setWsJump(null);
           }}
         />
       )}

@@ -14,6 +14,9 @@ export interface SearchPanelProps {
   initialScope?: SearchScope;
   /** 工作区根(整个工作区作用域可用时)。 */
   workspaceRoot?: string | null;
+  /** 工作区命中跳转后待补写的文件内高亮(08:由面板在挂载清除后应用,
+      消除 React 提交时机竞态)。 */
+  jump?: { ranges: Array<{ from: number; to: number }>; active: number } | null;
   /** 打开并定位工作区命中文件(父层负责自动保存/高亮首个命中)。 */
   onOpenWorkspaceHit: (absPath: string, query: string) => void;
   onClose: () => void;
@@ -24,6 +27,7 @@ export function SearchPanel({
   focusRequest,
   initialScope = "file",
   workspaceRoot,
+  jump = null,
   onOpenWorkspaceHit,
   onClose,
 }: SearchPanelProps) {
@@ -33,6 +37,9 @@ export function SearchPanel({
   const [wsHits, setWsHits] = useState<WorkspaceSearchFileHit[]>([]);
   const [wsSearching, setWsSearching] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
+  /** 上一作用域(ref;仅跨作用域时清文件高亮——hits 每次重算都清会把
+      工作区命中的跳转高亮一并抹掉,08 修)。 */
+  const prevScopeRef = useRef<SearchScope | null>(null);
   /** 树刷新节拍(工作区搜索重跑;state 而非 ref——ref 变化不触发 effect 重跑,24)。 */
   const [treeTick, setTreeTick] = useState(0);
 
@@ -82,8 +89,12 @@ export function SearchPanel({
   };
 
   useEffect(() => {
+    // 作用域离开 file 时清文件高亮;仅跨作用域时清(prevScope 判界),避免
+    // 命中列表每次重算把「工作区跳转后补写的命中高亮」抹掉(08 修)
+    const prev = prevScopeRef.current;
+    prevScopeRef.current = scope;
     if (scope !== "file") {
-      engine?.clearSearchHighlights();
+      if (prev !== "workspace") engine?.clearSearchHighlights();
       return;
     }
     if (hits.length === 0) {
@@ -93,6 +104,15 @@ export function SearchPanel({
     engine?.setSearchHighlights(hits, active);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [scope, hits.length]);
+
+  // 工作区命中跳转高亮(08):声明于清除 effect 之后——同一提交内按声明序
+  // 执行,挂载清除(scope≠file)先跑、此处补写后跑,顺序确定
+  useEffect(() => {
+    if (!jump || !engine) return;
+    engine.setSearchHighlights(jump.ranges, jump.active);
+    const first = jump.ranges[0];
+    if (first) engine.revealRange(first.from, first.to);
+  }, [jump, engine]);
 
   const summary = (text: string): string => text.replace(/\s+/g, " ").trim() || "(空行)";
   const fileHitsCount = hits.length;
@@ -104,7 +124,7 @@ export function SearchPanel({
       data-testid="search-panel"
       style={{
         position: "fixed",
-        top: 44,
+        top: 12,
         right: 14,
         width: 400,
         maxHeight: "60vh",

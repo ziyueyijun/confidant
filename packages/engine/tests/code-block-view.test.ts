@@ -65,7 +65,9 @@ describe("代码块行号(28)", () => {
     const { engine, host } = makeEngine("```js\na\nb\n```\n");
     const code = codeEl(host);
     const clone = code!.cloneNode(true) as HTMLElement;
+    // 视图装饰剥离:行号列 + 语言标签(02;渲染层复制按钮同此逻辑)
     clone.querySelector(".code-linenums")?.remove();
+    clone.querySelector(".code-lang")?.remove();
     expect(clone.textContent).toBe("a\nb");
     engine.destroy();
   });});
