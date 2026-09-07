@@ -35,6 +35,25 @@ export function useEditorSettings(): {
     })();
   }, []);
 
+  // 跨窗同步(07):偏好设置窗口改动后广播到达即重载
+  useEffect(() => {
+    return window.confidant.onStateChanged((key) => {
+      if (key !== "editorSettings") return;
+      void (async () => {
+        const stored = (await window.confidant.stateGet("editorSettings")) as
+          | Partial<EditorSettings>
+          | null;
+        if (stored && typeof stored === "object") {
+          setSettings((prev) => ({
+            codeWrap: typeof stored.codeWrap === "boolean" ? stored.codeWrap : prev.codeWrap,
+            codeLineNumbers:
+              typeof stored.codeLineNumbers === "boolean" ? stored.codeLineNumbers : prev.codeLineNumbers,
+          }));
+        }
+      })();
+    });
+  }, []);
+
   const toggle = useCallback((key: "codeWrap" | "codeLineNumbers") => {
     setSettings((prev) => {
       const next = { ...prev, [key]: !prev[key] };

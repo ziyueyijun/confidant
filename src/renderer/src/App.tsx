@@ -23,12 +23,14 @@ import { Welcome } from "./components/Welcome";
 import { CodeBlockActions } from "./components/CodeBlockActions";
 import { ChangeNoticeToast, DocMissingBanner } from "./components/OverlayBanners";
 import { Footer } from "./components/Footer";
+import { FormatToolbar } from "./components/FormatToolbar";
 import { EmptyWorkspaceGuidance, NotePickHint } from "./components/EmptyStates";
 import { countMdInTree, relPathOf, wsJoin, type Workspace } from "./workspace/workspace";
 import type { OpenNote } from "./session/types";
 import { useAppTheme } from "./hooks/use-app-theme";
 import { useSidebarLayout } from "./hooks/use-sidebar-layout";
 import { useEditorSettings } from "./hooks/use-editor-settings";
+import { usePreferences } from "./hooks/use-preferences";
 import { useTreeExpansion } from "./hooks/use-tree-expansion";
 import { useDocMissing } from "./hooks/use-doc-missing";
 import { useEditorHost } from "./hooks/use-editor-host";
@@ -110,6 +112,8 @@ export default function App() {
   const { sidebar, setWidth: setSidebarWidth, toggleSidebar, commitSidebar } = useSidebarLayout();
   // ── 编辑器设置(28):代码块换行/行号,持久化 + 勾选态 ──
   const { settings, toggleCodeWrap, toggleCodeLineNumbers } = useEditorSettings();
+  // ── 偏好设置(07):外观「显示工具栏」开关(主窗口只读,改动经偏好设置窗口) ──
+  const { preferences } = usePreferences();
 
   // ── 保存管线(02) ──
   useEffect(() => {
@@ -716,6 +720,16 @@ export default function App() {
         onToggleFocus={() => toggleMode("focus")}
         onToggleTypewriter={() => toggleMode("typewriter")}
       />
+      {/* 底部悬浮格式工具栏(07):偏好设置「显示工具栏」开启且非源码模式时显示 */}
+      {preferences.showToolbar && !sourceMode && doc && (
+        <FormatToolbar
+          engine={engine}
+          tick={uiTick}
+          onLink={() => setLinkRequest((r) => r + 1)}
+          onInsertImage={() => void insertImageViaDialog()}
+          bump={() => setUiTick((t) => t + 1)}
+        />
+      )}
     </div>
   );
 }

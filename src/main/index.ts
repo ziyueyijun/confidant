@@ -285,6 +285,43 @@ function registerIpc(): void {
 
   ipcMain.on(IPC.stateSet, (_e, key: keyof AppStateV1, value: unknown) => {
     setState(key, value as never);
+    // 跨窗口同步:任一窗口写状态即广播(偏好设置窗口 ↔ 主窗口,07)
+    for (const w of BrowserWindow.getAllWindows()) {
+      if (!w.isDestroyed()) w.webContents.send(IPC.stateChanged, key, value);
+    }
+  });
+
+  // ── 偏好设置窗口(07):独立 BrowserWindow,同渲染 bundle 的 #preferences 路由 ──
+  let preferencesWin: BrowserWindow | null = null;
+  ipcMain.on(IPC.preferencesOpen, () => {
+    if (preferencesWin && !preferencesWin.isDestroyed()) {
+      preferencesWin.focus();
+      return;
+    }
+    const win = new BrowserWindow({
+      width: 560,
+      height: 460,
+      minWidth: 480,
+      minHeight: 380,
+      title: "confidant · 偏好设置",
+      autoHideMenuBar: true,
+      backgroundColor: "#ffffff",
+      webPreferences: {
+        preload: join(__dirname, "../preload/index.js"),
+        contextIsolation: true,
+        sandbox: true,
+        nodeIntegration: false,
+      },
+    });
+    preferencesWin = win;
+    win.on("closed", () => {
+      if (preferencesWin === win) preferencesWin = null;
+    });
+    if (isDev) {
+      void win.loadURL(`${process.env["ELECTRON_RENDERER_URL"]}#preferences`);
+    } else {
+      void win.loadFile(join(__dirname, "../renderer/index.html"), { hash: "preferences" });
+    }
   });
 
   // ── 图片落盘通道(05) ──

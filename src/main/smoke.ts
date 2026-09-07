@@ -126,7 +126,7 @@ export async function runSelfCheck(win: BrowserWindow, notePath: string | null):
       } else {
         // 菜单框架验证:菜单结构 + 启用态 + 经菜单命令通道手动保存
         const topMenus = Menu.getApplicationMenu()?.items.map((i) => i.label) ?? [];
-        const expectTop = ["文件", "编辑", "段落", "格式", "视图", "设置", "帮助"];
+        const expectTop = ["文件", "编辑", "段落", "格式", "视图", "主题", "帮助"]; // 07:七菜单(设置取消)
         if (topMenus.join("|") !== expectTop.join("|")) {
           return fail(`menu structure mismatch: ${JSON.stringify(topMenus)}`);
         }
@@ -706,6 +706,76 @@ export async function runWorkspaceSelfCheck(win: BrowserWindow, wsDir: string, e
     if (!fsOff) return fail("fullscreen did not exit (F11)");
     console.log("[smoke] view modes ok (focus colors/blur-keep/typewriter padding/source-exclusive/fullscreen)");
 
+    // 07:偏好设置窗口 + 格式工具栏探针——打开窗口(默认工具栏隐藏)→ 勾选
+    // 显示工具栏 → 工具栏出现且按钮齐全 → 点加粗落盘 → 源码模式隐藏 →
+    // 退出恢复 → 取消勾选隐藏
+    win.webContents.send(IPC.menuCommand, "preferences");
+    const prefWin = await poll(async () => {
+      const w = BrowserWindow.getAllWindows().find(
+        (x) => !x.isDestroyed() && x !== win && x.webContents.getURL().includes("#preferences"),
+      );
+      return w ? w : null;
+    });
+    if (!prefWin) return fail("preferences window not opened");
+    const prefReady = await poll(async () =>
+      prefWin.webContents.executeJavaScript(
+        `!!document.querySelector("[data-testid='pref-show-toolbar']")`,
+      ),
+    );
+    if (!prefReady) return fail("preferences UI not rendered");
+    const toolbarHidden = await js<boolean>(`!document.querySelector("[data-testid='format-toolbar']")`);
+    if (!toolbarHidden) return fail("format toolbar visible by default");
+    await prefWin.webContents.executeJavaScript(
+      `document.querySelector("[data-testid='pref-show-toolbar']").click()`,
+    );
+    const toolbarShown = await poll(() => js<boolean>(q("[data-testid='format-toolbar']")));
+    if (!toolbarShown) return fail("format toolbar not shown after pref enable");
+    const ftBtnCount = await js<number>(`document.querySelectorAll("[data-testid^='ft-']").length`);
+    if (ftBtnCount < 12) return fail(`format toolbar controls: ${ftBtnCount} (expect >=12)`);
+    // 工具栏加粗:先键入独立标记段(不碰「正文 a。」——2.7 探针依赖其直接文本节点),
+    // 选中标记 → 点 ft-bold → 落盘含 **
+    const ftMark = `工具栏加粗-${Date.now()}`;
+    const ftTyped = await typeAtEnd(win, ftMark);
+    if (!ftTyped.ok) return fail(`toolbar mark typing failed: ${JSON.stringify(ftTyped)}`);
+    await js<void>(`(() => {
+      const el = document.querySelector('[contenteditable="true"]');
+      el.focus();
+      const p = [...el.querySelectorAll("p")].find((n) => n.textContent?.includes(${JSON.stringify(ftMark)}));
+      const tn = [...p.childNodes].find((n) => n.nodeType === Node.TEXT_NODE);
+      if (!tn) return;
+      const text = tn.textContent ?? "";
+      const start = text.indexOf(${JSON.stringify(ftMark)});
+      const range = document.createRange();
+      range.setStart(tn, start);
+      range.setEnd(tn, start + ${JSON.stringify(ftMark)}.length);
+      const sel = window.getSelection();
+      sel?.removeAllRanges();
+      sel?.addRange(range);
+      document.dispatchEvent(new Event("selectionchange"));
+    })()`);
+    await js<void>(`document.querySelector("[data-testid='ft-bold']").click()`);
+    const boldViaToolbar = await poll(async () => {
+      const content = await readFile(join(wsDir, "a.md"), "utf8");
+      return content.includes(`**${ftMark}**`) ? true : null;
+    });
+    if (!boldViaToolbar) return fail("bold via format toolbar not persisted");
+    // 源码模式:工具栏隐藏;退出恢复
+    win.webContents.send(IPC.menuCommand, "source-mode");
+    const ftToolbarGone = await poll(() => js<boolean>(`!document.querySelector("[data-testid='format-toolbar']")`));
+    if (!ftToolbarGone) return fail("format toolbar not hidden in source mode");
+    win.webContents.send(IPC.menuCommand, "source-mode");
+    await poll(() => js<boolean>(`!document.querySelector("[data-testid='source-editor']")`));
+    const toolbarBack = await poll(() => js<boolean>(q("[data-testid='format-toolbar']")));
+    if (!toolbarBack) return fail("format toolbar not restored after source exit");
+    // 取消勾选 → 隐藏;关偏好设置窗口
+    await prefWin.webContents.executeJavaScript(
+      `document.querySelector("[data-testid='pref-show-toolbar']").click()`,
+    );
+    const toolbarHidden2 = await poll(() => js<boolean>(`!document.querySelector("[data-testid='format-toolbar']")`));
+    if (!toolbarHidden2) return fail("format toolbar not hidden after pref disable");
+    prefWin.close();
+    console.log("[smoke] preferences window + format toolbar ok (7-menu/pref-enable/bold/source-hide)");
+
     const mark1 = `工作区保存-${Date.now()}`;
     const typed = await typeAtEnd(win, mark1);
     if (!typed.ok) return fail(`typing failed: ${JSON.stringify(typed)}`);
@@ -1181,7 +1251,18 @@ export async function runWorkspaceSelfCheck(win: BrowserWindow, wsDir: string, e
       const sel = await js<string>(`window.getSelection()?.toString() ?? ""`);
       return sel.includes("乙") ? true : null;
     });
-    if (!anchorSelected) return fail("heading anchor not selected after jump");
+    if (!anchorSelected) {
+      const diag = await js<string>(
+        `JSON.stringify({
+          title: document.title,
+          sel: window.getSelection()?.toString() ?? "",
+          anchorTag: (() => { const a = window.getSelection()?.anchorNode; return a ? a.nodeName : "none"; })(),
+          headings: [...document.querySelectorAll(".editor-prose :is(h1,h2,h3,h4,h5,h6)")].map((h) => h.textContent),
+          focusBlocks: document.querySelectorAll(".focus-block").length,
+        })`,
+      );
+      return fail(`heading anchor not selected after jump; diag=${diag}`);
+    }
 
     // 6.4) 代码块视图(28):写带语言代码块的夹具 → 打开 → 高亮/行号断言 →
     //      设置菜单关行号/换行 → 复制按钮 → 剪贴板不含行号

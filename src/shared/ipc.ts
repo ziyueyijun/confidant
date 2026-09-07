@@ -28,6 +28,10 @@ export const IPC = {
   closeWindow: "window:close",
   /** 全屏切换(06:F11)。 */
   fullscreenToggle: "window:fullscreen-toggle",
+  /** 打开偏好设置窗口(07:文件 → 偏好设置… / Ctrl+,)。 */
+  preferencesOpen: "window:open-preferences",
+  /** 主进程 → 渲染层:某状态键已变更(任一窗口 stateSet 后广播,跨窗同步)。 */
+  stateChanged: "state:changed",
   /** 原生「打开文件夹(工作区)」对话框。 */
   pickFolderDialog: "dialog:pick-folder",
   /** 打开工作区:主进程起监听并返回初始整树。 */
@@ -148,6 +152,10 @@ export interface ConfidantApi {
   closeWindow(): void;
   /** 切换主窗口全屏(06:F11)。 */
   toggleFullscreen(): void;
+  /** 打开偏好设置窗口(07)。 */
+  openPreferences(): void;
+  /** 订阅状态键变更广播(任一窗口 stateSet 后触发;返回退订函数)。 */
+  onStateChanged(cb: (key: string, value: unknown) => void): () => void;
   /** 订阅主进程的「打开文件」请求(冒烟驱动与菜单打开共用)。返回退订函数。 */
   onOpenFile(cb: (path: string) => void): () => void;
   /** 订阅主进程的「打开工作区」请求(冒烟驱动共用)。返回退订函数。 */

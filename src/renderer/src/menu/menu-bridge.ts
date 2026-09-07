@@ -36,6 +36,7 @@ export const Cmd = {
   print: "print",
   rename: "file-rename",
   delete: "file-delete",
+  preferences: "preferences",
   quit: "quit",
   // 编辑
   undo: "undo",
@@ -137,6 +138,9 @@ export function buildMenuTemplate(recent: RecentItem[] = []): MenuItemTemplate[]
         disabledItem(Cmd.exportPdf, "导出 PDF"),
         disabledItem(Cmd.print, "打印"),
         sep(),
+        // 07:「偏好设置…」(Ctrl+,;Typora asar 实测键位)打开偏好设置窗口
+        disabledItem(Cmd.preferences, "偏好设置…", "Ctrl+,"),
+        sep(),
         disabledItem(Cmd.quit, "退出"),
       ],
     },
@@ -172,7 +176,7 @@ export function buildMenuTemplate(recent: RecentItem[] = []): MenuItemTemplate[]
         sep(),
         disabledItem(Cmd.bulletList, "无序列表", "Ctrl+Shift+]"),
         disabledItem(Cmd.orderedList, "有序列表", "Ctrl+Shift+["),
-        disabledItem(Cmd.taskList, "任务列表", "Ctrl+Shift+9"),
+        disabledItem(Cmd.taskList, "任务列表", "Ctrl+Shift+X"), // 08:Typora 实测键位
         disabledItem(Cmd.quote, "引用", "Ctrl+Shift+Q"),
         disabledItem(Cmd.codeBlock, "代码块", "Ctrl+Shift+K"),
         disabledItem(Cmd.insertTable, "表格", "Ctrl+T"),
@@ -187,7 +191,7 @@ export function buildMenuTemplate(recent: RecentItem[] = []): MenuItemTemplate[]
         disabledItem(Cmd.italic, "斜体", "Ctrl+I"),
         disabledItem(Cmd.strike, "删除线", "Ctrl+Shift+S"),
         disabledItem(Cmd.link, "链接", "Ctrl+K"),
-        disabledItem(Cmd.clearFormat, "清除格式", "Ctrl+Shift+L"),
+        disabledItem(Cmd.clearFormat, "清除格式", "Ctrl+\\"), // 08:Typora 实测键位(侧栏让出 Ctrl+Shift+L)
         sep(),
         disabledItem(Cmd.insertImage, "插入图片…", "Ctrl+Shift+I"),
       ],
@@ -197,7 +201,7 @@ export function buildMenuTemplate(recent: RecentItem[] = []): MenuItemTemplate[]
       type: "submenu",
       label: "视图",
       submenu: [
-        disabledItem(Cmd.toggleSidebar, "侧栏显示/隐藏", "Ctrl+Shift+B"),
+        disabledItem(Cmd.toggleSidebar, "侧栏显示/隐藏", "Ctrl+Shift+L"), // 08:Typora 实测键位
         disabledItem(Cmd.sourceMode, "源码模式", "Ctrl+/"),
         // 06:专注/打字机(F8/F9,勾选态由 App 同步;与源码模式互斥置灰)
         disabledItem(Cmd.focusMode, "专注模式", "F8"),
@@ -205,35 +209,17 @@ export function buildMenuTemplate(recent: RecentItem[] = []): MenuItemTemplate[]
         disabledItem(Cmd.fullscreen, "全屏", "F11"),
         sep(),
         disabledItem(Cmd.workspaceSearch, "全工作区搜索", "Ctrl+Shift+F"),
-        sep(),
-        // 01:「外观」子菜单(跟随系统/浅色/深色)删除;「主题」子菜单三勾选占位
-        // (07 提级为顶级菜单)
-        {
-          id: "menu-theme",
-          type: "submenu",
-          label: "主题",
-          submenu: [
-            disabledItem(Cmd.themeGithub, "GitHub"),
-            disabledItem(Cmd.themeNight, "Night"),
-            disabledItem(Cmd.themeNewsprint, "Newsprint"),
-          ],
-        },
       ],
     },
+    // 07:「主题」提级为顶级菜单(自「视图 → 主题」迁入;勾选态沿用 setChecked)
     {
-      id: "menu-settings",
+      id: "menu-theme",
       type: "submenu",
-      label: "设置",
+      label: "主题",
       submenu: [
-        {
-          id: "menu-editor",
-          type: "submenu",
-          label: "编辑器",
-          submenu: [
-            disabledItem(Cmd.settingsCodeWrap, "代码块自动换行"),
-            disabledItem(Cmd.settingsCodeLineNumbers, "代码块显示行号"),
-          ],
-        },
+        disabledItem(Cmd.themeGithub, "GitHub"),
+        disabledItem(Cmd.themeNight, "Night"),
+        disabledItem(Cmd.themeNewsprint, "Newsprint"),
       ],
     },
     {

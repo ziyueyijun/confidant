@@ -172,6 +172,8 @@ export function useMenuBridgeRegistration(api: MenuRegistrationApi): void {
     });
     menu.register(Cmd.about, () => true, () => void window.confidant.showAbout());
     menu.register(Cmd.quit, () => true, () => window.confidant.closeWindow());
+    // 07:偏好设置窗口(文件 → 偏好设置… / Ctrl+,)
+    menu.register(Cmd.preferences, () => true, () => window.confidant.openPreferences());
     // 主题三态(01):勾选态由 useAppTheme 经 setChecked 同步
     menu.register(Cmd.themeGithub, () => true, () => applyTheme("github"));
     menu.register(Cmd.themeNight, () => true, () => applyTheme("night"));
