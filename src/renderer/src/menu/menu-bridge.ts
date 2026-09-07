@@ -66,6 +66,9 @@ export const Cmd = {
   // 视图
   toggleSidebar: "toggle-sidebar",
   sourceMode: "source-mode",
+  focusMode: "focus-mode",
+  typewriterMode: "typewriter-mode",
+  fullscreen: "fullscreen",
   workspaceSearch: "workspace-search",
   themeGithub: "theme-github",
   themeNight: "theme-night",
@@ -196,6 +199,11 @@ export function buildMenuTemplate(recent: RecentItem[] = []): MenuItemTemplate[]
       submenu: [
         disabledItem(Cmd.toggleSidebar, "侧栏显示/隐藏", "Ctrl+Shift+B"),
         disabledItem(Cmd.sourceMode, "源码模式", "Ctrl+/"),
+        // 06:专注/打字机(F8/F9,勾选态由 App 同步;与源码模式互斥置灰)
+        disabledItem(Cmd.focusMode, "专注模式", "F8"),
+        disabledItem(Cmd.typewriterMode, "打字机模式", "F9"),
+        disabledItem(Cmd.fullscreen, "全屏", "F11"),
+        sep(),
         disabledItem(Cmd.workspaceSearch, "全工作区搜索", "Ctrl+Shift+F"),
         sep(),
         // 01:「外观」子菜单(跟随系统/浅色/深色)删除;「主题」子菜单三勾选占位

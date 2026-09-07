@@ -26,6 +26,8 @@ export const IPC = {
   aboutDialog: "dialog:about",
   /** 关闭窗口(退出命令;走与点 X 相同的 flush 路径)。 */
   closeWindow: "window:close",
+  /** 全屏切换(06:F11)。 */
+  fullscreenToggle: "window:fullscreen-toggle",
   /** 原生「打开文件夹(工作区)」对话框。 */
   pickFolderDialog: "dialog:pick-folder",
   /** 打开工作区:主进程起监听并返回初始整树。 */
@@ -144,6 +146,8 @@ export interface ConfidantApi {
   showAbout(): Promise<void>;
   /** 关闭主窗口(与点 X 同路径:先 flush 再销毁)。 */
   closeWindow(): void;
+  /** 切换主窗口全屏(06:F11)。 */
+  toggleFullscreen(): void;
   /** 订阅主进程的「打开文件」请求(冒烟驱动与菜单打开共用)。返回退订函数。 */
   onOpenFile(cb: (path: string) => void): () => void;
   /** 订阅主进程的「打开工作区」请求(冒烟驱动共用)。返回退订函数。 */

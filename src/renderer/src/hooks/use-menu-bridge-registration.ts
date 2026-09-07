@@ -21,6 +21,9 @@ export interface MenuRegistrationApi {
   /** 保存当前文档(源码模式直写文本区,否则走保存管线)。 */
   saveCurrent: () => Promise<void>;
   toggleSourceMode: () => void;
+  /** 06:专注/打字机模式切换(页脚按钮与菜单共用)。 */
+  toggleFocusMode: () => void;
+  toggleTypewriterMode: () => void;
   setFindOpen: (v: boolean) => void;
   setFindScope: (v: "file" | "workspace") => void;
   setFindFocus: (fn: (f: number) => number) => void;
@@ -40,7 +43,7 @@ export interface MenuRegistrationApi {
 }
 
 export function useMenuBridgeRegistration(api: MenuRegistrationApi): void {
-  const { menuRef, docRef, engineRef, pipelineRef, workspaceRef, selectedRef, sourceModeRef, saveCurrent, toggleSourceMode, setFindOpen, setFindScope, setFindFocus, setLinkRequest, setUiTick, toggleSidebar, toggleCodeWrap, toggleCodeLineNumbers, insertImageViaDialog, applyTheme, openFolderViaDialog, doCreateNote, doDeleteEntry, setPrompt, showNotice, refreshMenuContext } = api;
+  const { menuRef, docRef, engineRef, pipelineRef, workspaceRef, selectedRef, sourceModeRef, saveCurrent, toggleSourceMode, toggleFocusMode, toggleTypewriterMode, setFindOpen, setFindScope, setFindFocus, setLinkRequest, setUiTick, toggleSidebar, toggleCodeWrap, toggleCodeLineNumbers, insertImageViaDialog, applyTheme, openFolderViaDialog, doCreateNote, doDeleteEntry, setPrompt, showNotice, refreshMenuContext } = api;
 
 // ── 菜单桥(03) ──
   useEffect(() => {
@@ -84,6 +87,12 @@ export function useMenuBridgeRegistration(api: MenuRegistrationApi): void {
     menu.register(Cmd.toggleSidebar, () => true, toggleSidebar);
     // 源码模式(30):Ctrl+/ 或「视图 → 源码模式」;勾选态由 App 侧 setChecked 同步
     menu.register(Cmd.sourceMode, (ctx) => ctx.docOpen, toggleSourceMode);
+    // 06:专注/打字机(F8/F9);与源码模式互斥(置灰);勾选态由 App 侧同步
+    const modeRule = (ctx: MenuContext) => ctx.docOpen && !ctx.sourceMode;
+    menu.register(Cmd.focusMode, modeRule, toggleFocusMode);
+    menu.register(Cmd.typewriterMode, modeRule, toggleTypewriterMode);
+    // 06:全屏(F11)
+    menu.register(Cmd.fullscreen, () => true, () => window.confidant.toggleFullscreen());
     // 设置(28):代码块换行/行号,勾选态由 App 侧经 setChecked 同步
     menu.register(Cmd.settingsCodeWrap, () => true, () => {
       toggleCodeWrap();

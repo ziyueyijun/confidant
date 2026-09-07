@@ -589,6 +589,123 @@ export async function runWorkspaceSelfCheck(win: BrowserWindow, wsDir: string, e
       .find((b) => b.textContent?.includes("字数"))?.click()`);
     console.log(`[smoke] footer word count ok (${wcText}; block type 标题 1; metric persisted)`);
 
+    // 06:视图模式探针——专注(焦点块正色/他块淡出/失焦保持)→ 打字机(padding 50%)
+    // → 与源码互斥(进入退出恢复)→ F11 全屏
+    const hostCls = `document.querySelector("[data-testid='editor-prose']")?.className ?? ""`;
+    // 光标置入正文段(「正文 a。」所在 p)
+    await js<void>(`(() => {
+      const el = document.querySelector('[contenteditable="true"]');
+      const p = [...el.querySelectorAll("p")].find((n) => n.textContent?.includes("正文 a"));
+      const tn = [...p.childNodes].find((n) => n.nodeType === Node.TEXT_NODE);
+      if (!tn) return;
+      const range = document.createRange();
+      range.setStart(tn, 0);
+      range.collapse(true);
+      const sel = window.getSelection();
+      sel?.removeAllRanges();
+      sel?.addRange(range);
+      document.dispatchEvent(new Event("selectionchange"));
+    })()`);
+    win.webContents.send(IPC.menuCommand, "focus-mode");
+    const focusOn = await poll(() =>
+      js<boolean>(`(${hostCls}).includes("focus-mode")`),
+    );
+    if (!focusOn) return fail("focus mode class not applied");
+    const focusBlock = await poll(() =>
+      js<boolean>(
+        `!!document.querySelector(".editor-prose .ProseMirror > .focus-block")`,
+      ),
+    );
+    if (!focusBlock) {
+      const diag = await js<string>(
+        `JSON.stringify({
+          anyMarker: document.querySelectorAll(".focus-block").length,
+          anchorTag: (() => { const a = window.getSelection()?.anchorNode; return a ? (a.nodeType === Node.TEXT_NODE ? "text:" + (a.parentElement?.tagName ?? "") : a.nodeName) : "none"; })(),
+          hostCls: document.querySelector("[data-testid='editor-prose']")?.className ?? "",
+        })`,
+      );
+      return fail(`focus block marker missing; diag=${diag}`);
+    }
+    const focusColors = await js<{ focus: string; other: string }>(
+      `(() => {
+        const f = document.querySelector(".editor-prose .focus-block");
+        const h = document.querySelector(".editor-prose h1");
+        return {
+          focus: getComputedStyle(f).color,
+          other: getComputedStyle(h).color,
+        };
+      })()`,
+    );
+    // github 主题:焦点段 #333333、非焦点段 #C8C8C8
+    if (!focusColors.focus.includes("51, 51, 51") || !focusColors.other.includes("200, 200, 200")) {
+      return fail(`focus colors wrong: ${JSON.stringify(focusColors)}`);
+    }
+    // 失焦保持:点侧栏空白 → 模式与焦点块标记仍在
+    await js<void>(`(() => {
+      const sb = document.querySelector("[data-testid='sidebar']");
+      const r = sb.getBoundingClientRect();
+      const el = document.elementFromPoint(r.left + 30, r.top + 80);
+      if (el && !el.closest("[data-testid='sidebar-tabs'], [data-testid='tree-search-placeholder']")) el.click();
+    })()`);
+    await delay(300);
+    const focusKept = await js<boolean>(`(${hostCls}).includes("focus-mode")`);
+    if (!focusKept) return fail("focus mode exited on editor blur");
+    // 打字机:padding-top 50%(内容宽 860 → ≈430px)、padding-bottom 收紧;
+    // padding-top 有 0.4s 过渡,须等过渡完成再读计算值
+    win.webContents.send(IPC.menuCommand, "typewriter-mode");
+    const twOn = await poll(() => js<boolean>(`(${hostCls}).includes("typewriter-mode")`));
+    if (!twOn) return fail("typewriter class not applied");
+    await delay(600);
+    const twPad = await js<{ top: number; bottom: number }>(
+      `(() => {
+        const p = document.querySelector("[data-testid='editor-prose']");
+        return {
+          top: parseFloat(getComputedStyle(p).paddingTop),
+          bottom: parseFloat(getComputedStyle(p).paddingBottom),
+        };
+      })()`,
+    );
+    if (Math.abs(twPad.top - 430) > 60 || twPad.bottom > 200) {
+      return fail(`typewriter padding wrong: ${JSON.stringify(twPad)}`);
+    }
+    // 两模式叠加 + 与源码互斥:进入源码自动退出;退出恢复原勾选态
+    win.webContents.send(IPC.menuCommand, "source-mode");
+    await poll(() => js<boolean>(`!!document.querySelector("[data-testid='source-editor']")`));
+    const modesOffInSource = await js<boolean>(
+      `(${hostCls}).includes("focus-mode") === false && (${hostCls}).includes("typewriter-mode") === false`,
+    );
+    if (!modesOffInSource) return fail("focus/typewriter not exited in source mode");
+    const modeItemGreyed = await poll(async () => {
+      const item = getMenuItem("focus-mode");
+      return item ? item.enabled === false : null;
+    });
+    if (!modeItemGreyed) return fail("focus-mode menu item not disabled in source mode");
+    win.webContents.send(IPC.menuCommand, "source-mode");
+    const modesRestored = await poll(() =>
+      js<boolean>(
+        `(${hostCls}).includes("focus-mode") && (${hostCls}).includes("typewriter-mode")`,
+      ),
+    );
+    if (!modesRestored) return fail("focus/typewriter not restored after source exit");
+    // 关闭两模式(还原现场)
+    win.webContents.send(IPC.menuCommand, "focus-mode");
+    win.webContents.send(IPC.menuCommand, "typewriter-mode");
+    await delay(300);
+    // F11 全屏:主进程窗口状态直接断言
+    win.webContents.send(IPC.menuCommand, "fullscreen");
+    const fsOn = await poll(async () => {
+      const v = win.isFullScreen();
+      return v ? true : null;
+    });
+    if (!fsOn) return fail("fullscreen did not enter (F11)");
+    win.webContents.send(IPC.menuCommand, "fullscreen");
+    const fsOff = await poll(async () => {
+      const v = win.isFullScreen();
+      return !v ? true : null;
+    });
+    if (!fsOff) return fail("fullscreen did not exit (F11)");
+    console.log("[smoke] view modes ok (focus colors/blur-keep/typewriter padding/source-exclusive/fullscreen)");
+
     const mark1 = `工作区保存-${Date.now()}`;
     const typed = await typeAtEnd(win, mark1);
     if (!typed.ok) return fail(`typing failed: ${JSON.stringify(typed)}`);

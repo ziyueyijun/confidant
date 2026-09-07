@@ -287,6 +287,31 @@ body {
     max-width: min(1200px, 100% - 32px);
   }
 }
+
+/* 06:打字机模式——内容容器 padding-top 50%(光标行推至视口垂直中点,基线 §5.2);
+   底部 40vh 余量收紧为正常值(实施微调 96px);0.4s 过渡在 .editor-prose 基规则 */
+.editor-prose.typewriter-mode {
+  padding-top: 50%;
+  padding-bottom: 96px;
+}
+
+/* 06:专注模式——非光标所在块整段文字覆盖为 --blur-text(可读残影而非透明,
+   基线 §5.1;高优先级类替代 !important);非焦点图片 opacity .2;
+   焦点块 = 引擎 selection 跟随装饰的 .focus-block 类(PM 安全路径,票 06 Answer)。
+   注意 host 同时持有 editor-prose 与 focus-mode 两类(同一元素,非嵌套)。 */
+.editor-prose.focus-mode .ProseMirror > :not(.focus-block) {
+  color: var(--blur-text);
+}
+.editor-prose.focus-mode .ProseMirror > :not(.focus-block) * {
+  color: var(--blur-text);
+}
+.editor-prose.focus-mode .ProseMirror > :not(.focus-block) img {
+  opacity: 0.2;
+}
+.editor-prose.focus-mode .ProseMirror > .focus-block,
+.editor-prose.focus-mode .ProseMirror > .focus-block * {
+  color: var(--app-fg);
+}
 /* 编辑区焦点环(31/修):PM 根(contenteditable)不在 .editor-prose 本身,
    UA 对 [contenteditable]:focus 的 outline:auto 细白环会透出;Blink 对
    编辑宿主 :focus-visible 恒真(鼠标点击也匹配),故由宿主

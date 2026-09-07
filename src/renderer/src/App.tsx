@@ -59,9 +59,21 @@ export default function App() {
   /** 源码模式(30):全屏原始 Markdown 文本编辑;文本区为磁盘字节级真相源。 */
   const [sourceMode, setSourceMode] = useState(false);
   const sourceModeRef = useRef(false);
-  /** 视图模式(06 接线完整版:F8/F9/菜单/互斥/CSS 生效;此处为页脚按钮入口的状态)。 */
+  /** 视图模式(06):专注/打字机——ref 为真相源(互斥/恢复用),state 驱动渲染。 */
+  const viewModesRef = useRef({ focus: false, typewriter: false });
   const [focusMode, setFocusMode] = useState(false);
   const [typewriterMode, setTypewriterMode] = useState(false);
+  /** 进入源码前记住的专注/打字机态(退出源码时恢复勾选态,06)。 */
+  const sourceModesRef = useRef({ focus: false, typewriter: false });
+  const setMode = useCallback((kind: "focus" | "typewriter", v: boolean) => {
+    viewModesRef.current[kind] = v;
+    if (kind === "focus") setFocusMode(v);
+    else setTypewriterMode(v);
+  }, []);
+  const toggleMode = useCallback(
+    (kind: "focus" | "typewriter") => setMode(kind, !viewModesRef.current[kind]),
+    [setMode],
+  );
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   const sourceSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   /** 查找面板(14/15):打开态、作用域与焦点请求。 */
@@ -248,9 +260,19 @@ export default function App() {
     refreshMenuContext();
   }, [refreshMenuContext]);
   const toggleSourceMode = useCallback((): void => {
-    if (sourceModeRef.current) exitSourceMode();
-    else enterSourceMode();
-  }, [enterSourceMode, exitSourceMode]);
+    if (sourceModeRef.current) {
+      // 06:退出源码恢复进入前的专注/打字机勾选态
+      setMode("focus", sourceModesRef.current.focus);
+      setMode("typewriter", sourceModesRef.current.typewriter);
+      exitSourceMode();
+    } else {
+      // 06:进入源码自动退出专注/打字机(记住原态,退出恢复)
+      sourceModesRef.current = { ...viewModesRef.current };
+      setMode("focus", false);
+      setMode("typewriter", false);
+      enterSourceMode();
+    }
+  }, [enterSourceMode, exitSourceMode, setMode]);
   const saveCurrent = useCallback(async (): Promise<void> => {
     if (sourceModeRef.current) await writeSourceText();
     else await pipelineRef.current?.flush();
@@ -297,7 +319,9 @@ export default function App() {
     menu.setChecked(Cmd.settingsCodeWrap, settings.codeWrap);
     menu.setChecked(Cmd.settingsCodeLineNumbers, settings.codeLineNumbers);
     menu.setChecked(Cmd.sourceMode, sourceMode);
-  }, [settings, sourceMode, engine]);
+    menu.setChecked(Cmd.focusMode, focusMode);
+    menu.setChecked(Cmd.typewriterMode, typewriterMode);
+  }, [settings, sourceMode, focusMode, typewriterMode, engine]);
 
   // ── 工作区外部变更处置(12):树刷新 + 当前文件删除/改名横幅 + 内容变更静默重载 ──
   const reloadCurrentFromDisk = useCallback(async () => {
@@ -475,6 +499,8 @@ export default function App() {
   useMenuBridgeRegistration({
     menuRef, docRef, engineRef, pipelineRef, workspaceRef, selectedRef, sourceModeRef,
     saveCurrent, toggleSourceMode,
+    toggleFocusMode: () => toggleMode("focus"),
+    toggleTypewriterMode: () => toggleMode("typewriter"),
     setFindOpen, setFindScope, setFindFocus, setLinkRequest, setUiTick,
     toggleSidebar, toggleCodeWrap, toggleCodeLineNumbers, insertImageViaDialog,
     applyTheme, openFolderViaDialog,
@@ -505,7 +531,7 @@ export default function App() {
   const engineHost = (
     <div
       ref={hostRef}
-      className="editor-prose"
+      className={`editor-prose${focusMode ? " focus-mode" : ""}${typewriterMode ? " typewriter-mode" : ""}`}
       data-testid="editor-prose"
       data-keyboard-focus={focusViaKeyboard}
       onMouseDownCapture={() => setFocusViaKeyboard(false)}
@@ -687,8 +713,8 @@ export default function App() {
         hasDoc={!!doc}
         focusMode={focusMode}
         typewriterMode={typewriterMode}
-        onToggleFocus={() => setFocusMode((v) => !v)}
-        onToggleTypewriter={() => setTypewriterMode((v) => !v)}
+        onToggleFocus={() => toggleMode("focus")}
+        onToggleTypewriter={() => toggleMode("typewriter")}
       />
     </div>
   );

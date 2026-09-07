@@ -14,6 +14,7 @@ import { TaskItem } from "@tiptap/extension-task-item";
 import { Image } from "@tiptap/extension-image";
 import { createSearchPlugin } from "./search-highlight";
 import { createCodeBlockViewPlugin, LOWLIGHT } from "./code-block-view";
+import { createFocusBlockPlugin } from "./focus-block";
 
 /**
  * 图片显示解析器:markdown 引用(src 原样) → 渲染层可加载的 URL。
@@ -75,6 +76,11 @@ export function makeExtensions(
       addProseMirrorPlugins: () => [
         createCodeBlockViewPlugin({ lowlight: LOWLIGHT, getLineNumbers: getCodeLineNumbers }),
       ],
+    }),
+    // 专注模式焦点块(06):selection 跟随装饰(纯视图态)
+    Extension.create({
+      name: "focusBlock",
+      addProseMirrorPlugins: () => [createFocusBlockPlugin()],
     }),
   ];
 }

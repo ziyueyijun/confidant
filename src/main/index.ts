@@ -235,6 +235,12 @@ function registerIpc(): void {
     if (win) win.close();
   });
 
+  // 全屏切换(06:F11;菜单 accelerator 走命令通道)
+  ipcMain.on(IPC.fullscreenToggle, () => {
+    const win = menuTarget();
+    if (win) win.setFullScreen(!win.isFullScreen());
+  });
+
   // ── 工作区与状态(04) ──
   ipcMain.handle(IPC.pickFolderDialog, async () => {
     const win = menuTarget();

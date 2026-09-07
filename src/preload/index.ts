@@ -70,6 +70,10 @@ const api: ConfidantApi = {
     ipcRenderer.send(IPC.closeWindow);
   },
 
+  toggleFullscreen: () => {
+    ipcRenderer.send(IPC.fullscreenToggle);
+  },
+
   pickFolderDialog: () => ipcRenderer.invoke(IPC.pickFolderDialog) as Promise<string | null>,
 
   openWorkspace: (path: string) =>
