@@ -3,6 +3,8 @@
 // 行号:inline widget 置于代码文本起点,绝对定位覆盖 pre 左 padding 区
 // (pre position:relative;padding-left 由渲染层 data-code-lines 控制)。
 // 行号文本随插件重建刷新(1..N);复制按钮取 code 文本时排除 .code-linenums。
+// 工具条容器(反馈轮 05):常驻 widget 于代码文本起点——渲染层 portal 语言/复制
+// 按钮进容器,按钮长在代码块上滚动天然跟随(替代 absolute 坐标跟随)。
 
 import { Plugin, PluginKey } from "@tiptap/pm/state";
 import { Decoration, DecorationSet } from "@tiptap/pm/view";
@@ -76,6 +78,19 @@ function getDecorations(doc: Parameters<typeof DecorationSet.create>[0], opts: C
         from = to;
       }
     }
+    // 工具条容器(反馈轮 05):常驻代码块顶部工具区(pre padding-top 由渲染层
+    // 让位);渲染层 portal 语言/复制按钮进容器——按钮随代码块滚动,零重算
+    decorations.push(
+      Decoration.widget(
+        pos + 1,
+        () => {
+          const el = document.createElement("span");
+          el.className = "code-tools";
+          return el;
+        },
+        { side: -1 },
+      ),
+    );
     // 行号:inline widget 于文本起点;内容随插件重建刷新(1..N 行)。
     // 每行一个块级 span(不依赖 white-space——CSS 文件规则在该环境下
     // computed 异常,span 块方案 100% 确定单列,修复「行号折成两列」)。

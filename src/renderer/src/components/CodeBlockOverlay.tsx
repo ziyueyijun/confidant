@@ -1,14 +1,14 @@
-// 代码块工具区(反馈轮 03):常驻代码块顶部——左上语言标签(可点击切换语言)、
-// 右上复制按钮,位于代码块预留的工具区内(pre padding-top 38px 让位,占内容流,
-// 行号从内容第 1 行开始编号);替代反馈轮 01 悬停浮层与 02 浮块外方案。
-// 语言数据经引擎 getDoc() 按序 zip(portal 渲染于编辑区外,不受 PM 观察器影响);
-// 语言切换 = 引擎 setCodeBlockLanguageAt(改 ``` 标记、进历史、自动保存)。
-// 内容/滚动变化经 MutationObserver + rAF 合并重扫,浅比较跳过无变化重渲染。
+// 代码块工具区(反馈轮 05):语言标签(左)+ 复制按钮(右)经 PM 装饰容器
+// (.code-tools widget,引擎层插入 pre 内)内嵌代码块顶部工具区——按钮长在
+// 代码块上,滚动天然跟随零重算(替代反馈轮 03 的 absolute 坐标跟随:
+// 滚动滞后一帧「跳」、front matter 块偏移「有的代码块没有」)。
+// 语言数据经引擎 getDoc() 按序 zip;语言切换 = setCodeBlockLanguageAt
+// (改 ``` 标记、进历史、自动保存)。
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import type { Engine } from "../../../../packages/engine";
-import { codeBlockLanguages, languageForPre } from "../editor/code-block-lang";
+import { codeBlockLanguages } from "../editor/code-block-lang";
 import { LangSelect } from "./LangSelect";
 
 /** 剪贴板写入(反馈轮 01):navigator.clipboard 在非用户手势/权限被拒时抛异常,
@@ -30,51 +30,35 @@ async function writeClipboard(text: string): Promise<boolean> {
   }
 }
 
-/** 单个代码块的工具条定位与语言(相对编辑区滚动容器坐标)。 */
-interface BlockTool {
-  pre: HTMLElement;
-  top: number;
-  left: number;
-  right: number;
-  lang: string | null;
-}
-
 export function CodeBlockOverlay({ engine }: { engine: Engine | null }) {
-  const [tools, setTools] = useState<BlockTool[]>([]);
-  const lastRef = useRef<BlockTool[] | null>(null);
+  const [containers, setContainers] = useState<HTMLElement[]>([]);
+  const [langs, setLangs] = useState<(string | null)[]>([]);
+  const lastRef = useRef<{ els: HTMLElement[]; langs: (string | null)[] } | null>(null);
 
   const scan = useCallback((): void => {
-    const scroll = document.querySelector("[data-testid='editor-scroll']");
-    if (!scroll) return;
-    const sr = scroll.getBoundingClientRect();
-    const pres = [...scroll.querySelectorAll(".editor-prose pre")] as HTMLElement[];
-    const langs = codeBlockLanguages(engine?.getDoc() ?? null);
-    const next: BlockTool[] = pres.map((pre, i) => {
-      const r = pre.getBoundingClientRect();
-      return {
-        pre,
-        top: r.top - sr.top,
-        left: r.left - sr.left,
-        right: sr.right - r.right,
-        lang: languageForPre(pre, langs),
-      };
-    });
-    // 浅比较:结构/位置/语言均未变时不重渲染(打字时每击键都触发 observer)
+    const host = document.querySelector("[data-testid='editor-scroll']");
+    if (!host) return;
+    const els = [...host.querySelectorAll(".editor-prose pre .code-tools")] as HTMLElement[];
+    const nextLangs = codeBlockLanguages(engine?.getDoc() ?? null);
+    // 浅比较:结构/语言未变不重渲染(打字时每击键都触发 observer)
     const last = lastRef.current;
     const same =
       last !== null &&
-      last.length === next.length &&
-      last.every((t, i) => t.pre === next[i]!.pre && t.top === next[i]!.top && t.left === next[i]!.left && t.right === next[i]!.right && t.lang === next[i]!.lang);
+      last.els.length === els.length &&
+      last.els.every((el, i) => el === els[i]!) &&
+      last.langs.length === nextLangs.length &&
+      last.langs.every((l, i) => l === nextLangs[i]!);
     if (same) return;
-    lastRef.current = next;
-    setTools(next);
+    lastRef.current = { els, langs: nextLangs };
+    setContainers(els);
+    setLangs(nextLangs);
   }, [engine]);
 
   useEffect(() => {
-    const prose = document.querySelector("[data-testid='editor-prose']");
-    if (!prose) return;
+    const host = document.querySelector("[data-testid='editor-scroll']");
+    if (!host) return;
     scan();
-    // rAF 合并:避免编辑时每击键同步 reflow(getBoundingClientRect)
+    // rAF 合并:结构/语言变化重扫(编辑时每击键触发 observer,合并到每帧一次)
     let scheduled = false;
     const schedule = (): void => {
       if (scheduled) return;
@@ -85,36 +69,27 @@ export function CodeBlockOverlay({ engine }: { engine: Engine | null }) {
       });
     };
     const mo = new MutationObserver(schedule);
-    mo.observe(prose, { childList: true, subtree: true });
-    const scroll = document.querySelector("[data-testid='editor-scroll']");
-    scroll?.addEventListener("scroll", schedule, true);
-    window.addEventListener("resize", schedule);
-    return () => {
-      mo.disconnect();
-      scroll?.removeEventListener("scroll", schedule, true);
-      window.removeEventListener("resize", schedule);
-    };
+    mo.observe(host, { childList: true, subtree: true });
+    return () => mo.disconnect();
   }, [scan]);
 
-  const host = document.querySelector("[data-testid='editor-scroll']");
-  if (!host || tools.length === 0) return null;
-  return createPortal(
+  if (containers.length === 0) return null;
+  return (
     <>
-      {tools.map((t, i) => (
-        <CodeBlockTools key={i} tool={t} engine={engine} />
+      {containers.map((container, i) => (
+        <CodeBlockTools key={i} container={container} lang={langs[i] ?? null} engine={engine} />
       ))}
-    </>,
-    host,
+    </>
   );
 }
 
-/** 单个代码块的工具条:语言标签(左)+ 复制按钮(右),位于 pre 顶部工具区内。 */
-function CodeBlockTools({ tool, engine }: { tool: BlockTool; engine: Engine | null }) {
+/** 单个代码块的工具条:语言标签(左)+ 复制按钮(右),portal 进 .code-tools 容器。 */
+function CodeBlockTools({ container, lang, engine }: { container: HTMLElement; lang: string | null; engine: Engine | null }) {
   const [copied, setCopied] = useState(false);
   const [pickerOpen, setPickerOpen] = useState(false);
   const [pickerAnchor, setPickerAnchor] = useState<{ x: number; y: number } | null>(null);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const { pre, top, left, right, lang } = tool;
+  const pre = container.closest("pre");
 
   useEffect(
     () => () => {
@@ -124,11 +99,12 @@ function CodeBlockTools({ tool, engine }: { tool: BlockTool; engine: Engine | nu
   );
 
   const doCopy = useCallback(async (): Promise<void> => {
-    const code = pre.querySelector("code");
+    const code = pre?.querySelector("code");
     if (!code) return;
     const clone = code.cloneNode(true) as HTMLElement;
-    // 视图装饰剥离:行号列(纯源码不带行号;工具区在 pre padding 内,不在内容流)
+    // 视图装饰剥离:行号列 + 工具条容器(纯源码不带行号/按钮文字)
     clone.querySelector(".code-linenums")?.remove();
+    clone.querySelector(".code-tools")?.remove();
     const ok = await writeClipboard(clone.textContent ?? "");
     if (ok) {
       setCopied(true);
@@ -139,22 +115,20 @@ function CodeBlockTools({ tool, engine }: { tool: BlockTool; engine: Engine | nu
     }
   }, [pre]);
 
-  return (
+  return createPortal(
     <>
-      {/* 语言标签(左上;点击弹出语言选择)。切换后经 observer 重扫刷新文案 */}
+      {/* 语言标签(左;点击弹出语言选择)。切换后经 observer 重扫刷新文案 */}
       <button
         type="button"
         data-testid="code-lang-btn"
         onMouseDown={(e) => e.preventDefault()}
         onClick={() => {
-          const r = pre.getBoundingClientRect();
+          const r = pre?.getBoundingClientRect();
+          if (!r) return;
           setPickerAnchor({ x: r.left, y: r.top + 4 });
           setPickerOpen((v) => !v);
         }}
         style={{
-          position: "absolute",
-          top: top + 8,
-          left: left + 8,
           height: 19,
           boxSizing: "border-box",
           lineHeight: "15px",
@@ -170,16 +144,13 @@ function CodeBlockTools({ tool, engine }: { tool: BlockTool; engine: Engine | nu
       >
         {lang ?? "代码块"}
       </button>
-      {/* 复制按钮(右上,交互保留:1.5s 已复制反馈) */}
+      {/* 复制按钮(右,交互保留:1.5s 已复制反馈) */}
       <button
         type="button"
         data-testid="code-copy-btn"
         onMouseDown={(e) => e.preventDefault()}
         onClick={() => void doCopy()}
         style={{
-          position: "absolute",
-          top: top + 8,
-          right: right + 8,
           padding: "2px 10px",
           fontSize: 12,
           borderRadius: 5,
@@ -199,12 +170,13 @@ function CodeBlockTools({ tool, engine }: { tool: BlockTool; engine: Engine | nu
           current={lang}
           languages={engine?.supportedLanguages() ?? []}
           onSelect={(l) => {
-            engine?.setCodeBlockLanguageAt(pre, l);
+            if (pre) engine?.setCodeBlockLanguageAt(pre, l);
             setPickerOpen(false);
           }}
           onClose={() => setPickerOpen(false)}
         />
       )}
-    </>
+    </>,
+    container,
   );
 }

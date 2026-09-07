@@ -395,6 +395,21 @@ body {
   font: inherit;
   line-height: inherit;
 }
+.editor-prose .code-tools {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 38px; /* 与 pre padding-top 同高(工具区让位) */
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 8px;
+  pointer-events: none; /* 容器不拦鼠标;按钮自身 pointer-events: auto */
+}
+.editor-prose .code-tools button {
+  pointer-events: auto;
+}
 /* 行号每行块级 span:单列渲染不依赖 white-space(修复「行号折成两列」) */
 .editor-prose .code-linenums .code-ln {
   display: block;
