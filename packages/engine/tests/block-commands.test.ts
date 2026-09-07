@@ -93,6 +93,19 @@ describe("块级命令", () => {
     engine.destroy();
   });
 
+  it("插入表格无参默认 5 行 3 列(快捷键/菜单/工具栏共用默认路径,反馈轮 02)", () => {
+    const engine = makeEngine("表格前\n");
+    const at = findPos(engine, "表格前");
+    engine.setSelection(at + 3, at + 3);
+    expect(engine.insertTable()).toBe(true);
+    expect(engine.isInsideTable()).toBe(true);
+    const out = engine.getMarkdown();
+    // 3 列分隔线;管道行 = 表头 1 + 分隔线 1 + 数据 4
+    expect(out).toContain("| --- | --- | --- |");
+    expect(out.split("\n").filter((l) => l.startsWith("|"))).toHaveLength(6);
+    engine.destroy();
+  });
+
   it("表格内块命令禁用的上下文标记正确", () => {
     const engine = makeEngine("段\n");
     expect(engine.isInsideTable()).toBe(false);

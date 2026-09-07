@@ -502,7 +502,7 @@ export function createEngine(
       }
     },
 
-    insertTable(rows = 2, cols = 2) {
+    insertTable(rows = 5, cols = 3) {
       const ed = editor;
       if (!ed) return false;
       return ed.chain().focus().insertTable({ rows, cols, withHeaderRow: true }).run();

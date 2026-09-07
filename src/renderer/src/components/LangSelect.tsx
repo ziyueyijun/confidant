@@ -17,6 +17,18 @@ export interface LangSelectProps {
 export function LangSelect({ x, y, current, languages, onSelect, onClose }: LangSelectProps) {
   const [query, setQuery] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);
+  const currentRowRef = useRef<HTMLButtonElement | null>(null);
+
+  // 反馈轮 02:打开时列表滚动定位到当前语言(已设语言且在主列表时);
+  // 手输别名/未注册语言不在列表(ref 不设)→ 停在顶部;输入框不预填
+  useEffect(() => {
+    if (current !== null) {
+      requestAnimationFrame(() => {
+        currentRowRef.current?.scrollIntoView({ block: "center" });
+      });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   useEffect(() => {
     inputRef.current?.focus();
@@ -95,6 +107,7 @@ export function LangSelect({ x, y, current, languages, onSelect, onClose }: Lang
         {filtered.slice(0, 60).map((l) => (
           <button
             key={l}
+            ref={l === current ? currentRowRef : undefined}
             type="button"
             data-testid={`lang-option-${l}`}
             onClick={() => commit(l)}

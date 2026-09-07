@@ -896,7 +896,7 @@ export async function runWorkspaceSelfCheck(win: BrowserWindow, wsDir: string, e
       const dom = await js<boolean>(q("table"));
       if (!dom) return null;
       const content = await readFile(aPath, "utf8");
-      return content.includes("| --- | --- |") ? true : null;
+      return content.includes("| --- | --- | --- |") ? true : null;
     });
     if (!tableIn) return fail("insert table via menu failed");
     win.webContents.send(IPC.menuCommand, "undo");
@@ -904,7 +904,7 @@ export async function runWorkspaceSelfCheck(win: BrowserWindow, wsDir: string, e
       const dom = await js<boolean>(`document.querySelector("table") === null`);
       if (!dom) return null;
       const content = await readFile(aPath, "utf8");
-      return !content.includes("| --- | --- |") ? true : null;
+      return !content.includes("| --- | --- | --- |") ? true : null;
     });
     if (!tableUndone) return fail("undo of table insert not applied/persisted");
 
@@ -1180,6 +1180,10 @@ export async function runWorkspaceSelfCheck(win: BrowserWindow, wsDir: string, e
 
     // 6.2) 全工作区搜索(15):Ctrl+Shift+F → 跨文件命中 → 点击打开并高亮首个命中
     win.webContents.send(IPC.menuCommand, "workspace-search");
+    const scopeBtn = await poll(() => js<boolean>(q("[data-testid='search-scope-select']")));
+    if (!scopeBtn) return fail("search scope button missing");
+    // 反馈轮 02:作用域下拉自绘,选项行展开后才在 DOM(原生 select 常驻)
+    await js<void>(`document.querySelector("[data-testid='search-scope-select']").click()`);
     const wsPanel = await poll(() => js<boolean>(q("[data-testid='scope-workspace']")));
     if (!wsPanel) return fail("workspace scope button missing");
     await js<void>(`(() => {

@@ -17,6 +17,19 @@ import {
   Table,
 } from "lucide-react";
 import type { Engine } from "../../../../packages/engine";
+import { DropdownSelect } from "./DropdownSelect";
+
+/** 标题下拉选项(07;反馈轮 02:原生 select 改自绘——展开列表 OS 渲染、
+    night 下白底,CSS 变量管不到)。 */
+const HEADING_OPTIONS = [
+  { value: "paragraph", label: "正文" },
+  { value: "heading1", label: "标题 1" },
+  { value: "heading2", label: "标题 2" },
+  { value: "heading3", label: "标题 3" },
+  { value: "heading4", label: "标题 4" },
+  { value: "heading5", label: "标题 5" },
+  { value: "heading6", label: "标题 6" },
+];
 
 export interface FormatToolbarProps {
   engine: Engine | null;
@@ -47,7 +60,7 @@ const btnBase: React.CSSProperties = {
 const sep: React.CSSProperties = {
   width: 1,
   height: 18,
-  background: "rgba(127,127,127,.3)",
+  background: "var(--toolbar-border)", // 反馈轮 02:分隔线走 token(原 rgba 硬编码)
   margin: "0 3px",
   flexShrink: 0,
 };
@@ -137,41 +150,21 @@ export function FormatToolbar({ engine, tick, onLink, onInsertImage, bump }: For
         <Strikethrough size={13} />,
         strikeOn,
       )}
-      <select
-        data-testid="ft-heading-select"
-        aria-label="标题"
+      <DropdownSelect
         value={headingValue}
-        onChange={(e) => {
-          const v = e.target.value;
+        options={HEADING_OPTIONS}
+        onSelect={(v) => {
           if (!engine) return;
           if (v === "paragraph") engine.setBlockKind("paragraph");
           else engine.setBlockKind(v as "heading1" | "heading2" | "heading3" | "heading4" | "heading5" | "heading6");
           bump();
-          e.currentTarget.blur(); // 选择后归还编辑区焦点
         }}
-        onMouseDown={(e) => e.stopPropagation()}
-        style={{
-          height: 28,
-          maxWidth: 96,
-          fontSize: 12.5,
-          border: "none",
-          borderRadius: 7,
-          background: "transparent",
-          color: "inherit",
-          cursor: "pointer",
-          outline: "none",
-          opacity: 0.6,
-          padding: "0 4px",
-        }}
-      >
-        <option value="paragraph">正文</option>
-        <option value="heading1">标题 1</option>
-        <option value="heading2">标题 2</option>
-        <option value="heading3">标题 3</option>
-        <option value="heading4">标题 4</option>
-        <option value="heading5">标题 5</option>
-        <option value="heading6">标题 6</option>
-      </select>
+        ariaLabel="标题"
+        testId="ft-heading-select"
+        itemTestIdPrefix="ft-heading"
+        direction="up"
+        buttonStyle={{ height: 28, maxWidth: 96, fontSize: 12.5, borderRadius: 7, opacity: 0.6, padding: "0 4px" }}
+      />
       <div style={sep} />
       {/* 组 2:块级 */}
       {mkBtn("ft-bullet", "无序列表", () => run((e) => e.setBlockKind("bulletList")), <List size={13} />)}

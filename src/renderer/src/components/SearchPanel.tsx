@@ -5,6 +5,7 @@
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import type { Engine } from "../../../../packages/engine";
 import type { WorkspaceSearchFileHit } from "@shared/ipc";
+import { DropdownSelect } from "./DropdownSelect";
 
 export type SearchScope = "file" | "workspace";
 
@@ -139,30 +140,19 @@ export function SearchPanel({
     >
       {/* 顶部通栏行(05:约 39px 高;输入框 26px 直角透明;作用域 76px 下拉) */}
       <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "5px 12px 6px", maxHeight: 39 }}>
-        <select
-          data-testid="search-scope-select"
+        <DropdownSelect
           value={scope}
+          options={[
+            { value: "file", label: "当前文件" },
+            { value: "workspace", label: "整个工作区", disabled: !workspaceRoot },
+          ]}
+          onSelect={(v) => setScope(v as SearchScope)}
+          ariaLabel="搜索范围"
+          testId="search-scope-select"
+          itemTestIdPrefix="scope"
           disabled={scope === "workspace" && !workspaceRoot}
-          onChange={(e) => setScope(e.target.value as SearchScope)}
-          style={{
-            width: 76,
-            flexShrink: 0,
-            height: 26,
-            fontSize: 12,
-            border: "none",
-            background: "transparent",
-            color: "inherit",
-            outline: "none",
-            cursor: "pointer",
-          }}
-        >
-          <option data-testid="scope-file" value="file">
-            当前文件
-          </option>
-          <option data-testid="scope-workspace" value="workspace" disabled={!workspaceRoot}>
-            整个工作区
-          </option>
-        </select>
+          buttonStyle={{ width: 76, flexShrink: 0, height: 26, fontSize: 12 }}
+        />
         <input
           ref={inputRef}
           data-testid="search-input"

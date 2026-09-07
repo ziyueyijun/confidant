@@ -38,6 +38,8 @@ export function CodeBlockOverlay({ engine }: { engine: Engine | null }) {
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const preRef = useRef<HTMLElement | null>(null);
   preRef.current = pre;
+  /** 语言按钮自身(ref 量高:浮层上移贴块顶需要精确按钮高度)。 */
+  const langBtnRef = useRef<HTMLButtonElement | null>(null);
 
   const place = useCallback(
     (el: HTMLElement) => {
@@ -45,7 +47,9 @@ export function CodeBlockOverlay({ engine }: { engine: Engine | null }) {
       const sr = scroll?.getBoundingClientRect();
       const r = el.getBoundingClientRect();
       if (!sr || r.width === 0) return;
-      setPos({ top: r.top - sr.top + 6, left: r.left - sr.left + 8, right: sr.right - r.right + 8 });
+      // 反馈轮 02:语言标签上移到代码块上方、底边贴住块顶(间隙 0),不再压行号
+      const btnH = langBtnRef.current?.offsetHeight ?? 19;
+      setPos({ top: r.top - sr.top - btnH, left: r.left - sr.left + 8, right: sr.right - r.right + 8 });
       // 语言:doc 按序 zip 当前 pre
       setLang(languageForPre(el, codeBlockLanguages(engine?.getDoc() ?? null)));
     },
@@ -115,6 +119,7 @@ export function CodeBlockOverlay({ engine }: { engine: Engine | null }) {
       const el = preRef.current;
       if (!el || !engine) return;
       engine.setCodeBlockLanguageAt(el, language);
+      setLang(language); // 反馈轮 02:切换后即时刷新按钮文案(此前要等下次 mousemove)
     },
     [engine],
   );
@@ -123,8 +128,10 @@ export function CodeBlockOverlay({ engine }: { engine: Engine | null }) {
   if (!host || !pre || !pos) return null;
   return createPortal(
     <>
-      {/* 语言标签(左上;点击弹出语言选择) */}
+      {/* 语言标签(左上;点击弹出语言选择)。反馈轮 02:浮在代码块上方贴块顶,
+          固定高 19px(place 估算基准),不再压行号 */}
       <button
+        ref={langBtnRef}
         type="button"
         data-testid="code-lang-btn"
         onMouseDown={(e) => e.preventDefault()}
@@ -137,6 +144,9 @@ export function CodeBlockOverlay({ engine }: { engine: Engine | null }) {
           position: "absolute",
           top: pos.top,
           left: pos.left,
+          height: 19,
+          boxSizing: "border-box",
+          lineHeight: "15px",
           padding: "1px 8px",
           fontSize: 11.5,
           borderRadius: 4,

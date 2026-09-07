@@ -563,7 +563,6 @@ export default function App() {
         {sidebar.visible &&
           (workspace ? (
             <Sidebar
-              workspaceName={workspace.name}
               tree={tree}
               expanded={expanded}
               activeRel={activeRel}

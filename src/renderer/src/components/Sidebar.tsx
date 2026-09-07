@@ -1,4 +1,4 @@
-// 侧栏(03:文件树 + 大纲双 tab + 知识库搜索 + 工作区名);宽度拖拽与折叠由父组件持有状态。
+// 侧栏(03:文件树 + 大纲双 tab + 知识库搜索);宽度拖拽与折叠由父组件持有状态。
 
 import { useEffect, useRef, useState, type CSSProperties, type DragEvent as ReactDragEvent, type MouseEvent as ReactMouseEvent, type PointerEvent } from "react";
 import type { TreeEntry, WorkspaceSearchFileHit } from "@shared/ipc";
@@ -7,7 +7,6 @@ import { OutlinePanel } from "./OutlinePanel";
 import type { OutlineItem } from "../editor/outline";
 
 export interface SidebarProps {
-  workspaceName: string;
   workspaceRoot: string;
   tree: TreeEntry[] | null;
   expanded: ReadonlySet<string>;
@@ -37,7 +36,6 @@ const MIN_WIDTH = 180;
 const MAX_WIDTH = 480;
 
 export function Sidebar({
-  workspaceName,
   workspaceRoot,
   tree,
   expanded,
@@ -130,28 +128,16 @@ export function Sidebar({
         flexShrink: 0,
       }}
     >
-      <div
-        style={{
-          padding: "8px 10px 4px",
-          fontSize: 12,
-          fontWeight: 600,
-          color: "var(--muted)",
-          overflow: "hidden",
-          textOverflow: "ellipsis",
-          whiteSpace: "nowrap",
-        }}
-        title={workspaceName}
-      >
-        {workspaceName}
-      </div>
       {/* 文件/大纲双 tab(03):宽 84px、激活加粗 + 底部 4px currentColor 色条,
-          下方 1px 分隔线(基线 §3.2);点击条目不自动收起侧边栏 */}
+          下方 1px 分隔线(基线 §3.2);点击条目不自动收起侧边栏。
+          反馈轮 02:去工作区名头区,标签栏顶到侧栏顶部(留白 10px) */}
       <div
         data-testid="sidebar-tabs"
         style={{
           display: "flex",
           borderBottom: "1px solid var(--shell-border, var(--border))",
           flexShrink: 0,
+          paddingTop: 10,
         }}
       >
         {(["files", "outline"] as const).map((t) => (
@@ -182,7 +168,7 @@ export function Sidebar({
         <>
           {/* 搜索框(反馈轮 01):就地输入——文件名匹配 + 内容命中(知识库文件搜索);
               Ctrl+F 顶部条当前文件查找保持独立 */}
-          <div style={{ padding: "0 8px 6px" }}>
+          <div style={{ padding: "0 8px 12px" }}>
             <input
               data-testid="tree-search-input"
               placeholder="搜索知识库…"
