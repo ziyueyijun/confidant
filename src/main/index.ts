@@ -298,30 +298,36 @@ function registerIpc(): void {
       preferencesWin.focus();
       return;
     }
-    const win = new BrowserWindow({
-      width: 560,
-      height: 460,
-      minWidth: 480,
-      minHeight: 380,
-      title: "confidant · 偏好设置",
-      autoHideMenuBar: true,
-      backgroundColor: "#ffffff",
-      webPreferences: {
-        preload: join(__dirname, "../preload/index.js"),
-        contextIsolation: true,
-        sandbox: true,
-        nodeIntegration: false,
-      },
-    });
-    preferencesWin = win;
-    win.on("closed", () => {
-      if (preferencesWin === win) preferencesWin = null;
-    });
-    if (isDev) {
-      void win.loadURL(`${process.env["ELECTRON_RENDERER_URL"]}#preferences`);
-    } else {
-      void win.loadFile(join(__dirname, "../renderer/index.html"), { hash: "preferences" });
-    }
+    void (async () => {
+      // 创建底色随持久化主题(审查修:night/newsprint 下避免白闪;窗口样式仍吃主题变量)
+      const theme = await getState("theme");
+      const bg =
+        theme === "night" ? "#363b40" : theme === "newsprint" ? "#f3f2ee" : "#ffffff";
+      const win = new BrowserWindow({
+        width: 560,
+        height: 460,
+        minWidth: 480,
+        minHeight: 380,
+        title: "confidant · 偏好设置",
+        autoHideMenuBar: true,
+        backgroundColor: bg,
+        webPreferences: {
+          preload: join(__dirname, "../preload/index.js"),
+          contextIsolation: true,
+          sandbox: true,
+          nodeIntegration: false,
+        },
+      });
+      preferencesWin = win;
+      win.on("closed", () => {
+        if (preferencesWin === win) preferencesWin = null;
+      });
+      if (isDev) {
+        void win.loadURL(`${process.env["ELECTRON_RENDERER_URL"]}#preferences`);
+      } else {
+        void win.loadFile(join(__dirname, "../renderer/index.html"), { hash: "preferences" });
+      }
+    })();
   });
 
   // ── 图片落盘通道(05) ──

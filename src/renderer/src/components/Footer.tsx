@@ -9,6 +9,7 @@ import {
   docStats,
   METRIC_LABELS,
   normalizeMetric,
+  type DocStats,
   type WordCountMetric,
 } from "../editor/doc-stats";
 
@@ -27,7 +28,7 @@ export interface FooterProps {
 
 export function Footer({ engine, tick, hasDoc, focusMode, typewriterMode, onToggleFocus, onToggleTypewriter }: FooterProps) {
   const [metric, setMetric] = useState<WordCountMetric>("words");
-  const [stats, setStats] = useState({ words: 0, chars: 0, paragraphs: 0, lines: 0 });
+  const [stats, setStats] = useState<DocStats>({ words: 0, chars: 0, paragraphs: 0, lines: 0 });
   const [blockType, setBlockType] = useState<string | null>(null);
   const [popupOpen, setPopupOpen] = useState(false);
   const statsTimer = useRef<ReturnType<typeof setTimeout> | null>(null);

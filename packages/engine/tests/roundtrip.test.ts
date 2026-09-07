@@ -159,7 +159,8 @@ describe("markdown 往返(语义级)", () => {
     engine.loadMarkdown("# 标题甲\n\n- 甲\n- 乙\n\n> 引用\n");
     const editable = host.querySelector("[contenteditable='true']");
     const html = editable?.innerHTML ?? "";
-    expect(html).toMatch(/<h1>/);
+    // h1 可能带焦点块装饰类(06:初始选区即标记);只断言标签结构
+    expect(html).toMatch(/<h1( class="[^"]*")?>/);
     expect(html).toContain("<ul>");
     expect(html).toContain("<blockquote>");
     // 不是把 markdown 原文当文本渲染

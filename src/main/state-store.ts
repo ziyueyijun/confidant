@@ -33,7 +33,8 @@ export interface AppStateV1 {
   sidebar: { visible: boolean; width: number };
   /** 树展开记忆:工作区根路径 → 展开的目录相对路径列表。 */
   expanded: Record<string, string[]>;
-  theme: "system" | "light" | "dark";
+  /** 主题(01):三值 github/night/newsprint;旧值 system/light/dark 仅读迁移(normalizeTheme)。 */
+  theme: "github" | "night" | "newsprint" | "system" | "light" | "dark";
   window: WindowStateV1;
   /** 编辑器设置(28):代码块自动换行/行号,默认均开。 */
   editorSettings: { codeWrap: boolean; codeLineNumbers: boolean };
@@ -45,7 +46,7 @@ const DEFAULT_STATE: AppStateV1 = {
   lastSession: { workspace: null, file: null },
   sidebar: { visible: true, width: 260 },
   expanded: {},
-  theme: "system",
+  theme: "github",
   window: { maximized: false, bounds: null },
   editorSettings: { codeWrap: true, codeLineNumbers: true },
 };

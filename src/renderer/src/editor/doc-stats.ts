@@ -45,13 +45,14 @@ export function normalizeMetric(value: unknown): WordCountMetric {
   return METRIC_LABELS.some((m) => m.id === value) ? (value as WordCountMetric) : "words";
 }
 
-/** 光标所在块元素 → 段落类型标签(04 清单:标题 N/代码块/引用/列表/表格;正文为默认态 null)。 */
+/** 光标所在块元素 → 段落类型标签(04 清单:标题 N/代码块/引用/列表/表格;正文为默认态 null)。
+ *  文本锚点取父元素,元素锚点(空块光标,如 `<h1><br></h1>`)直接取自身。 */
 export function blockTypeLabel(anchor: Node | null): string | null {
-  if (!anchor || anchor.nodeType !== Node.TEXT_NODE) return null;
+  if (!anchor) return null;
+  const base =
+    anchor.nodeType === Node.TEXT_NODE ? anchor.parentElement : (anchor as Element | null);
   // 文本节点的块级祖先(PM 块节点即这些标签之一)
-  const el = (anchor.parentElement ?? null)?.closest?.(
-    "h1, h2, h3, h4, h5, h6, pre, blockquote, ul, ol, td, th",
-  );
+  const el = base?.closest?.("h1, h2, h3, h4, h5, h6, pre, blockquote, ul, ol, td, th");
   if (!el) return null;
   const tag = el.tagName.toLowerCase();
   if (/^h[1-6]$/.test(tag)) return `标题 ${tag.slice(1)}`;

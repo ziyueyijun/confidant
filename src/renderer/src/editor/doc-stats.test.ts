@@ -62,7 +62,14 @@ describe("blockTypeLabel(04:段落类型映射)", () => {
     const host = mount("<p>正文</p>");
     expect(blockTypeLabel(host.querySelector("p")!.firstChild!)).toBeNull();
     expect(blockTypeLabel(null)).toBeNull();
-    expect(blockTypeLabel(host.querySelector("p"))).toBeNull(); // 元素节点非文本
+    expect(blockTypeLabel(host.querySelector("p"))).toBeNull(); // 元素锚点在正文块
+  });
+
+  it("空块光标(元素锚点)→ 块类型仍识别(审查修)", () => {
+    const host = mount("<h3><br></h3>");
+    expect(blockTypeLabel(host.querySelector("h3"))).toBe("标题 3");
+    const host2 = mount("<p><br></p>");
+    expect(blockTypeLabel(host2.querySelector("p"))).toBeNull(); // 空正文 → 默认态
   });
 });
 

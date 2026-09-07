@@ -33,6 +33,15 @@ describe("focus-block 装饰(06)", () => {
     engine.destroy();
   });
 
+  it("装载后初始选区即有焦点块(审查修:新文档专注模式不整篇淡出)", () => {
+    const { engine, host } = makeEngine("# 甲\n\n正文一。\n");
+    const h1 = host.querySelector("h1");
+    expect(h1).not.toBeNull();
+    // 装载后光标在文档首(标题处),首块立即带焦点标记
+    expect(h1!.classList.contains("focus-block")).toBe(true);
+    engine.destroy();
+  });
+
   it("装饰为纯视图态:序列化字节不变", () => {
     const { engine } = makeEngine("# 甲\n\n正文一。\n");
     engine.setSelection(6, 6);
