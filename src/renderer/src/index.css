@@ -527,9 +527,6 @@ body {
   background: var(--block-bg); /* 02:表头底色(基线 #f8f8f8 系) */
   font-weight: 600;
 }
-.editor-prose tr:nth-child(even) td {
-  background: var(--block-bg); /* 02:偶数行底色(基线) */
-}
 .editor-prose img {
   max-width: 100%;
   height: auto;
