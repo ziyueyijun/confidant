@@ -35,10 +35,14 @@ import { useFileOperations } from "./hooks/use-file-operations";
 import { useMenuBridgeRegistration } from "./hooks/use-menu-bridge-registration";
 import { useRecentFolders } from "./hooks/use-recent-folders";
 import { useStartupRecovery } from "./hooks/use-startup-recovery";
+import { useOutline } from "./hooks/use-outline";
+import type { OutlineItem } from "./editor/outline";
 
 
 export default function App() {
   const hostRef = useRef<HTMLDivElement>(null);
+  /** 编辑区滚动容器(03:大纲滚动跟随监听)。 */
+  const editorScrollRef = useRef<HTMLDivElement>(null);
   const engineRef = useRef<Engine | null>(null);
   const docRef = useRef<OpenNote | null>(null);
   const pipelineRef = useRef<ReturnType<typeof createSavePipeline> | null>(null);
@@ -185,6 +189,19 @@ export default function App() {
     openLink: openLinkTarget,
     bumpUi: () => setUiTick((t) => t + 1),
   });
+
+  // ── 大纲面板(03):doc 防抖重建 + 滚动跟随高亮 ──
+  const outline = useOutline(engine, uiTick, editorScrollRef);
+  const jumpToOutline = useCallback(
+    (item: OutlineItem) => {
+      const ed = engineRef.current;
+      if (!ed) return;
+      // 滚动定位 + 光标置入标题处 + 编辑器聚焦(setSelection 已 focus)
+      ed.setSelection(item.pos + 1, item.pos + 1);
+      ed.revealRange(item.pos + 1, item.pos + 1);
+    },
+    [],
+  );
 
 
 
@@ -525,6 +542,10 @@ export default function App() {
               onEmptyContext={(e) => void onTreeEmptyContext(e)}
               onDragStartEntry={onDragStartEntry}
               onDropEntry={onDropEntry}
+              outlineItems={outline.items}
+              outlineActivePos={outline.activePos}
+              outlineDisabled={sourceMode}
+              onOutlineJump={jumpToOutline}
               onSearchBoxClick={() => {
                 if (!docRef.current) return;
                 setFindScope("file");
@@ -552,6 +573,7 @@ export default function App() {
           )}
           <div
             className="editor-scroll"
+            ref={editorScrollRef}
             // 30:源码模式时隐藏但保持挂载(引擎 DOM 不卸载,切回即恢复)
             style={{ display: sourceMode || !showEditorArea ? "none" : undefined }}
             data-testid="editor-scroll"

@@ -1089,6 +1089,88 @@ export async function runWorkspaceSelfCheck(win: BrowserWindow, wsDir: string, e
     if (clipText !== "const x = 1;") return fail(`copy clipboard wrong: ${JSON.stringify(clipText)}`);
     console.log("[smoke] code block view ok (highlight/line-numbers/copy)");
 
+    // 6.4b) 大纲面板(03):双 tab → 空态(code.md 无标题)→ 多标题文档渲染 →
+    //       点击跳转(光标置入标题)→ 滚动跟随 → 折叠 → 源码模式禁用
+    await js<void>(`document.querySelector("[data-testid='sidebar-tab-outline']").click()`);
+    const outlineEmpty = await poll(() =>
+      js<boolean>(`document.body.innerText.includes("暂无标题")`),
+    );
+    if (!outlineEmpty) return fail("outline empty state missing (code.md has no headings)");
+    // 先回文件 tab(树 DOM 仅文件 tab 渲染),写 outline.md → 开 → 再切大纲 tab
+    await js<void>(`document.querySelector("[data-testid='sidebar-tab-files']").click()`);
+    const outlineDoc = join(wsDir, "outline.md");
+    await wf2(
+      outlineDoc,
+      "# 甲\n\n## 甲一\n\n## 甲二\n\n# 乙\n\n### 乙一\n\n" + "正文段落。\n\n".repeat(50),
+      "utf8",
+    );
+    const outlineRow = await poll(() => js<boolean>(q("[data-rel='outline.md']")));
+    if (!outlineRow) return fail("outline.md row missing");
+    await js<void>(`document.querySelector("[data-rel='outline.md']").click()`);
+    const outlineOpen = await poll(() => docTitleIs(win, "outline.md"));
+    if (!outlineOpen) return fail("outline.md not opened");
+    await js<void>(`document.querySelector("[data-testid='sidebar-tab-outline']").click()`);
+    const outlineItems = await poll(async () => {
+      const count = await js<number>(
+        `document.querySelectorAll("[data-testid^='outline-item']").length`,
+      );
+      return count === 5 ? count : null;
+    });
+    if (!outlineItems) return fail(`outline items not rendered (got ${outlineItems})`);
+    // 点击跳转:甲二条目 → 光标置入标题内
+    await js<void>(`[...document.querySelectorAll("[data-testid^='outline-item']")]
+      .find((el) => el.textContent?.includes("甲二"))?.click()`);
+    const jumped = await poll(async () => {
+      const sel = await js<string>(`window.getSelection()?.anchorNode?.textContent ?? ""`);
+      return sel.includes("甲二") ? true : null;
+    });
+    if (!jumped) return fail("outline click did not place cursor into heading");
+    // 滚动跟随:滚到底 → 激活项 = 乙一
+    await js<void>(`(() => {
+      const sc = document.querySelector("[data-testid='editor-scroll']");
+      sc.scrollTop = sc.scrollHeight;
+      sc.dispatchEvent(new Event("scroll"));
+    })()`);
+    const activeBottom = await poll(() =>
+      js<string | null>(
+        // 判空用 null:空串会被 poll 当有效值立即返回,不等 rAF 提交渲染
+        `document.querySelector("[data-testid^='outline-item'][data-active]")?.textContent ?? null`,
+      ),
+    );
+    if (!activeBottom?.includes("乙一")) {
+      const diag = await js<string>(
+        `JSON.stringify({
+          sc: (() => { const s = document.querySelector("[data-testid='editor-scroll']"); return s ? { top: s.scrollTop, h: s.scrollHeight, c: s.clientHeight } : null; })(),
+          hTops: [...document.querySelectorAll(".editor-prose :is(h1,h2,h3,h4,h5,h6)")].map((h) => ({ t: h.textContent, top: h.getBoundingClientRect().top })),
+        })`,
+      );
+      return fail(`outline scroll-follow bottom active wrong: ${JSON.stringify(activeBottom)}; diag=${diag}`);
+    }
+    // 折叠乙(其行内箭头钮;乙行文本恰为「乙」):收起隐藏全部子级(乙一)
+    await js<void>(`(() => {
+      const row = [...document.querySelectorAll("[data-testid^='outline-item']")]
+        .find((el) => el.textContent?.trim() === "乙");
+      row?.querySelector("button")?.click();
+    })()`);
+    const outlineCollapsed = await poll(async () => {
+      const count = await js<number>(
+        `document.querySelectorAll("[data-testid^='outline-item']").length`,
+      );
+      return count === 4 ? count : null;
+    });
+    if (!outlineCollapsed) return fail("outline collapse did not hide children");
+    // 源码模式:大纲禁用占位
+    win.webContents.send(IPC.menuCommand, "source-mode");
+    const outlineDisabled = await poll(() =>
+      js<boolean>(`document.body.innerText.includes("源码模式下大纲不可用")`),
+    );
+    if (!outlineDisabled) return fail("outline not disabled in source mode");
+    win.webContents.send(IPC.menuCommand, "source-mode");
+    await poll(() => js<boolean>(`!document.querySelector("[data-testid='source-editor']")`));
+    // 回到文件 tab(后续探针依赖树 DOM)
+    await js<void>(`document.querySelector("[data-testid='sidebar-tab-files']").click()`);
+    console.log("[smoke] outline panel ok (tabs/empty/jump/scroll-follow/collapse/source-disable)");
+
     await delay(800);
     // 回到 a.md 作为「外部删除」测试对象
     await js<void>(`document.querySelector("[data-rel='a.md']").click()`);
