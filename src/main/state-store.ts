@@ -36,7 +36,7 @@ export interface AppStateV1 {
   /** 主题(01):三值 github/night/newsprint;旧值 system/light/dark 仅读迁移(normalizeTheme)。 */
   theme: "github" | "night" | "newsprint" | "system" | "light" | "dark";
   window: WindowStateV1;
-  /** 编辑器设置(28):代码块自动换行/行号,默认均开。 */
+  /** 编辑器设置(28 → 反馈轮 01):代码块换行(默认关——默认不换行横向滚动)/行号(默认开)。 */
   editorSettings: { codeWrap: boolean; codeLineNumbers: boolean };
 }
 
@@ -48,7 +48,7 @@ const DEFAULT_STATE: AppStateV1 = {
   expanded: {},
   theme: "github",
   window: { maximized: false, bounds: null },
-  editorSettings: { codeWrap: true, codeLineNumbers: true },
+  editorSettings: { codeWrap: false, codeLineNumbers: true },
 };
 
 export const RECENT_LIMIT = 10;

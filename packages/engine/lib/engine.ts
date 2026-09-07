@@ -9,7 +9,7 @@ import { linkRangeAt } from "./link-range";
 import type { LinkInfo } from "./link-range";
 import { moveTaskItem, toggleCheckedViaDom } from "./task-list-ops";
 import { makeEditor } from "./keyboard";
-import { CODE_BLOCK_VIEW_META } from "./code-block-view";
+import { CODE_BLOCK_VIEW_META, LOWLIGHT } from "./code-block-view";
 
 export function finalizeMarkdown(md: string): string {
   return md.replace(/\n+$/, "") + "\n";
@@ -144,6 +144,13 @@ export interface Engine {
    * domEl 为 NodeView 包装内的任意元素;非图片返回 false。
    */
   removeImageNodeAtElement(domEl: Element): boolean;
+
+  // ── 代码块语言(反馈轮 01) ──
+  /** 设置指定代码块的语言(domEl 为 pre 内任意元素;language 空串移除语言)。
+   *  语言进文档(``` 标记)、进撤销历史;高亮按语言重算。 */
+  setCodeBlockLanguageAt(domEl: Element, language: string): boolean;
+  /** 高亮支持的语言集(lowlight common;语言选择列表数据源)。 */
+  supportedLanguages(): string[];
   /** 释放资源,host 内容清空。 */
   destroy(): void;
 }
@@ -650,6 +657,35 @@ export function createEngine(
         .focus()
         .deleteRange({ from: hit.pos, to: hit.pos + hit.size })
         .run();
+    },
+
+    // ── 代码块语言(反馈轮 01):浮层标签切换语言 ──
+    setCodeBlockLanguageAt(domEl: Element, language: string) {
+      const ed = editor;
+      if (!ed) return false;
+      const target = domEl.closest("pre") ?? domEl;
+      // 与图片节点同模式:按 DOM 遍历定位 codeBlock 节点(posAtDOM 对原子块不可靠)
+      const hit = { pos: -1 };
+      ed.state.doc.descendants((node, pos) => {
+        if (hit.pos >= 0) return false;
+        if (node.type.name !== "codeBlock") return true;
+        const dom = ed.view.nodeDOM(pos) as Element | null;
+        if (dom && (dom === target || dom.contains(target) || target.contains(dom))) {
+          hit.pos = pos;
+          return false;
+        }
+        return true;
+      });
+      if (hit.pos < 0) return false;
+      // 语言进文档(改 ``` 标记)、进撤销历史、自动保存由上层管线接管
+      ed.view.dispatch(ed.state.tr.setNodeMarkup(hit.pos, undefined, { language }));
+      return true;
+    },
+
+    /** 高亮支持的语言主名集(渲染层语言选择列表数据源;别名如 js/ts 不列
+     *  于列表但输入框手输可用——lowlight.registered 按别名可判定高亮)。 */
+    supportedLanguages() {
+      return LOWLIGHT.listLanguages().sort();
     },
 
     destroy() {

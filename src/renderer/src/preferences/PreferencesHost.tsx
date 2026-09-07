@@ -22,7 +22,7 @@ interface EditorSettings {
 export function PreferencesHost() {
   const [category, setCategory] = useState<Category>("appearance");
   const [showToolbar, setShowToolbar] = useState(false);
-  const [editor, setEditor] = useState<EditorSettings>({ codeWrap: true, codeLineNumbers: true });
+  const [editor, setEditor] = useState<EditorSettings>({ codeWrap: false, codeLineNumbers: true });
   const [loaded, setLoaded] = useState(false);
 
   useEffect(() => {
@@ -36,7 +36,7 @@ export function PreferencesHost() {
       if (prefs && typeof prefs.showToolbar === "boolean") setShowToolbar(prefs.showToolbar);
       if (eds) {
         setEditor({
-          codeWrap: typeof eds.codeWrap === "boolean" ? eds.codeWrap : true,
+          codeWrap: typeof eds.codeWrap === "boolean" ? eds.codeWrap : false,
           codeLineNumbers: typeof eds.codeLineNumbers === "boolean" ? eds.codeLineNumbers : true,
         });
       }

@@ -1,13 +1,14 @@
-// 侧栏(03:文件树 + 大纲双 tab + 搜索占位 + 工作区名);宽度拖拽与折叠由父组件持有状态。
+// 侧栏(03:文件树 + 大纲双 tab + 知识库搜索 + 工作区名);宽度拖拽与折叠由父组件持有状态。
 
-import { useRef, useState, type DragEvent as ReactDragEvent, type MouseEvent as ReactMouseEvent, type PointerEvent } from "react";
-import type { TreeEntry } from "@shared/ipc";
+import { useEffect, useRef, useState, type CSSProperties, type DragEvent as ReactDragEvent, type MouseEvent as ReactMouseEvent, type PointerEvent } from "react";
+import type { TreeEntry, WorkspaceSearchFileHit } from "@shared/ipc";
 import { FileTree } from "./FileTree";
 import { OutlinePanel } from "./OutlinePanel";
 import type { OutlineItem } from "../editor/outline";
 
 export interface SidebarProps {
   workspaceName: string;
+  workspaceRoot: string;
   tree: TreeEntry[] | null;
   expanded: ReadonlySet<string>;
   activeRel: string | null;
@@ -22,8 +23,8 @@ export interface SidebarProps {
   onEmptyContext?: (e: ReactMouseEvent) => void;
   onDragStartEntry?: (e: ReactDragEvent, entry: TreeEntry) => void;
   onDropEntry?: (e: ReactDragEvent, entry: TreeEntry) => void;
-  /** 树顶搜索框点击(14:唤起当前文件查找面板)。 */
-  onSearchBoxClick?: () => void;
+  /** 内容命中打开并定位(反馈轮 01:侧边栏知识库搜索与顶部条共用跳转)。 */
+  onOpenWorkspaceHit?: (absPath: string, query: string) => void;
   /** 大纲面板数据(03):标题列表与滚动跟随高亮。 */
   outlineItems: OutlineItem[];
   outlineActivePos: number | null;
@@ -37,6 +38,7 @@ const MAX_WIDTH = 480;
 
 export function Sidebar({
   workspaceName,
+  workspaceRoot,
   tree,
   expanded,
   activeRel,
@@ -49,7 +51,7 @@ export function Sidebar({
   onEmptyContext,
   onDragStartEntry,
   onDropEntry,
-  onSearchBoxClick,
+  onOpenWorkspaceHit,
   outlineItems,
   outlineActivePos,
   outlineDisabled,
@@ -58,6 +60,44 @@ export function Sidebar({
   const dragState = useRef<{ startX: number; startW: number } | null>(null);
   /** 文件/大纲双 tab(03):tab 态为界面局部态,宽度记忆两 tab 共享。 */
   const [tab, setTab] = useState<"files" | "outline">("files");
+  /** 知识库搜索(反馈轮 01):就地输入;文件名匹配 + 内容命中。 */
+  const [searchQuery, setSearchQuery] = useState("");
+  const [searchFocus, setSearchFocus] = useState(false);
+  const [searching, setSearching] = useState(false);
+  const [fileHits, setFileHits] = useState<TreeEntry[]>([]);
+  const [wsHits, setWsHits] = useState<WorkspaceSearchFileHit[]>([]);
+
+  // 搜索:防抖 180ms——文件名匹配(客户端树遍历)+ 内容命中(searchWorkspace IPC)
+  useEffect(() => {
+    const q = searchQuery.trim();
+    if (!q) {
+      setFileHits([]);
+      setWsHits([]);
+      setSearching(false);
+      return;
+    }
+    const timer = setTimeout(() => {
+      // 文件名匹配:递归收集 md 文件,relPath/name 含查询(忽略大小写),前 20
+      const hits: TreeEntry[] = [];
+      const walk = (entries: TreeEntry[]): void => {
+        for (const e of entries) {
+          if (e.kind === "dir" && e.children) walk(e.children);
+          else if (e.kind === "md" && (e.relPath.toLowerCase().includes(q.toLowerCase()) || e.name.toLowerCase().includes(q.toLowerCase()))) {
+            hits.push(e);
+            if (hits.length >= 20) return;
+          }
+        }
+      };
+      if (tree) walk(tree);
+      setFileHits(hits);
+      setSearching(true);
+      void window.confidant.searchWorkspace(workspaceRoot, q).then((res) => {
+        setWsHits(res.ok ? res.value : []);
+        setSearching(false);
+      });
+    }, 180);
+    return () => clearTimeout(timer);
+  }, [searchQuery, tree, workspaceRoot]);
 
   const onPointerDown = (e: PointerEvent<HTMLDivElement>): void => {
     dragState.current = { startX: e.clientX, startW: width };
@@ -140,13 +180,25 @@ export function Sidebar({
       </div>
       {tab === "files" ? (
         <>
-          {/* 搜索框位:14/15 激活;本票仅占位 */}
+          {/* 搜索框(反馈轮 01):就地输入——文件名匹配 + 内容命中(知识库文件搜索);
+              Ctrl+F 顶部条当前文件查找保持独立 */}
           <div style={{ padding: "0 8px 6px" }}>
             <input
-              data-testid="tree-search-placeholder"
-              readOnly
-              placeholder="搜索笔记…"
-              onClick={onSearchBoxClick}
+              data-testid="tree-search-input"
+              placeholder="搜索知识库…"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              onFocus={() => setSearchFocus(true)}
+              onBlur={() => {
+                // 延迟收起,允许点击命中项
+                setTimeout(() => setSearchFocus(false), 150);
+              }}
+              onKeyDown={(e) => {
+                if (e.key === "Escape") {
+                  setSearchQuery("");
+                  setSearchFocus(false);
+                }
+              }}
               style={{
                 width: "100%",
                 boxSizing: "border-box",
@@ -157,6 +209,7 @@ export function Sidebar({
                 background: "transparent",
                 color: "inherit",
                 cursor: "text",
+                outline: "none",
               }}
             />
           </div>
@@ -170,7 +223,17 @@ export function Sidebar({
               }
             }}
           >
-            {tree ? (
+            {searchFocus || searchQuery.trim() !== "" ? (
+              <SidebarSearchResults
+                tree={tree}
+                query={searchQuery}
+                searching={searching}
+                fileHits={fileHits}
+                wsHits={wsHits}
+                onOpenFile={onOpenFile}
+                onOpenWorkspaceHit={onOpenWorkspaceHit}
+              />
+            ) : tree ? (
               <FileTree
                 tree={tree}
                 expanded={expanded}
@@ -259,3 +322,94 @@ export function SidebarEmpty({ width }: { width: number }) {
     </div>
   );
 }
+
+/** 知识库搜索命中列表(反馈轮 01):文件名匹配段 + 内容命中段。 */
+function SidebarSearchResults({
+  tree,
+  query,
+  searching,
+  fileHits,
+  wsHits,
+  onOpenFile,
+  onOpenWorkspaceHit,
+}: {
+  tree: TreeEntry[] | null;
+  query: string;
+  searching: boolean;
+  fileHits: TreeEntry[];
+  wsHits: WorkspaceSearchFileHit[];
+  onOpenFile: (relPath: string) => void;
+  onOpenWorkspaceHit?: (absPath: string, query: string) => void;
+}) {
+  const q = query.trim();
+  const wsCount = wsHits.reduce((n, f) => n + f.lines.length, 0);
+  const empty = q !== "" && fileHits.length === 0 && wsCount === 0 && !searching;
+  return (
+    <div data-testid="sidebar-search-results" style={{ padding: "4px 0 8px" }}>
+      {q === "" && (
+        <div style={{ padding: "8px 10px", color: "var(--muted)", fontSize: 12.5 }}>
+          输入关键词搜索知识库(文件名与内容)
+        </div>
+      )}
+      {searching && <div style={{ padding: "8px 10px", color: "var(--muted)", fontSize: 12.5 }}>搜索中…</div>}
+      {empty && <div style={{ padding: "8px 10px", color: "var(--muted)", fontSize: 12.5 }}>无结果</div>}
+      {fileHits.length > 0 && (
+        <>
+          <div style={{ padding: "2px 10px", fontSize: 11.5, color: "var(--muted)", fontWeight: 600 }}>
+            文件名匹配
+          </div>
+          {fileHits.map((e) => (
+            <button
+              key={e.relPath}
+              type="button"
+              data-testid="sidebar-file-hit"
+              onMouseDown={(ev) => ev.preventDefault()}
+              onClick={() => onOpenFile(e.relPath)}
+              style={searchRowStyle}
+            >
+              {e.name.replace(/\.md$/i, "")}
+            </button>
+          ))}
+        </>
+      )}
+      {wsHits.length > 0 && (
+        <>
+          <div style={{ padding: "2px 10px", fontSize: 11.5, color: "var(--muted)", fontWeight: 600 }}>
+            内容命中
+          </div>
+          {wsHits.map((f) => (
+            <button
+              key={f.path}
+              type="button"
+              data-testid="sidebar-ws-hit"
+              onMouseDown={(ev) => ev.preventDefault()}
+              onClick={() => onOpenWorkspaceHit?.(f.path, q)}
+              style={searchRowStyle}
+            >
+              <span style={{ color: "var(--muted)", fontWeight: 600 }}>{f.name}</span>
+              <span style={{ color: "var(--quote-fg)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                {f.lines[0]?.text.slice(0, 40) ?? ""}
+              </span>
+            </button>
+          ))}
+        </>
+      )}
+      {tree === null && q !== "" && <div style={{ padding: "8px 10px", color: "var(--muted)", fontSize: 12.5 }}>正在扫描…</div>}
+    </div>
+  );
+}
+
+const searchRowStyle: CSSProperties = {
+  display: "flex",
+  flexDirection: "column",
+  alignItems: "flex-start",
+  gap: 1,
+  width: "100%",
+  textAlign: "left",
+  border: "none",
+  background: "transparent",
+  color: "inherit",
+  padding: "3px 10px",
+  fontSize: 12.5,
+  cursor: "pointer",
+};

@@ -1,16 +1,16 @@
-// 编辑器设置(28):代码块自动换行/行号开关,持久化到 state("editorSettings")。
-// 默认均开(28 裁决);勾选即时生效 + 防抖落盘(与侧栏布局同模式)。
+// 编辑器设置(28 → 反馈轮 01):代码块自动换行(默认关——默认不换行横向滚动,
+// 与 Typora 一致,行号对齐)/行号开关(默认开),持久化到 state("editorSettings")。
 
 import { useCallback, useEffect, useState } from "react";
 
 export interface EditorSettings {
-  /** 代码块自动换行(关 = 横向滚动)。 */
+  /** 代码块自动换行(关 = 横向滚动;反馈轮 01 默认关)。 */
   codeWrap: boolean;
   /** 代码块显示行号。 */
   codeLineNumbers: boolean;
 }
 
-const DEFAULT_SETTINGS: EditorSettings = { codeWrap: true, codeLineNumbers: true };
+const DEFAULT_SETTINGS: EditorSettings = { codeWrap: false, codeLineNumbers: true };
 
 export function useEditorSettings(): {
   settings: EditorSettings;

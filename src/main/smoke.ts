@@ -487,31 +487,27 @@ export async function runWorkspaceSelfCheck(win: BrowserWindow, wsDir: string, e
       t.h1Weight === "700" || `h1 weight ${t.h1Weight} (expect 700)`,
       (h1BorderPx >= 0.5 && h1BorderPx <= 1.5) || `h1 border ${t.h1Border} (expect ~1px)`,
       t.pMargin === "12.8px" || `p margin ${t.pMargin} (expect 12.8px = 0.8em)`,
-      t.width <= 860 || `prose width ${t.width} (expect <=860)`,
+      t.width <= 900 || `prose width ${t.width} (expect <=900 = 72vw@1200)`, // 反馈轮 01:72vw
     ];
     const firstTypoBad = typoChecks.find((c) => typeof c === "string");
     if (firstTypoBad) return fail(`typography probe: ${firstTypoBad} (${typo})`);
     console.log(`[smoke] typography probe ok (h1 36px/bold/border, p 0.8em, width ${t.width}px)`);
 
-    // 02:宽度分级探针(视口 ≥1400 → 1024px;≥1800 → 1200px;侧栏 260px 让位)
-    for (const [w, expect] of [
-      [1500, 1024],
-      [1900, 1200],
-    ] as const) {
+    // 反馈轮 01:内容区宽度 = 视口 72% 百分比自适应(72vw 相对整个视口,上限 1400px)
+    // 期望按实际 innerWidth 动态计算(窗口边框使 innerWidth 略小于 setSize)
+    for (const w of [1200, 1500, 1900]) {
       win.setSize(w, 800);
       await delay(500);
+      const vw = await js<number>(`window.innerWidth`);
+      const expect = Math.min(0.72 * vw, vw - 32, 1400);
       const pw = await js<number>(
         `document.querySelector(".editor-prose").getBoundingClientRect().width`,
       );
-      if (Math.abs(pw - expect) > 2) return fail(`width tier ${w}px: got ${pw} expect ${expect}`);
+      if (Math.abs(pw - expect) > 3) return fail(`width vw ${w}px: got ${pw} expect ${expect}`);
     }
     win.setSize(1200, 800);
     await delay(500);
-    const pwBack = await js<number>(
-      `document.querySelector(".editor-prose").getBoundingClientRect().width`,
-    );
-    if (Math.abs(pwBack - 860) > 2) return fail(`width tier 1200px: got ${pwBack} expect 860`);
-    console.log("[smoke] width tiers ok (860/1024/1200)");
+    console.log("[smoke] width vw probe ok (72vw × innerWidth, cap 1400)");
 
     // 02:字体资产落地(Open Sans 随 UI 文本已用;PT Serif 需主动 load 触发)
     const fontsOk = await poll(async () => {
@@ -953,6 +949,9 @@ export async function runWorkspaceSelfCheck(win: BrowserWindow, wsDir: string, e
       sel?.addRange(range);
       document.dispatchEvent(new Event("selectionchange"));
     })()`);
+    // PM 经 selectionchange 异步同步内部选区:留出同步窗口再发菜单命令
+    // (否则 applyLinkEdit 读不到链接上下文,退化为在末尾插新链接,反馈轮 01 修)
+    await delay(120);
     win.webContents.send(IPC.menuCommand, "link");
     const panelEdit = await poll(() => js<boolean>(q("[data-testid='link-text-input']")));
     if (!panelEdit) return fail("link panel not in edit mode on link caret");
@@ -1275,19 +1274,33 @@ export async function runWorkspaceSelfCheck(win: BrowserWindow, wsDir: string, e
     if (!codeOpen) return fail("code.md not opened");
     const hlOk = await poll(() => js<boolean>(q(".editor-prose pre code .hljs-keyword")));
     if (!hlOk) return fail("code highlight classes missing");
-    // 02:语言标签 widget(js → pre 内 .code-lang 文本)
-    const langTag = await poll(() =>
-      js<boolean>(`document.querySelector(".editor-prose pre .code-lang")?.textContent === "js"`),
+    // 反馈轮 01:代码块默认不换行(data-code-wrap=off)+ 行号与代码文本同字号
+    // (0.9em 嵌套导致的逐行错位根因已修)
+    const wrapDefault = await poll(() =>
+      js<boolean>(`document.querySelector("[data-testid='editor-prose']")?.dataset.codeWrap === "off"`),
     );
-    if (!langTag) {
+    if (!wrapDefault) {
       const diag = await js<string>(
-        `JSON.stringify({
-          preCount: document.querySelectorAll(".editor-prose pre").length,
-          langTags: [...document.querySelectorAll(".editor-prose pre .code-lang")].map((p) => p.textContent),
-          hasHost: !!document.querySelector("[data-testid='editor-prose']"),
-        })`,
+        `(async () => JSON.stringify({
+          wrap: document.querySelector("[data-testid='editor-prose']")?.dataset.codeWrap ?? null,
+          settings: await window.confidant.stateGet("editorSettings"),
+        }))()`,
       );
-      return fail(`code block language label missing; diag=${diag}`);
+      return fail(`code block not wrap-off by default (反馈轮 01); diag=${diag}`);
+    }
+    const lnAlign = await js<{ ln: string; code: string }>(
+      `(() => {
+        const pre = document.querySelector(".editor-prose pre");
+        const ln = pre.querySelector(".code-linenums .code-ln");
+        const code = pre.querySelector("code");
+        return {
+          ln: ln ? getComputedStyle(ln).fontSize : "none",
+          code: getComputedStyle(code).fontSize,
+        };
+      })()`,
+    );
+    if (lnAlign.ln !== lnAlign.code) {
+      return fail(`line number font mismatch: ${JSON.stringify(lnAlign)}`);
     }
     const lnOk = await poll(async () => {
       const t = await js<string>(
@@ -1322,7 +1335,9 @@ export async function runWorkspaceSelfCheck(win: BrowserWindow, wsDir: string, e
       js<boolean>(`document.querySelector("[data-testid='editor-prose']")?.dataset.codeWrap === "on"`),
     );
     if (!wrapOn) return fail("code wrap setting did not restore (data attr)");
-    // 复制按钮:真实鼠标移动到代码块 → 按钮浮现 → 点击复制 → 剪贴板为纯源码(不含行号)
+    // 复制按钮:真实鼠标移动到代码块 → 按钮浮现 → 点击复制 → 剪贴板为纯源码(不含行号)。
+    // 先清剪贴板,防上一次运行的残留值误判(反馈轮 01 修)
+    clipboard.clear();
     const codeRect = await js<{ x: number; y: number } | null>(
       `(() => {
         const pre = document.querySelector(".editor-prose pre");
@@ -1350,7 +1365,32 @@ export async function runWorkspaceSelfCheck(win: BrowserWindow, wsDir: string, e
       return t === "const x = 1;" ? t : null;
     }, 5000);
     if (clipText !== "const x = 1;") return fail(`copy clipboard wrong: ${JSON.stringify(clipText)}`);
-    console.log("[smoke] code block view ok (highlight/line-numbers/copy)");
+    // 反馈轮 01:语言标签浮层——悬停浮现(左上)→ 点击弹语言选择 → 过滤选
+    // typescript → 磁盘 ```typescript(切换进历史、自动保存)
+    const langBtn = await poll(() => js<boolean>(q("[data-testid='code-lang-btn']")));
+    if (!langBtn) return fail("code lang button not shown on hover");
+    const langBtnText = await js<string>(
+      `document.querySelector("[data-testid='code-lang-btn']")?.textContent ?? ""`,
+    );
+    if (langBtnText !== "js") return fail(`code lang button text wrong: ${langBtnText}`);
+    await js<void>(`document.querySelector("[data-testid='code-lang-btn']").click()`);
+    const pickerShown = await poll(() => js<boolean>(q("[data-testid='lang-select']")));
+    if (!pickerShown) return fail("lang select not shown");
+    await js<void>(`(() => {
+      const input = document.querySelector("[data-testid='lang-select-input']");
+      const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, "value")?.set;
+      setter?.call(input, "typescript");
+      input.dispatchEvent(new Event("input", { bubbles: true }));
+    })()`);
+    const langTs = await poll(() => js<boolean>(q("[data-testid='lang-option-typescript']")));
+    if (!langTs) return fail("typescript option not filtered in lang select");
+    await js<void>(`document.querySelector("[data-testid='lang-option-typescript']").click()`);
+    const langSaved = await poll(async () => {
+      const content = await readFile(codeDoc, "utf8");
+      return content.includes("```typescript") ? true : null;
+    });
+    if (!langSaved) return fail("language switch not persisted to disk");
+    console.log("[smoke] code block view ok (highlight/line-numbers/copy/lang-overlay-switch)");
 
     // 6.4b) 大纲面板(03):双 tab → 空态(code.md 无标题)→ 多标题文档渲染 →
     //       点击跳转(光标置入标题)→ 滚动跟随 → 折叠 → 源码模式禁用
@@ -1462,6 +1502,58 @@ export async function runWorkspaceSelfCheck(win: BrowserWindow, wsDir: string, e
     // 回到文件 tab(后续探针依赖树 DOM)
     await js<void>(`document.querySelector("[data-testid='sidebar-tab-files']").click()`);
     console.log("[smoke] outline panel ok (tabs/empty/jump/scroll-follow/collapse/source-disable)");
+
+    // 反馈轮 01:侧边栏就地搜索——点击搜索框就地输入(不弹顶部条)→ 文件名匹配
+    // → 内容命中 → 点击打开并高亮;Ctrl+F 顶部条当前文件查找保持独立
+    const sidebarInput = await poll(() => js<boolean>(q("[data-testid='tree-search-input']")));
+    if (!sidebarInput) return fail("sidebar search input missing");
+    await js<void>(`(() => {
+      const input = document.querySelector("[data-testid='tree-search-input']");
+      input.focus();
+      const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, "value")?.set;
+      setter?.call(input, "外部新增");
+      input.dispatchEvent(new Event("input", { bubbles: true }));
+    })()`);
+    const fileHit = await poll(() => js<boolean>(q("[data-testid='sidebar-file-hit']")));
+    if (!fileHit) return fail("sidebar search file-name hit missing");
+    const fileHitName = await js<string>(
+      `document.querySelector("[data-testid='sidebar-file-hit']")?.textContent ?? ""`,
+    );
+    if (!fileHitName.includes("外部新增")) return fail(`file hit wrong: ${fileHitName}`);
+    await js<void>(`document.querySelector("[data-testid='sidebar-file-hit']").click()`);
+    const fileHitOpened = await poll(async () => {
+      const title = await js<string>("document.title");
+      return title.startsWith("外部新增-") ? true : null;
+    });
+    if (!fileHitOpened) return fail("sidebar file hit did not open file");
+    // 内容命中:输入正文词 → 命中行 → 点击打开并高亮首个命中
+    await js<void>(`(() => {
+      const input = document.querySelector("[data-testid='tree-search-input']");
+      input.focus();
+      const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, "value")?.set;
+      setter?.call(input, "外部新增标记");
+      input.dispatchEvent(new Event("input", { bubbles: true }));
+    })()`);
+    const wsHit = await poll(() => js<boolean>(q("[data-testid='sidebar-ws-hit']")), 10000);
+    if (!wsHit) return fail("sidebar search content hit missing");
+    await js<void>(`document.querySelector("[data-testid='sidebar-ws-hit']").click()`);
+    const wsHitOpened = await poll(async () => {
+      const title = await js<string>("document.title");
+      return title.startsWith("外部新增-") ? true : null;
+    });
+    if (!wsHitOpened) return fail("sidebar content hit did not open file");
+    const wsHitHl = await poll(() => js<boolean>(q(".search-hit-active")));
+    if (!wsHitHl) return fail("sidebar content hit highlight missing");
+    // Esc 清空收起;Ctrl+F 顶部条仍弹
+    await js<void>(`(() => {
+      const input = document.querySelector("[data-testid='tree-search-input']");
+      input.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true, cancelable: true }));
+    })()`);
+    win.webContents.send(IPC.menuCommand, "find");
+    const topbarStill = await poll(() => js<boolean>(q("[data-testid='search-panel']")));
+    if (!topbarStill) return fail("Ctrl+F topbar find broken by sidebar search");
+    await js<void>(`document.querySelector("[data-testid='search-panel'] [aria-label='关闭查找']").click()`);
+    console.log("[smoke] sidebar search ok (in-place/file-name-hits/content-hits/topbar-independent)");
 
     await delay(800);
     // 回到 a.md 作为「外部删除」测试对象

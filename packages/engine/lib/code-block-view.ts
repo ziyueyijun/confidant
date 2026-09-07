@@ -99,23 +99,6 @@ function getDecorations(doc: Parameters<typeof DecorationSet.create>[0], opts: C
         ),
       );
     }
-    // 语言标签(02):widget 装饰于文本起点,绝对定位左上(纯视图态,同行号机制)。
-    // 经装饰而非属性写 DOM——直接改 contenteditable 内属性会被 PM 观察器
-    // 当外部变更重渲染抹掉(渲染层方案实测失败,记录于票 02 Answer)。
-    if (language !== null && language !== "") {
-      decorations.push(
-        Decoration.widget(
-          pos + 1,
-          () => {
-            const el = document.createElement("span");
-            el.className = "code-lang";
-            el.textContent = language;
-            return el;
-          },
-          { side: -1 },
-        ),
-      );
-    }
     return true;
   });
   return DecorationSet.create(doc, decorations);

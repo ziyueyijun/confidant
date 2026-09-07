@@ -20,7 +20,7 @@ import { LinkPanel } from "./components/LinkPanel";
 import { TextPrompt } from "./components/TextPrompt";
 import { SearchPanel } from "./components/SearchPanel";
 import { Welcome } from "./components/Welcome";
-import { CodeBlockActions } from "./components/CodeBlockActions";
+import { CodeBlockOverlay } from "./components/CodeBlockOverlay";
 import { ChangeNoticeToast, DocMissingBanner } from "./components/OverlayBanners";
 import { Footer } from "./components/Footer";
 import { FormatToolbar } from "./components/FormatToolbar";
@@ -580,11 +580,18 @@ export default function App() {
               outlineActivePos={outline.activePos}
               outlineDisabled={sourceMode}
               onOutlineJump={jumpToOutline}
-              onSearchBoxClick={() => {
-                if (!docRef.current) return;
-                setFindScope("file");
-                setFindOpen(true);
-                setFindFocus((f) => f + 1);
+              workspaceRoot={workspace.root}
+              onOpenWorkspaceHit={(absPath, q) => {
+                // 反馈轮 01:侧边栏内容命中打开并定位(不经顶部条面板,直接高亮首个命中)
+                void (async () => {
+                  await openPath(absPath);
+                  const ed = engineRef.current;
+                  const found = ed?.findInDoc(q) ?? [];
+                  if (ed && found.length > 0) {
+                    ed.setSearchHighlights(found, 0);
+                    ed.revealRange(found[0]!.from, found[0]!.to);
+                  }
+                })();
               }}
             />
           ) : (
@@ -633,7 +640,7 @@ export default function App() {
       {/* 链接面板(29):格式 → 链接 / Ctrl+K;原浮动工具条已移除 */}
       <LinkPanel engine={engine} openLinkRequest={linkRequest} />
       {/* 代码块复制按钮(28):悬停编辑区代码块时浮现 */}
-      <CodeBlockActions />
+      <CodeBlockOverlay engine={engine} />
       {/* 查找面板(14/15) */}
       {findOpen && doc && (
         <SearchPanel

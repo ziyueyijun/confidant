@@ -26,8 +26,9 @@ describe("Engine.getDoc() 渲染层 seam(02/03)", () => {
         return true;
       });
       expect(langs).toEqual(["js"]);
-      // 语言标签 widget 已渲染(纯视图装饰)
-      expect(host.querySelector(".code-lang")?.textContent).toBe("js");
+      // 语言标签浮层数据源可用(反馈轮 01:widget 已移除,渲染层浮层经 getDoc 提取)
+      expect(host.querySelector(".code-lang")).toBeNull();
+      expect(host.querySelector(".hljs-keyword")).not.toBeNull();
     } finally {
       engine.destroy();
       host.remove();

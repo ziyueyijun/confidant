@@ -265,9 +265,9 @@ body {
 }
 
 .editor-prose {
-  /* 02:宽度分级限宽(基线 §2.2)——860px 起步,≥1400px 视口 1024px、
-     ≥1800px 视口 1200px;窄窗两侧 ≥16px 留白 */
-  max-width: min(860px, 100% - 32px);
+  /* 反馈轮 01:宽度 = 视口 72% 百分比自适应(上限 1400px;窄窗两侧 ≥16px 留白),
+     替代 860/1024/1200 分级限宽(用户实测大屏左右余白浪费) */
+  max-width: min(72vw, 1400px, 100% - 32px);
   margin: 0 auto;
   padding: 32px 0 40vh; /* 左右留白由 max-width 承担,内部不再设 padding */
   font-size: 16px;
@@ -276,16 +276,6 @@ body {
   word-break: break-word;
   outline: none;
   transition: padding-top 0.4s ease-out; /* 06:打字机模式平滑过渡 */
-}
-@media (min-width: 1400px) {
-  .editor-prose {
-    max-width: min(1024px, 100% - 32px);
-  }
-}
-@media (min-width: 1800px) {
-  .editor-prose {
-    max-width: min(1200px, 100% - 32px);
-  }
 }
 
 /* 06:打字机模式——内容容器 padding-top 50%(光标行推至视口垂直中点,基线 §5.2);
@@ -365,20 +355,21 @@ body {
 }
 .editor-prose code {
   font-family: var(--font-code);
-  font-size: 0.9em;
+  font-size: 0.9em; /* 行内代码(反馈轮 01:代码块内由 pre code 规则还原为 inherit) */
   background: var(--code-bg);
   border-radius: 3px;
   padding: 0.1em 0.35em;
 }
-/* 代码块(28/02):默认自动换行;圆角 3px、字号 0.9em(基线 §5.3);
+/* 代码块(28/02 + 反馈轮 01):默认不换行(横向滚动,与 Typora 一致——折行会使
+   行号与视觉行错位);圆角 3px、字号 0.9em;「代码块自动换行」设置开启时改 pre-wrap。
    行号列由 data-code-lines 与 .code-linenums 联动 */
 .editor-prose pre {
-  position: relative; /* 行号列与语言标签定位锚 */
+  position: relative; /* 行号列定位锚 */
   background: var(--block-bg);
   border: 1px solid var(--block-border);
   border-radius: 3px;
   padding: 12px 14px;
-  white-space: pre-wrap; /* 28:默认换行;关闭时(设置)改横向滚动 */
+  white-space: pre; /* 反馈轮 01:默认不换行 */
   overflow-x: auto;
   font-family: var(--font-code);
   font-size: 0.9em;
@@ -404,20 +395,6 @@ body {
   font: inherit;
   line-height: inherit;
 }
-/* 代码块语言标签(02):widget 装饰(纯视图态,与行号同机制),砖红小字左上
-   (票 04 裁决;基线 .md-lang #b4654d 系);行号开启时让位到行号列右侧 */
-.editor-prose pre .code-lang {
-  position: absolute;
-  top: 6px;
-  left: 14px;
-  font-size: 0.78em;
-  color: var(--lang-tag);
-  pointer-events: none;
-  user-select: none;
-}
-.editor-prose[data-code-lines="on"] pre .code-lang {
-  left: 3.4em;
-}
 /* 行号每行块级 span:单列渲染不依赖 white-space(修复「行号折成两列」) */
 .editor-prose .code-linenums .code-ln {
   display: block;
@@ -425,6 +402,9 @@ body {
 }
 .editor-prose[data-code-wrap="off"] pre {
   white-space: pre;
+}
+.editor-prose[data-code-wrap="on"] pre {
+  white-space: pre-wrap; /* 反馈轮 01:设置开启才换行(默认关) */
 }
 /* 代码高亮主题(28):hljs token 常用子集,跟随深浅色变量 */
 .editor-prose .hljs-comment,
@@ -479,6 +459,10 @@ body {
 .editor-prose pre code {
   background: transparent;
   padding: 0;
+  /* 反馈轮 01:行号对齐修复——pre 内 code 不再嵌套缩小 0.9em×0.9em,
+     与行号列(font: inherit)同字号同行高,逐行不错位 */
+  font-size: inherit;
+  font-family: inherit;
 }
 /* 列表标记(26):preflight 将 ol/ul list-style 归零,这里恢复;嵌套层级随深度换符号 */
 .editor-prose ul {
@@ -566,12 +550,12 @@ body {
   accent-color: currentColor;
 }
 
-/* 源码模式(30):全文件原始 Markdown 文本区,与 WYSIWYG 同宽约束(02 分级) */
+/* 源码模式(30):全文件原始 Markdown 文本区,与 WYSIWYG 同宽策略(反馈轮 01:72vw) */
 .source-editor {
   flex: 1;
   min-height: 0;
   width: 100%;
-  max-width: min(860px, 100% - 32px);
+  max-width: min(72vw, 1400px, 100% - 32px);
   margin: 0 auto;
   padding: 24px;
   box-sizing: border-box;
@@ -586,16 +570,6 @@ body {
   white-space: pre;
   overflow: auto;
 }
-@media (min-width: 1400px) {
-  .source-editor {
-    max-width: min(1024px, 100% - 32px);
-  }
-}
-@media (min-width: 1800px) {
-  .source-editor {
-    max-width: min(1200px, 100% - 32px);
-  }
-}
 
 /* 查找高亮(14):临时视图态,不落盘;颜色吃主题变量(05:琥珀 + 当前项黑底白字) */
 .search-hit {
@@ -608,20 +582,10 @@ body {
   color: var(--search-hit-active-fg);
 }
 .fm-block {
-  /* 02:与编辑区同宽分级(留白观感连续) */
-  max-width: min(860px, 100% - 32px);
+  /* 反馈轮 01:与编辑区同宽策略(72vw,上限 1400px) */
+  max-width: min(72vw, 1400px, 100% - 32px);
   margin: 0 auto;
   padding: 12px 0 0;
-}
-@media (min-width: 1400px) {
-  .fm-block {
-    max-width: min(1024px, 100% - 32px);
-  }
-}
-@media (min-width: 1800px) {
-  .fm-block {
-    max-width: min(1200px, 100% - 32px);
-  }
 }
 .fm-block pre {
   margin: 0;

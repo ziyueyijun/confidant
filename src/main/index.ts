@@ -82,7 +82,9 @@ if (smoke || e2eFile || e2eWs || e2eSeed || e2eRestore) {
     app.setPath("userData", e2eStateDir);
   } else {
     const base = process.env["TEMP"] ?? process.env["TMP"] ?? "C:/Windows/Temp";
-    app.setPath("userData", join(base, "confidant-e2e-state", `run-${process.pid}`));
+    // 反馈轮 01:目录名带时间戳——Windows pid 复用会让新 run 读到旧 run 残留
+    // 的持久化状态(如旧默认 editorSettings),造成 smoke 偶发误判
+    app.setPath("userData", join(base, "confidant-e2e-state", `run-${process.pid}-${Date.now()}`));
   }
 }
 

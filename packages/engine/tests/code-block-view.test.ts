@@ -93,3 +93,42 @@ describe("代码块往返不回归(28)", () => {
     e2.destroy();
   });
 });
+
+describe("代码块语言切换(反馈轮 01)", () => {
+  it("setCodeBlockLanguageAt 改语言 → 序列化 ``` 标记与高亮随之变化", () => {
+    const md = "```js\nconst x = 1;\n```\n";
+    const { engine, host } = makeEngine(md);
+    const pre = host.querySelector("pre") as HTMLElement;
+    expect(engine.supportedLanguages().length).toBeGreaterThan(30);
+    expect(engine.supportedLanguages()).toContain("typescript");
+    // 别名手输可用:registered 按别名判定高亮,序列化保留别名写法
+    expect(engine.setCodeBlockLanguageAt(pre, "ts")).toBe(true);
+    expect(engine.getMarkdown()).toBe("```ts\nconst x = 1;\n```\n");
+    engine.destroy();
+  });
+
+  it("空串移除语言(无语言不高亮、序列化 ``` 不带语言)", () => {
+    const { engine, host } = makeEngine("```js\nconst x = 1;\n```\n");
+    const pre = host.querySelector("pre") as HTMLElement;
+    expect(engine.setCodeBlockLanguageAt(pre, "")).toBe(true);
+    expect(engine.getMarkdown()).toBe("```\nconst x = 1;\n```\n");
+    expect(host.querySelector(".hljs-keyword")).toBeNull();
+    engine.destroy();
+  });
+
+  it("非代码块元素返回 false", () => {
+    const { engine, host } = makeEngine("# 标题\n");
+    expect(engine.setCodeBlockLanguageAt(host.querySelector("h1")!, "ts")).toBe(false);
+    engine.destroy();
+  });
+
+  it("切换语言进撤销历史(undo 还原 ```js)", () => {
+    const { engine, host } = makeEngine("```js\nconst x = 1;\n```\n");
+    const pre = host.querySelector("pre") as HTMLElement;
+    engine.setCodeBlockLanguageAt(pre, "ts");
+    expect(engine.getMarkdown()).toContain("```ts");
+    engine.undo();
+    expect(engine.getMarkdown()).toBe("```js\nconst x = 1;\n```\n");
+    engine.destroy();
+  });
+});
