@@ -30,6 +30,9 @@
 无违规)。
 
 - **搜索输入框上边距**:12px → 16px(Sidebar 搜索框 wrapper padding)。
+  **修正(用户复验)**:三值 padding 简写理解错误——`0 8px 16px` 实为上 0 下 16,
+  加在了底边距;改为输入框自身 `margin-top: 16px`(上外边距),wrapper 恢复
+  `0 8px 6px`(下方 6px 原样)。
 - **下拉浮层宽度自适应**:DropdownSelect 浮层 `width` → `minWidth`(按钮宽),
   选项行 `white-space: nowrap`——「整个工作区」「标题 1」各独占一行,
   不再按按钮宽折行截断;查找条作用域与工具栏标题两处同修(同一组件)。

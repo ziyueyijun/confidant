@@ -168,7 +168,7 @@ export function Sidebar({
         <>
           {/* 搜索框(反馈轮 01):就地输入——文件名匹配 + 内容命中(知识库文件搜索);
               Ctrl+F 顶部条当前文件查找保持独立 */}
-          <div style={{ padding: "0 8px 16px" }}>
+          <div style={{ padding: "0 8px 6px" }}>
             <input
               data-testid="tree-search-input"
               placeholder="搜索知识库…"
@@ -188,6 +188,7 @@ export function Sidebar({
               style={{
                 width: "100%",
                 boxSizing: "border-box",
+                marginTop: 16, // 反馈轮 03 修正:输入框与标签栏的上方外边距(此前误加在 wrapper 底边距)
                 padding: "4px 8px",
                 fontSize: 12.5,
                 borderRadius: 6,
