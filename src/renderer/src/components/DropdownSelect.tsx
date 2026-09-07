@@ -110,7 +110,7 @@ export function DropdownSelect({
             left: anchor.left,
             top: direction === "down" ? anchor.top : undefined,
             bottom: direction === "up" ? anchor.bottom : undefined,
-            width: anchor.width,
+            minWidth: anchor.width, // 反馈轮 03:宽度随内容自适应,不再按按钮宽截断折行
             zIndex: 80,
             background: "var(--surface)",
             border: "1px solid var(--border)",
@@ -147,6 +147,7 @@ export function DropdownSelect({
                 color: "inherit",
                 cursor: o.disabled ? "default" : "pointer",
                 opacity: o.disabled ? 0.45 : 1,
+                whiteSpace: "nowrap", // 反馈轮 03:选项独占一行不换行
               }}
             >
               {o.label}

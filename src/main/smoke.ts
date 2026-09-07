@@ -1339,19 +1339,9 @@ export async function runWorkspaceSelfCheck(win: BrowserWindow, wsDir: string, e
       js<boolean>(`document.querySelector("[data-testid='editor-prose']")?.dataset.codeWrap === "on"`),
     );
     if (!wrapOn) return fail("code wrap setting did not restore (data attr)");
-    // 复制按钮:真实鼠标移动到代码块 → 按钮浮现 → 点击复制 → 剪贴板为纯源码(不含行号)。
-    // 先清剪贴板,防上一次运行的残留值误判(反馈轮 01 修)
+    // 复制按钮(反馈轮 03 常驻):工具区按钮直接存在(不再悬停模拟)→ 点击复制 →
+    // 剪贴板为纯源码(不含行号)。先清剪贴板,防上一次运行的残留值误判(反馈轮 01 修)
     clipboard.clear();
-    const codeRect = await js<{ x: number; y: number } | null>(
-      `(() => {
-        const pre = document.querySelector(".editor-prose pre");
-        const r = pre ? pre.getBoundingClientRect() : null;
-        if (!r || r.width === 0) return null;
-        return { x: r.left + r.width / 2, y: r.top + r.height / 2 };
-      })()`,
-    );
-    if (!codeRect) return fail("code block rect missing");
-    win.webContents.sendInputEvent({ type: "mouseMove", x: codeRect.x, y: codeRect.y });
     const copyBtn = await poll(() => js<boolean>(q("[data-testid='code-copy-btn']")), 5000);
     if (!copyBtn) {
       const diag = await js<string>(
@@ -1361,7 +1351,7 @@ export async function runWorkspaceSelfCheck(win: BrowserWindow, wsDir: string, e
           scroll: !!document.querySelector("[data-testid='editor-scroll']"),
         })`,
       );
-      return fail(`copy button not shown on code block hover; diag=${diag}`);
+      return fail(`copy button not shown (常驻工具区); diag=${diag}`);
     }
     await js<void>(`document.querySelector("[data-testid='code-copy-btn']").click()`);
     const clipText = await poll<string>(async () => {
@@ -1369,10 +1359,10 @@ export async function runWorkspaceSelfCheck(win: BrowserWindow, wsDir: string, e
       return t === "const x = 1;" ? t : null;
     }, 5000);
     if (clipText !== "const x = 1;") return fail(`copy clipboard wrong: ${JSON.stringify(clipText)}`);
-    // 反馈轮 01:语言标签浮层——悬停浮现(左上)→ 点击弹语言选择 → 过滤选
+    // 语言标签(反馈轮 03 常驻):左上工具区按钮 → 点击弹语言选择 → 过滤选
     // typescript → 磁盘 ```typescript(切换进历史、自动保存)
     const langBtn = await poll(() => js<boolean>(q("[data-testid='code-lang-btn']")));
-    if (!langBtn) return fail("code lang button not shown on hover");
+    if (!langBtn) return fail("code lang button not shown (常驻工具区)");
     const langBtnText = await js<string>(
       `document.querySelector("[data-testid='code-lang-btn']")?.textContent ?? ""`,
     );

@@ -168,7 +168,7 @@ export function Sidebar({
         <>
           {/* 搜索框(反馈轮 01):就地输入——文件名匹配 + 内容命中(知识库文件搜索);
               Ctrl+F 顶部条当前文件查找保持独立 */}
-          <div style={{ padding: "0 8px 12px" }}>
+          <div style={{ padding: "0 8px 16px" }}>
             <input
               data-testid="tree-search-input"
               placeholder="搜索知识库…"
