@@ -22,6 +22,7 @@ import { SearchPanel } from "./components/SearchPanel";
 import { Welcome } from "./components/Welcome";
 import { CodeBlockActions } from "./components/CodeBlockActions";
 import { ChangeNoticeToast, DocMissingBanner } from "./components/OverlayBanners";
+import { Footer } from "./components/Footer";
 import { EmptyWorkspaceGuidance, NotePickHint } from "./components/EmptyStates";
 import { countMdInTree, relPathOf, wsJoin, type Workspace } from "./workspace/workspace";
 import type { OpenNote } from "./session/types";
@@ -58,6 +59,9 @@ export default function App() {
   /** 源码模式(30):全屏原始 Markdown 文本编辑;文本区为磁盘字节级真相源。 */
   const [sourceMode, setSourceMode] = useState(false);
   const sourceModeRef = useRef(false);
+  /** 视图模式(06 接线完整版:F8/F9/菜单/互斥/CSS 生效;此处为页脚按钮入口的状态)。 */
+  const [focusMode, setFocusMode] = useState(false);
+  const [typewriterMode, setTypewriterMode] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   const sourceSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   /** 查找面板(14/15):打开态、作用域与焦点请求。 */
@@ -676,6 +680,16 @@ export default function App() {
           onCancel={() => setPrompt(null)}
         />
       )}
+      {/* 页脚状态条(04):字数/段落类型/模式按钮(06 接线) */}
+      <Footer
+        engine={engine}
+        tick={uiTick}
+        hasDoc={!!doc}
+        focusMode={focusMode}
+        typewriterMode={typewriterMode}
+        onToggleFocus={() => setFocusMode((v) => !v)}
+        onToggleTypewriter={() => setTypewriterMode((v) => !v)}
+      />
     </div>
   );
 }

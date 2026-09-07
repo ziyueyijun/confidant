@@ -534,6 +534,61 @@ export async function runWorkspaceSelfCheck(win: BrowserWindow, wsDir: string, e
       return fail(`font assets not loaded; diag=${diag}`);
     }
 
+    // 04:页脚字数探针——常驻渲染 → 点击弹四口径 → 切换口径持久化 → 段落类型
+    const wcText = await poll(async () => {
+      const t = await js<string>(
+        `document.querySelector("[data-testid='footer-word-count']")?.textContent ?? ""`,
+      );
+      return t.includes("字数 ") ? t : null;
+    });
+    if (!wcText) return fail("footer word count not rendered");
+    const wcNum = parseInt(wcText.replace(/[^\d]/g, ""), 10);
+    if (!(wcNum > 0)) return fail(`footer word count zero: ${wcText}`);
+    await js<void>(`document.querySelector("[data-testid='footer-word-count']").click()`);
+    const popupShown = await poll(() => js<boolean>(q("[data-testid='word-count-popup']")));
+    if (!popupShown) return fail("word count popup not shown");
+    const metricRows = await js<number>(
+      `document.querySelectorAll("[data-testid^='wc-metric-']").length`,
+    );
+    if (metricRows !== 4) return fail(`word count popup rows: ${metricRows}`);
+    // 段落类型:光标置入 h1 标题 a → footer 显示「标题 1」
+    await js<void>(`(() => {
+      const h = document.querySelector(".editor-prose h1");
+      if (!h) return;
+      const tn = [...h.childNodes].find((n) => n.nodeType === Node.TEXT_NODE);
+      if (!tn) return;
+      const range = document.createRange();
+      range.setStart(tn, 0);
+      range.collapse(true);
+      const sel = window.getSelection();
+      sel?.removeAllRanges();
+      sel?.addRange(range);
+      document.dispatchEvent(new Event("selectionchange"));
+    })()`);
+    const blockTypeShown = await poll(() =>
+      js<boolean>(
+        `document.querySelector("[data-testid='footer-block-type']")?.textContent === "标题 1"`,
+      ),
+    );
+    if (!blockTypeShown) return fail("footer block type not shown for heading");
+    // 切换口径为「字符」→ footer 更新 + 持久化
+    await js<void>(`[...document.querySelectorAll("[data-testid^='wc-metric-']")]
+      .find((b) => b.textContent?.includes("字符"))?.click()`);
+    const metricSwitched = await poll(async () => {
+      const t = await js<string>(
+        `document.querySelector("[data-testid='footer-word-count']")?.textContent ?? ""`,
+      );
+      return t.includes("字符 ") ? t : null;
+    });
+    if (!metricSwitched) return fail("word count metric switch not applied");
+    const storedMetric = await js<unknown>(`window.confidant.stateGet("wordCountMetric")`);
+    if (storedMetric !== "chars") return fail(`metric persistence wrong: ${JSON.stringify(storedMetric)}`);
+    // 还原为默认口径(后续探针不受影响)
+    await js<void>(`document.querySelector("[data-testid='footer-word-count']").click()`);
+    await js<void>(`[...document.querySelectorAll("[data-testid^='wc-metric-']")]
+      .find((b) => b.textContent?.includes("字数"))?.click()`);
+    console.log(`[smoke] footer word count ok (${wcText}; block type 标题 1; metric persisted)`);
+
     const mark1 = `工作区保存-${Date.now()}`;
     const typed = await typeAtEnd(win, mark1);
     if (!typed.ok) return fail(`typing failed: ${JSON.stringify(typed)}`);
