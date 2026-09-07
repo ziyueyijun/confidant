@@ -147,7 +147,7 @@ export function Sidebar({
             data-testid={`sidebar-tab-${t}`}
             onClick={() => setTab(t)}
             style={{
-              width: 84,
+              flex: 1, // 反馈轮 04:两 tab 均分侧栏宽度(原固定 84px)
               lineHeight: "2.4",
               fontSize: 13,
               border: "none",
