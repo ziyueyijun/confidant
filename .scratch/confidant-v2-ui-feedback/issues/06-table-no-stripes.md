@@ -24,3 +24,4 @@
 `var(--block-bg)` 底色,三主题(github/night/newsprint)全部通过;截图即
 表格观感直接证据(`out/smoke/theme-{github,night,newsprint}.png`,gitignore 内)。
 观感如仍不满意,用户可随时推翻(回滚一处 CSS 删除即可)。
+用户确认(2026-09-10):实机查看后指示确认完成,未提出调整。
