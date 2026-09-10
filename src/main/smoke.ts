@@ -1086,7 +1086,21 @@ export async function runWorkspaceSelfCheck(win: BrowserWindow, wsDir: string, e
     });
     if (!movedBack) return fail("undo of move did not restore b.md");
 
-    // 5.6) 主题(01):三主题即时生效(computed 校验)+ 每主题截图存档
+    // 反馈轮 06:表格去隔行换色——写表格夹具并打开,三主题截图即表格观感证据;
+    // 每主题下断言内容行透明底(nth-child(even) 规则已删)、表头底色保留
+    const tableDoc = join(wsDir, "表格观感.md");
+    await writeFile(
+      tableDoc,
+      "# 表格观感\n\n| 列一 | 列二 | 列三 |\n| --- | --- | --- |\n| 甲 | 乙 | 丙 |\n| 丁 | 戊 | 己 |\n| 庚 | 辛 | 壬 |\n| 癸 | 子 | 丑 |\n",
+      "utf8",
+    );
+    const tableRow = await poll(() => js<boolean>(q("[data-rel='表格观感.md']")));
+    if (!tableRow) return fail("table fixture row missing");
+    await js<void>(`document.querySelector("[data-rel='表格观感.md']").click()`);
+    const tableOpen = await poll(() => docTitleIs(win, "表格观感.md"));
+    if (!tableOpen) return fail("table fixture not opened");
+
+    // 5.6) 主题(01):三主题即时生效(computed 校验)+ 每主题截图存档(反馈轮 06 起为表格观感)
     const themes: Array<{ cmd: string; name: string; bg: string }> = [
       { cmd: "theme-github", name: "github", bg: "255, 255, 255" },
       { cmd: "theme-night", name: "night", bg: "54, 59, 64" },
@@ -1101,6 +1115,26 @@ export async function runWorkspaceSelfCheck(win: BrowserWindow, wsDir: string, e
         return bg.includes(t.bg) ? true : null;
       });
       if (!applied) return fail(`theme ${t.name} not applied`);
+      // 反馈轮 06:内容行透明底、表头保留底色(三主题逐一断言)
+      const tableTone = await js<{ data: string[]; head: string }>(
+        `(() => {
+          const trs = [...document.querySelectorAll(".editor-prose table tr")];
+          const head = document.querySelector(".editor-prose table th");
+          return {
+            data: trs.slice(1).map((tr) => {
+              const td = tr.querySelector("td");
+              return td ? getComputedStyle(td).backgroundColor : "none";
+            }),
+            head: head ? getComputedStyle(head).backgroundColor : "none",
+          };
+        })()`,
+      );
+      if (tableTone.data.length < 3 || tableTone.data.some((c) => c !== "rgba(0, 0, 0, 0)")) {
+        return fail(`table data rows not transparent in ${t.name}: ${JSON.stringify(tableTone)}`);
+      }
+      if (tableTone.head === "rgba(0, 0, 0, 0)") {
+        return fail(`table header background missing in ${t.name}: ${JSON.stringify(tableTone)}`);
+      }
       await delay(300);
       try {
         mkdirSync(join(__dirname, "../../out/smoke"), { recursive: true });
@@ -1181,7 +1215,17 @@ export async function runWorkspaceSelfCheck(win: BrowserWindow, wsDir: string, e
     // 6.2) 全工作区搜索(15):Ctrl+Shift+F → 跨文件命中 → 点击打开并高亮首个命中
     win.webContents.send(IPC.menuCommand, "workspace-search");
     const scopeBtn = await poll(() => js<boolean>(q("[data-testid='search-scope-select']")));
-    if (!scopeBtn) return fail("search scope button missing");
+    if (!scopeBtn) {
+      const diag = await js<string>(
+        `JSON.stringify({
+          panel: !!document.querySelector("[data-testid='search-panel']"),
+          input: !!document.querySelector("[data-testid='search-input']"),
+          title: document.title,
+          body: document.body.innerText.slice(0, 120),
+        })`,
+      );
+      return fail(`search scope button missing; diag=${diag}`);
+    }
     // 反馈轮 02:作用域下拉自绘,选项行展开后才在 DOM(原生 select 常驻)
     await js<void>(`document.querySelector("[data-testid='search-scope-select']").click()`);
     const wsPanel = await poll(() => js<boolean>(q("[data-testid='scope-workspace']")));
