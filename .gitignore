@@ -6,7 +6,7 @@ out/
 dist/
 *.tsbuildinfo
 
-# 一次性原型(06 票验证用,源码归档于分支 prototype/engine-prototype-06,不入主线)
+# 一次性原型(06 票验证用,源码归档于 tag archive/engine-prototype-06,不入主线)
 engine-prototype/
 
 # 本地技能库(第三方技能资产与文档库,不入库)
