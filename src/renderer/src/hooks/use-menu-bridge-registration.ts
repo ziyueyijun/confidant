@@ -20,6 +20,8 @@ export interface MenuRegistrationApi {
   sourceModeRef: RefObject<boolean>;
   /** 01b:打开「同步设置…」对话框(工作区级模态)。 */
   openSyncSettings: () => void;
+  /** 02:立即同步当前工作区(内部先 flush)。 */
+  syncNow: () => void;
   /** 保存当前文档(源码模式直写文本区,否则走保存管线)。 */
   saveCurrent: () => Promise<void>;
   toggleSourceMode: () => void;
@@ -45,7 +47,7 @@ export interface MenuRegistrationApi {
 }
 
 export function useMenuBridgeRegistration(api: MenuRegistrationApi): void {
-  const { menuRef, docRef, engineRef, pipelineRef, workspaceRef, selectedRef, sourceModeRef, saveCurrent, toggleSourceMode, toggleFocusMode, toggleTypewriterMode, setFindOpen, setFindScope, setFindFocus, setLinkRequest, setUiTick, toggleSidebar, toggleCodeWrap, toggleCodeLineNumbers, insertImageViaDialog, applyTheme, openFolderViaDialog, doCreateNote, doDeleteEntry, setPrompt, showNotice, refreshMenuContext, openSyncSettings } = api;
+  const { menuRef, docRef, engineRef, pipelineRef, workspaceRef, selectedRef, sourceModeRef, saveCurrent, toggleSourceMode, toggleFocusMode, toggleTypewriterMode, setFindOpen, setFindScope, setFindFocus, setLinkRequest, setUiTick, toggleSidebar, toggleCodeWrap, toggleCodeLineNumbers, insertImageViaDialog, applyTheme, openFolderViaDialog, doCreateNote, doDeleteEntry, setPrompt, showNotice, refreshMenuContext, openSyncSettings, syncNow } = api;
 
 // ── 菜单桥(03) ──
   useEffect(() => {
@@ -178,6 +180,8 @@ export function useMenuBridgeRegistration(api: MenuRegistrationApi): void {
     menu.register(Cmd.preferences, () => true, () => window.confidant.openPreferences());
     // 01b:同步设置…(文件 → 同步设置…;始终可点,未打开工作区时对话框给明确空态,决议 50)
     menu.register(Cmd.syncSettings, () => true, openSyncSettings);
+    // 02:立即同步(有工作区时可点;同步前由 syncNow 内部 flush)
+    menu.register(Cmd.syncNow, (ctx) => ctx.hasWorkspace, syncNow);
     // 主题三态(01):勾选态由 useAppTheme 经 setChecked 同步
     menu.register(Cmd.themeGithub, () => true, () => applyTheme("github"));
     menu.register(Cmd.themeNight, () => true, () => applyTheme("night"));

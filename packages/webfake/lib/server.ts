@@ -3,9 +3,11 @@
 // 全部为真 HTTP:测试走真 fetch,客户端不注入任何替身。
 
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
+import { createServer as createHttpsServer } from "node:https";
 import type { AddressInfo } from "node:net";
 import { randomBytes } from "node:crypto";
 import { escapeXml, xmlDocument } from "./xml";
+import { SELFSIGNED_CERT_PEM, SELFSIGNED_KEY_PEM } from "./cert";
 import type {
   WebfakeOptions,
   WebfakeQuirks,
@@ -338,7 +340,7 @@ export async function startWebfakeServer(opts: WebfakeOptions = {}): Promise<Web
     }
   }
 
-  const server = createServer((req, res) => {
+  const handler = (req: IncomingMessage, res: ServerResponse): void => {
     void handle(req, res).catch(() => {
       try {
         res.writeHead(500);
@@ -347,10 +349,18 @@ export async function startWebfakeServer(opts: WebfakeOptions = {}): Promise<Web
         // 响应可能已发出;忽略
       }
     });
-  });
+  };
+  const tls = opts.tls ?? false;
+  const server = tls
+    ? createHttpsServer(
+        typeof tls === "object" ? { cert: tls.cert, key: tls.key } : { cert: SELFSIGNED_CERT_PEM, key: SELFSIGNED_KEY_PEM },
+        handler,
+      )
+    : createServer(handler);
 
   await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
   const port = (server.address() as AddressInfo).port;
+  const scheme = tls ? "https" : "http";
 
   function mkdirp(path: string): void {
     const n = normPath(path);
@@ -363,7 +373,7 @@ export async function startWebfakeServer(opts: WebfakeOptions = {}): Promise<Web
   }
 
   return {
-    url: `http://127.0.0.1:${port}`,
+    url: `${scheme}://127.0.0.1:${port}`,
     port,
     requests,
     close: () =>

@@ -24,6 +24,10 @@ export interface SyncSettingsDialogProps {
   /** 当前工作区根路径;null = 未打开工作区(给明确空态)。 */
   workspacePath: string | null;
   onClose: () => void;
+  /** 02:「立即同步」——由 App 负责 flush 后发起;未提供则隐藏该按钮。 */
+  onSyncNow?: () => void;
+  /** 同步进行中(禁用「立即同步」,决议 12)。 */
+  syncRunning?: boolean;
 }
 
 /** 未打开工作区时的空视图(不触发 IPC)。 */
@@ -39,7 +43,7 @@ const EMPTY_VIEW: SyncSettingsView = {
   cloudEnv: { oneDrive: null, oneDriveConsumer: null, oneDriveCommercial: null },
 };
 
-export function SyncSettingsDialog({ workspacePath, onClose }: SyncSettingsDialogProps) {
+export function SyncSettingsDialog({ workspacePath, onClose, onSyncNow, syncRunning }: SyncSettingsDialogProps) {
   const hasWorkspace = !!workspacePath;
   const [loaded, setLoaded] = useState(!hasWorkspace);
   const [view, setView] = useState<SyncSettingsView>(EMPTY_VIEW);
@@ -306,6 +310,17 @@ export function SyncSettingsDialog({ workspacePath, onClose }: SyncSettingsDialo
             )}
 
             <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginTop: 4 }}>
+              {onSyncNow && (
+                <button
+                  type="button"
+                  data-testid="sync-now-button"
+                  onClick={onSyncNow}
+                  disabled={disabled || !!syncRunning}
+                  style={{ ...btnStyle, marginRight: "auto", background: "var(--accent-soft)" }}
+                >
+                  {syncRunning ? "同步中…" : "立即同步"}
+                </button>
+              )}
               <button
                 type="button"
                 data-testid="sync-test-button"

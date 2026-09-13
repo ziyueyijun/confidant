@@ -4,6 +4,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { Engine } from "../../../../packages/engine";
+import type { SyncOutcome } from "@shared/sync";
 import {
   blockTypeLabel,
   docStats,
@@ -12,6 +13,17 @@ import {
   type DocStats,
   type WordCountMetric,
 } from "../editor/doc-stats";
+import { formatSyncOutcome } from "../sync/sync-summary";
+
+/** 同步状态条(02):进行中显示「同步中 已完成 / 总数」+ 取消;结束后显示摘要。 */
+export interface SyncFooterState {
+  running: boolean;
+  done: number;
+  total: number;
+  current: string | null;
+  last: SyncOutcome | null;
+  onCancel: () => void;
+}
 
 export interface FooterProps {
   engine: Engine | null;
@@ -24,9 +36,11 @@ export interface FooterProps {
   typewriterMode: boolean;
   onToggleFocus: () => void;
   onToggleTypewriter: () => void;
+  /** 02:WebDAV 同步状态(未打开工作区时为 undefined)。 */
+  sync?: SyncFooterState;
 }
 
-export function Footer({ engine, tick, hasDoc, focusMode, typewriterMode, onToggleFocus, onToggleTypewriter }: FooterProps) {
+export function Footer({ engine, tick, hasDoc, focusMode, typewriterMode, onToggleFocus, onToggleTypewriter, sync }: FooterProps) {
   const [metric, setMetric] = useState<WordCountMetric>("words");
   const [stats, setStats] = useState<DocStats>({ words: 0, chars: 0, paragraphs: 0, lines: 0 });
   const [blockType, setBlockType] = useState<string | null>(null);
@@ -76,6 +90,7 @@ export function Footer({ engine, tick, hasDoc, focusMode, typewriterMode, onTogg
     [metric],
   );
   const metricValue = stats[metric];
+  const syncSummary = sync ? formatSyncOutcome(sync.last) : null;
 
   return (
     <footer
@@ -128,8 +143,39 @@ export function Footer({ engine, tick, hasDoc, focusMode, typewriterMode, onTogg
           </button>
         ))}
       </div>
-      {/* 右:段落类型 + 字数常驻 */}
+      {/* 右:同步状态 + 段落类型 + 字数常驻 */}
       <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+        {sync?.running && (
+          <span data-testid="footer-sync" style={{ display: "flex", alignItems: "center", gap: 6 }}>
+            <span style={{ color: "var(--muted)" }}>
+              同步中 {sync.done} / {sync.total}
+            </span>
+            <button
+              type="button"
+              data-testid="footer-sync-cancel"
+              onClick={sync.onCancel}
+              style={{
+                padding: "2px 8px",
+                fontSize: 12,
+                border: "1px solid var(--border)",
+                borderRadius: 4,
+                background: "transparent",
+                color: "inherit",
+                cursor: "pointer",
+              }}
+            >
+              取消
+            </button>
+          </span>
+        )}
+        {sync && !sync.running && syncSummary && (
+          <span
+            data-testid="footer-sync-summary"
+            style={{ color: sync.last?.status === "error" ? "var(--danger)" : "var(--muted)" }}
+          >
+            {syncSummary}
+          </span>
+        )}
         {blockType && (
           <span data-testid="footer-block-type" style={{ color: "var(--muted)", opacity: 0.75 }}>
             {blockType}

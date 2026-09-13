@@ -26,6 +26,7 @@ import { Footer } from "./components/Footer";
 import { FormatToolbar } from "./components/FormatToolbar";
 import { EmptyWorkspaceGuidance, NotePickHint } from "./components/EmptyStates";
 import { SyncSettingsDialog } from "./sync/SyncSettingsDialog";
+import { useSyncRun } from "./sync/use-sync-run";
 import { countMdInTree, relPathOf, wsJoin, type Workspace } from "./workspace/workspace";
 import type { OpenNote } from "./session/types";
 import { useAppTheme } from "./hooks/use-app-theme";
@@ -117,6 +118,8 @@ export default function App() {
   const { settings, toggleCodeWrap, toggleCodeLineNumbers } = useEditorSettings();
   // ── 偏好设置(07):外观「显示工具栏」开关(主窗口只读,改动经偏好设置窗口) ──
   const { preferences } = usePreferences();
+  // ── 同步运行(02):进度/取消/结果;同步前强制 flush 由 syncNow 负责 ──
+  const sync = useSyncRun();
 
   // ── 保存管线(02) ──
   useEffect(() => {
@@ -284,6 +287,13 @@ export default function App() {
     if (sourceModeRef.current) await writeSourceText();
     else await pipelineRef.current?.flush();
   }, [writeSourceText]);
+  // ── 同步(02):关设置对话框 → 先 flush 未保存内容(决议 9)→ 跑一次同步 ──
+  const syncNow = useCallback(async (): Promise<void> => {
+    const ws = workspaceRef.current;
+    if (!ws) return;
+    setSyncSettingsOpen(false);
+    await sync.start(ws.root, saveCurrent);
+  }, [sync.start, saveCurrent]);
   // 文本区内容:进入时以引擎序列化填充(头字节原样 + 正文引擎规范化,即保存口径)
   useEffect(() => {
     if (!sourceMode) return;
@@ -522,6 +532,7 @@ export default function App() {
     applyTheme, openFolderViaDialog,
     doCreateNote, doDeleteEntry, setPrompt, showNotice, refreshMenuContext,
     openSyncSettings: () => setSyncSettingsOpen(true),
+    syncNow: () => void syncNow(),
   });
 
   // 当前文件自动展开与 toggle 持久化归 useTreeExpansion(22)。
@@ -738,6 +749,18 @@ export default function App() {
         typewriterMode={typewriterMode}
         onToggleFocus={() => toggleMode("focus")}
         onToggleTypewriter={() => toggleMode("typewriter")}
+        sync={
+          workspace
+            ? {
+                running: sync.running,
+                done: sync.done,
+                total: sync.total,
+                current: sync.current,
+                last: sync.last,
+                onCancel: sync.cancel,
+              }
+            : undefined
+        }
       />
       {/* 底部悬浮格式工具栏(07):偏好设置「显示工具栏」开启且非源码模式时显示 */}
       {preferences.showToolbar && !sourceMode && doc && (
@@ -754,6 +777,8 @@ export default function App() {
         <SyncSettingsDialog
           workspacePath={workspace?.root ?? null}
           onClose={() => setSyncSettingsOpen(false)}
+          onSyncNow={() => void syncNow()}
+          syncRunning={sync.running}
         />
       )}
     </div>

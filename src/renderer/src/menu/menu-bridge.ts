@@ -39,6 +39,8 @@ export const Cmd = {
   preferences: "preferences",
   /** 文件 → 同步设置…(01b:当前工作区的 WebDAV 同步配置对话框)。 */
   syncSettings: "sync-settings",
+  /** 文件 → 立即同步(02:手动触发一次 WebDAV 同步)。 */
+  syncNow: "sync-now",
   quit: "quit",
   // 编辑
   undo: "undo",
@@ -142,6 +144,8 @@ export function buildMenuTemplate(recent: RecentItem[] = []): MenuItemTemplate[]
         sep(),
         // 01b:「同步设置…」——工作区级 WebDAV 同步配置(靠近「偏好设置…」)
         disabledItem(Cmd.syncSettings, "同步设置…"),
+        // 02:「立即同步」——手动触发一次(有工作区时可点)
+        disabledItem(Cmd.syncNow, "立即同步"),
         // 07:「偏好设置…」(Ctrl+,;Typora asar 实测键位)打开偏好设置窗口
         disabledItem(Cmd.preferences, "偏好设置…", "Ctrl+,"),
         sep(),

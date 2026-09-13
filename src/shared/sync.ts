@@ -6,6 +6,22 @@
 // 连接结果分类)放这里;只在渲染层用的界面文案判定与网盘启发式放
 // src/renderer/src/sync/。
 
+import type { SyncProgress, SyncReport } from "../../packages/sync";
+
+// ─── 同步运行(票 02:主进程执行 → 渲染层展示进度与结果) ────────────────────
+
+/** 进行中的进度(主进程 → 渲染层推送;形状即引擎的 SyncProgress)。 */
+export type { SyncProgress };
+
+/** 一次同步的最终结果(经 IPC 返回渲染层)。 */
+export interface SyncOutcome {
+  status: "ok" | "cancelled" | "error";
+  /** ok / cancelled 时的计数报告。 */
+  report?: SyncReport;
+  /** error 时的摘要(**已遮蔽密码**,决议 43/60)。 */
+  message?: string;
+}
+
 // ─── 配置归一化 ──────────────────────────────────────────────────────────
 
 /**

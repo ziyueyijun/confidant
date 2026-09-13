@@ -5,6 +5,8 @@ import type { TreeEntry } from "../../packages/files";
 import type {
   SyncConnectionInput,
   SyncConnectionResult,
+  SyncOutcome,
+  SyncProgress,
   SyncSettingsInput,
   SyncSettingsView,
 } from "./sync";
@@ -14,7 +16,9 @@ export type {
   SyncConnectionInput,
   SyncConnectionKind,
   SyncConnectionResult,
+  SyncOutcome,
   SyncPasswordStatus,
+  SyncProgress,
   SyncSettingsInput,
   SyncSettingsView,
 } from "./sync";
@@ -106,6 +110,12 @@ export const IPC = {
   syncSettingsSave: "sync:settings-save",
   /** 测试连接(可达 / 认证失败 / 目录不存在)。 */
   syncTestConnection: "sync:test-connection",
+  /** 发起一次同步(主进程执行;进度经 sync:progress 推送,结果作为 invoke 返回值)。 */
+  syncStart: "sync:start",
+  /** 取消进行中的同步(已完成的操作保留)。 */
+  syncCancel: "sync:cancel",
+  /** 主进程 → 渲染层:同步进度(done/total/current)。 */
+  syncProgress: "sync:progress",
 } as const;
 
 /** 外部变更原始事件(工作区监听批次内;树推送时一并携带,12 消费)。 */
@@ -256,6 +266,12 @@ export interface ConfidantApi {
   saveSyncSettings(workspacePath: string, input: SyncSettingsInput): Promise<Result<void>>;
   /** 测试连接(省略 password 时用已存密码);结果区分可达/认证失败/目录不存在。 */
   testSyncConnection(input: SyncConnectionInput): Promise<SyncConnectionResult>;
+  /** 发起一次同步(同步前应由渲染层先 flush;进行中进度经 onSyncProgress 推送)。 */
+  startSync(workspacePath: string): Promise<Result<SyncOutcome>>;
+  /** 取消进行中的同步(已完成的操作保留)。 */
+  cancelSync(): void;
+  /** 订阅同步进度。返回退订函数。 */
+  onSyncProgress(cb: (p: SyncProgress) => void): () => void;
 }
 
 declare global {
