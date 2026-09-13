@@ -59,7 +59,7 @@ export interface SyncDeps {
 
 **并发票（04–07）开工前先 `git rebase` 到当时的主线**，冲突自己解，解完跑三件套。
 
-## 2.5 状态表硬不变量（01a 已交付，02–07 必须遵守）
+## 2.5 状态表硬不变量（01a/01b 已交付，02–07 必须遵守）
 
 `packages/sync` 的 `createSyncStateStore` 已落地。读它之前先记住这条：
 
@@ -78,8 +78,20 @@ export interface SyncDeps {
 - `state.workspace` 与 `opts.workspacePath` 是**严格相等**比较。Windows 路径大小写不敏感，`C:\Notes` 与 `c:\notes` 会被判为「键不符 → 无状态表 → 保守合并」。这不丢内容（只是保守），但会让状态表看起来「没生效」。`src/main` 侧传入工作区路径时**先归一化大小写与分隔符**再交给状态表。
 - `webfake` 的 `PROPFIND depth: infinity` 按深度 1 处理，只保证 depth 0/1。`list()` 返回直接子项且已滤掉集合自身。**决议 63 的列举闸门不在 01a 里**：客户端用「返回 `[]`」区分空列举、「抛 `WebdavError`」区分非成功状态码，闸门判定留给票 05。
 
-## 3. 会咬人的既有事实
-- **`src/shared/ipc.ts` 是 IPC 协议单一事实源**，三侧（main/preload/renderer）共用。加通道要同时改 `IPC` 常量、`ConfidantApi`、preload 实现，否则 typecheck 不过。
+## 2.7 已交付的 IPC 与接线点（01b）
+
+`IPC` 常量：`syncSettingsGet` / `syncSettingsSave` / `syncTestConnection`。
+`ConfidantApi`：`getSyncSettings(workspacePath)` / `saveSyncSettings(workspacePath, input)` / `testSyncConnection(input)`。
+类型经 `@shared/sync` 转发（`@shared/ipc` re-export）：`SyncSettingsView`、`SyncSettingsInput`、`SyncConnectionInput`、`SyncConnectionResult`、`SyncConnectionKind`（`"reachable" | "auth-failed" | "not-found" | "error"`）、`SyncPasswordStatus`、`CloudEnv`。
+
+密码语义：`SyncSettingsInput.password` 省略＝保留已存密码，`""`＝清除，非空＝覆盖；`SyncConnectionInput.password` 省略＝用已存密码（**渲染层不掌握明文**）。
+
+**加通道要同时改三处**：`src/shared/ipc.ts` 的 `IPC` 常量与 `ConfidantApi`、`src/preload/index.ts`。缺一 typecheck 就不过。主进程的 sync IPC 注册块在 `src/main/index.ts` 的 `registerIpc()` 末尾，**只往块内加 handler**。
+
+- 菜单 id `Cmd.syncSettings` = `"sync-settings"`，在「文件」子菜单、紧邻「偏好设置…」之前；注册处 `use-menu-bridge-registration.ts` 的 `openSyncSettings`。
+- 对话框 `src/renderer/src/sync/SyncSettingsDialog.tsx`，props `{ workspacePath: string | null; onClose }`；挂载点在 `App.tsx` 根部末位。**「同步」按钮与进度接在这里**。
+
+## 3. 会咬人的既有事实- **`src/shared/ipc.ts` 是 IPC 协议单一事实源**，三侧（main/preload/renderer）共用。加通道要同时改 `IPC` 常量、`ConfidantApi`、preload 实现，否则 typecheck 不过。
 - **`App.tsx` 已有外部变更处置（自回声 2s 时间盒抑制）**。规格第 88 行明说：同步引擎**不注册**自身操作回声抑制——同步写本地文件时**恰恰需要**编辑器重载（正在编辑的笔记被同步更新了要看得见）。但同步删除一个正开着的文件时，要落进既有的「文件缺失」态（`use-doc-missing.ts` 的 `docMissing` + 横幅），不要新造一套。
 - **`save-pipeline.ts` 是 flush 的唯一入口**。决议 9 要求同步前强制 flush，复用它，不要重写。
 - **工作区树扫描会跟随符号链接**（带 realpath 防环），而规格第 107 行要求同步**不跟随**。同步的枚举必须是自己的实现，不能复用 `scanWorkspaceTree`。
