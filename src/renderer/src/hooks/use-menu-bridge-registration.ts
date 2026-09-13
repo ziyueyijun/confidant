@@ -15,7 +15,7 @@ export interface MenuRegistrationApi {
   engineRef: RefObject<Engine | null>;
   pipelineRef: RefObject<ReturnType<typeof createSavePipeline> | null>;
   workspaceRef: RefObject<Workspace | null>;
-  selectedRef: RefObject<{ rel: string; kind: "dir" | "md" } | null>;
+  selectedRef: RefObject<{ rel: string; kind: TreeEntry["kind"] } | null>;
   /** 源码模式(30):段落/格式/查找置灰;撤销重做转发文本区。 */
   sourceModeRef: RefObject<boolean>;
   /** 保存当前文档(源码模式直写文本区,否则走保存管线)。 */
@@ -36,7 +36,7 @@ export interface MenuRegistrationApi {
   applyTheme: (t: "github" | "night" | "newsprint") => void;
   openFolderViaDialog: () => Promise<void>;
   doCreateNote: (dirRel: string) => Promise<void>;
-  doDeleteEntry: (entry: { relPath: string; kind: "dir" | "md" }) => Promise<void>;
+  doDeleteEntry: (entry: { relPath: string; kind: TreeEntry["kind"] }) => Promise<void>;
   setPrompt: (p: { type: "new-folder"; dirRel: string } | { type: "rename"; rel: string; name: string } | null) => void;
   showNotice: (label: string, opts?: { undo?: () => void; action?: { label: string; run: () => void } }) => void;
   refreshMenuContext: () => void;
@@ -181,7 +181,7 @@ export function useMenuBridgeRegistration(api: MenuRegistrationApi): void {
     // 文件操作命令(10):文件菜单(工作区/选中态驱动)
     const wsRule = (ctx: MenuContext) => ctx.hasWorkspace;
     const selRule = (ctx: MenuContext) => ctx.hasWorkspace && ctx.hasSelection;
-    const treeSelectedAbs = (): { abs: string; rel: string; kind: "dir" | "md" } | null => {
+    const treeSelectedAbs = (): { abs: string; rel: string; kind: TreeEntry["kind"] } | null => {
       const ws = workspaceRef.current;
       const sel = selectedRef.current;
       if (!ws || !sel) return null;

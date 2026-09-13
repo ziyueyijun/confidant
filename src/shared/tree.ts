@@ -3,7 +3,7 @@
 // 结构参数取最小形状,兼容 @shared/ipc 与 packages/files 各自的 TreeEntry。
 
 interface CountableEntry {
-  kind: "dir" | "md";
+  kind: "dir" | "md" | "file";
   children?: CountableEntry[];
 }
 

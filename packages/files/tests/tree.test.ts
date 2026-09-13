@@ -1,10 +1,11 @@
-// 工作区目录树扫描测试(规格 §8 排序/过滤/结构)。真实临时目录夹具。
+// 工作区目录树扫描测试(票 01a 类目扩展后的口径:目录 + `.md` + 其余普通文件;
+// 点开头与 Thumbs.db/desktop.ini 排除)。真实临时目录夹具。
 
 import { describe, expect, it } from "vitest";
 import { mkdir, mkdtemp, rm, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { countMarkdown, scanWorkspaceTree, type TreeEntry } from "../index";
+import { collectMarkdownPaths, countMarkdown, isExcludedName, scanWorkspaceTree, type TreeEntry } from "../index";
 
 async function makeTree(): Promise<string> {
   const root = await mkdtemp(join(tmpdir(), "confidant-tree-"));
@@ -12,8 +13,12 @@ async function makeTree(): Promise<string> {
   await writeFile(join(root, "a10.md"), "");
   await writeFile(join(root, "a2.md"), "");
   await writeFile(join(root, "note.txt"), "not md");
+  await writeFile(join(root, "photo.png"), "png");
+  await writeFile(join(root, "manual.pdf"), "%PDF");
   await writeFile(join(root, ".hidden.md"), "hidden");
   await writeFile(join(root, ".env"), "");
+  await writeFile(join(root, "Thumbs.db"), "db");
+  await writeFile(join(root, "desktop.ini"), "ini");
   await mkdir(join(root, "子目录乙"));
   await writeFile(join(root, "子目录乙", "内.md"), "");
   await mkdir(join(root, "子目录甲"));
@@ -28,8 +33,12 @@ function names(entries: TreeEntry[]): string[] {
   return entries.map((e) => e.name);
 }
 
+function kindOf(entries: TreeEntry[], name: string): string | undefined {
+  return entries.find((e) => e.name === name)?.kind;
+}
+
 describe("scanWorkspaceTree", () => {
-  it("结构:目录全显(含空)、文件仅 .md、隐藏名不出现、非 md 不出现", async () => {
+  it("结构:目录全显(含空)、文件全收(.md→md,其余→file)、隐藏名与系统杂物不出现", async () => {
     const root = await makeTree();
     try {
       const tree = await scanWorkspaceTree(root);
@@ -38,10 +47,17 @@ describe("scanWorkspaceTree", () => {
       expect(top).toContain("子目录乙");
       expect(top).toContain("空目录");
       expect(top).toContain("a2.md");
-      expect(top).not.toContain("note.txt");
+      // 非 .md 普通文件收作 "file"(图片/PDF/文本)
+      expect(kindOf(tree, "note.txt")).toBe("file");
+      expect(kindOf(tree, "photo.png")).toBe("file");
+      expect(kindOf(tree, "manual.pdf")).toBe("file");
+      // 排除项照旧:点开头 + Thumbs.db/desktop.ini
       expect(top).not.toContain(".hidden.md");
       expect(top).not.toContain(".env");
       expect(top).not.toContain(".git");
+      expect(top).not.toContain("Thumbs.db");
+      expect(top).not.toContain("desktop.ini");
+      // 计数口径不变:只数 .md
       expect(countMarkdown(tree)).toBe(5);
     } finally {
       await rm(root, { recursive: true, force: true });
@@ -68,17 +84,36 @@ describe("scanWorkspaceTree", () => {
     }
   });
 
-  it("符号链接指向 md 可见、指向目录可下钻、悬空不可见", async () => {
+  it("符号链接指向 md 可见、指向普通文件为 file、指向目录可下钻、悬空不可见", async () => {
     const root = await makeTree();
     try {
       await symlink(join(root, "b.md"), join(root, "链接笔记.md"), "file");
+      await symlink(join(root, "photo.png"), join(root, "链接图片.png"), "file");
       await symlink(join(root, "子目录甲"), join(root, "链接目录"), "dir");
       await symlink(join(root, "不存在"), join(root, "悬空链接"), "file");
       const tree = await scanWorkspaceTree(root);
       const namesAll = names(tree);
       expect(namesAll).toContain("链接笔记.md");
+      expect(kindOf(tree, "链接图片.png")).toBe("file");
       expect(namesAll).toContain("链接目录");
       expect(namesAll).not.toContain("悬空链接");
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
+  it("collectMarkdownPaths 仍只收 .md;isExcludedName 覆盖点开头与系统杂物", async () => {
+    const root = await makeTree();
+    try {
+      const tree = await scanWorkspaceTree(root);
+      const md = collectMarkdownPaths(tree).sort();
+      expect(md).toEqual(["a10.md", "a2.md", "b.md", "子目录乙/内.md", "子目录甲/深层/deep.md"].sort());
+      expect(md).not.toContain("note.txt");
+      expect(isExcludedName(".git")).toBe(true);
+      expect(isExcludedName("Thumbs.db")).toBe(true);
+      expect(isExcludedName("desktop.ini")).toBe(true);
+      expect(isExcludedName("THUMBS.DB")).toBe(true);
+      expect(isExcludedName("note.txt")).toBe(false);
     } finally {
       await rm(root, { recursive: true, force: true });
     }

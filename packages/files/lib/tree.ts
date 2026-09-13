@@ -1,10 +1,12 @@
-// 工作区目录树扫描与排序(规格 §8:文件夹全显、仅 .md 文件、`.`/隐藏项不出现、
+// 工作区目录树扫描与排序(规格 §8:文件夹全显、`.`/隐藏项不出现、
 // 同层文件夹在前、组内名称自然升序)。
+// 类目扩展(票 01a,同步需要看见非 .md 文件):文件分两类——`.md` 为 "md",
+// 其余普通文件(图片/PDF 等)为 "file"。点开头条目与 Thumbs.db/desktop.ini 仍排除。
 
 import { lstat, readdir, realpath } from "node:fs/promises";
 import { join } from "node:path";
 
-export type TreeEntryKind = "dir" | "md";
+export type TreeEntryKind = "dir" | "md" | "file";
 
 export interface TreeEntry {
   name: string;
@@ -18,6 +20,13 @@ export interface TreeEntry {
 /** 以 `.` 开头的名字(含系统隐藏常见的点目录)不显示。 */
 export function isHiddenName(name: string): boolean {
   return name.startsWith(".");
+}
+
+/** 硬排除名单:点开头条目 + Windows 杂物文件(Thumbs.db / desktop.ini,大小写不敏感)。 */
+export function isExcludedName(name: string): boolean {
+  if (isHiddenName(name)) return true;
+  const lower = name.toLowerCase();
+  return lower === "thumbs.db" || lower === "desktop.ini";
 }
 
 const MD_RE = /\.md$/i;
@@ -54,18 +63,18 @@ async function walkDir(
   const kids: Array<{ name: string; kind: TreeEntryKind | null }> = [];
   for (const d of dirents) {
     const name = d.name;
-    if (isHiddenName(name)) continue;
+    if (isExcludedName(name)) continue;
     let kind: TreeEntryKind | null = null;
     if (d.isDirectory()) kind = "dir";
     else if (d.isFile()) {
-      if (MD_RE.test(name)) kind = "md";
+      kind = MD_RE.test(name) ? "md" : "file";
     } else if (d.isSymbolicLink()) {
       // 符号链接:跟随判断目标类型;悬空不显示
       try {
         const target = await realpath(join(dirAbs, name));
         const tst = await lstat(target);
         if (tst.isDirectory()) kind = "dir";
-        else if (tst.isFile() && MD_RE.test(name)) kind = "md";
+        else if (tst.isFile()) kind = MD_RE.test(name) ? "md" : "file";
       } catch {
         kind = null;
       }
@@ -91,8 +100,8 @@ async function walkDir(
 }
 
 /**
- * 递归扫描工作区(目录全显含空目录;文件仅 .md;隐藏名跳过;
- * 符号链接跟随判断、环防住;单目录失败只影响该枝)。
+ * 递归扫描工作区(目录全显含空目录;文件全收,`.md` 记 "md"、其余记 "file";
+ * 点开头与 Thumbs.db/desktop.ini 排除;符号链接跟随判断、环防住;单目录失败只影响该枝)。
  */
 export async function scanWorkspaceTree(rootAbs: string): Promise<TreeEntry[]> {
   return walkDir(rootAbs, "", new Set<string>());

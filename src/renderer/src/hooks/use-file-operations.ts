@@ -31,8 +31,8 @@ export function useFileOperations(api: FileOpsApi) {
   const { workspaceRef, docRef, engineRef, pipelineRef, setDoc, openPath, openRel, refreshMenuContext, markOwnOp, clearMissing } = api;
 
   // 树内选中项 / 输入对话框 / 变更通知条(局部状态)
-  const selectedRef = useRef<{ rel: string; kind: "dir" | "md" } | null>(null);
-  const [selected, setSelected] = useState<{ rel: string; kind: "dir" | "md" } | null>(null);
+  const selectedRef = useRef<{ rel: string; kind: TreeEntry["kind"] } | null>(null);
+  const [selected, setSelected] = useState<{ rel: string; kind: TreeEntry["kind"] } | null>(null);
   const [prompt, setPrompt] = useState<
     | { type: "rename"; rel: string; name: string }
     | { type: "new-folder"; dirRel: string }
@@ -70,7 +70,7 @@ export function useFileOperations(api: FileOpsApi) {
   }, []);
 
   /** 相对路径 → 绝对目录(选中文件夹自身;文件为父目录;'' = 根)。 */
-  const absDirFor = useCallback((rel: string | null, kind?: "dir" | "md"): string | null => {
+  const absDirFor = useCallback((rel: string | null, kind?: TreeEntry["kind"]): string | null => {
     const ws = workspaceRef.current;
     if (!ws) return null;
     const dirRel = !rel || rel === "" ? "" : kind === "dir" ? rel : rel.split("/").slice(0, -1).join("/");
@@ -99,7 +99,7 @@ export function useFileOperations(api: FileOpsApi) {
   }, []);
 
   const doDeleteEntry = useCallback(
-    async (entry: { relPath: string; kind: "dir" | "md" }) => {
+    async (entry: { relPath: string; kind: TreeEntry["kind"] }) => {
       const ws = workspaceRef.current;
       if (!ws) return;
       const rel = entry.relPath;

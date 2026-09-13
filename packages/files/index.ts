@@ -25,6 +25,6 @@ export {
   describeOpError,
 } from "./lib/ops";
 
-export { scanWorkspaceTree, compareTreeEntries, isHiddenName, collectMarkdownPaths, findLineHits } from "./lib/tree";
+export { scanWorkspaceTree, compareTreeEntries, isHiddenName, isExcludedName, collectMarkdownPaths, findLineHits } from "./lib/tree";
 export { countMarkdown } from "@shared/tree";
 export type { TreeEntry, TreeEntryKind } from "./lib/tree";
