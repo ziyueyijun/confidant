@@ -66,6 +66,12 @@ import {
   updateLastSession,
   type AppStateV1,
 } from "./state-store";
+import {
+  readSyncSettingsView,
+  testSyncConnection,
+  writeSyncSettings,
+} from "./sync-settings";
+import type { SyncConnectionInput, SyncSettingsInput } from "@shared/sync";
 
 const isDev = !!process.env["ELECTRON_RENDERER_URL"];
 const smoke = process.env["CONFIDANT_SMOKE"] === "1";
@@ -597,6 +603,31 @@ function registerIpc(): void {
     } catch (err) {
       return { ok: false, error: toError(err) };
     }
+  });
+
+  // ══════════════════════════════════════════════════════════════════════════
+  // ── WebDAV 同步 IPC 注册块(01b 建立) ──
+  // 后续票(02–07)只往这个块里追加 handler,不改块外的既有 handler。
+  // 凭据只在本进程内解密;返回渲染层的数据一律不含密码(见 sync-settings.ts)。
+  // ══════════════════════════════════════════════════════════════════════════
+  ipcMain.handle(IPC.syncSettingsGet, async (_e, workspacePath: string) => {
+    return readSyncSettingsView(workspacePath);
+  });
+
+  ipcMain.handle(
+    IPC.syncSettingsSave,
+    async (_e, workspacePath: string, input: SyncSettingsInput): Promise<Result<void>> => {
+      try {
+        await writeSyncSettings(workspacePath, input);
+        return { ok: true, value: undefined };
+      } catch (err) {
+        return { ok: false, error: toError(err) };
+      }
+    },
+  );
+
+  ipcMain.handle(IPC.syncTestConnection, async (_e, input: SyncConnectionInput) => {
+    return testSyncConnection(input);
   });
 }
 

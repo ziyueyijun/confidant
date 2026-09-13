@@ -245,7 +245,8 @@ export function useFileOperations(api: FileOpsApi) {
               { id: "delete", label: "删除" },
             ]
           : [
-              { id: "open", label: "打开" },
+              // 「打开」(作为笔记)是笔记专属项:对非 .md 的 file 项置灰而非消失(票 01b)
+              { id: "open", label: "打开", enabled: entry.kind === "md" },
               { id: "rename", label: "重命名" },
               { id: "delete", label: "删除" },
             ],

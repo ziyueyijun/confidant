@@ -8,7 +8,7 @@ import {
   type MouseEvent as ReactMouseEvent,
   type ReactNode,
 } from "react";
-import { ChevronRight, FileText, Folder, FolderOpen } from "lucide-react";
+import { ChevronRight, File, FileText, Folder, FolderOpen } from "lucide-react";
 import type { TreeEntry } from "@shared/ipc";
 
 export interface FileTreeProps {
@@ -39,6 +39,7 @@ export const FileTree = memo(function FileTree({
   const renderLevel = (entries: TreeEntry[], depth: number): ReactNode =>
     entries.map((entry) => {
       const isDir = entry.kind === "dir";
+      const isMd = entry.kind === "md";
       const isOpen = isDir && expanded.has(entry.relPath);
       const active = !isDir && activeRel !== null && entry.relPath === activeRel;
       const style: CSSProperties = {
@@ -119,9 +120,14 @@ export const FileTree = memo(function FileTree({
               onClick={() => onOpenFile(entry.relPath)}
             >
               <span style={{ width: 13, flexShrink: 0 }} />
-              <FileText size={14} style={{ flexShrink: 0, opacity: 0.7 }} />
-              <span style={{ overflow: "hidden", textOverflow: "ellipsis" }}>
-                {entry.name.replace(/\.md$/i, "")}
+              {isMd ? (
+                <FileText size={14} style={{ flexShrink: 0, opacity: 0.7 }} />
+              ) : (
+                // 非 .md 普通文件(图片/PDF 等):图标与 .md 区分
+                <File size={14} style={{ flexShrink: 0, opacity: 0.5, color: "var(--muted)" }} />
+              )}
+              <span style={{ overflow: "hidden", textOverflow: "ellipsis", opacity: isMd ? 1 : 0.85 }}>
+                {isMd ? entry.name.replace(/\.md$/i, "") : entry.name}
               </span>
             </button>
           )}
