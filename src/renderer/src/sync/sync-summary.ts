@@ -14,13 +14,16 @@ export function formatSyncOutcome(outcome: SyncOutcome | null): string | null {
   if (r.conflicts > 0) parts.push(`冲突 ${r.conflicts}`);
   if (r.skipped.length > 0) parts.push(`跳过 ${r.skipped.length}`);
   if (r.failed.length > 0) parts.push(`失败 ${r.failed.length}`);
+  // 决议 11:同步期间又被改动的文件(不自动重跑)。
+  if (r.remainingLocalChanges > 0) parts.push(`还有 ${r.remainingLocalChanges} 个文件的改动未同步`);
 
   const noChange =
     r.uploaded === 0 &&
     r.downloaded === 0 &&
     r.conflicts === 0 &&
     r.skipped.length === 0 &&
-    r.failed.length === 0;
+    r.failed.length === 0 &&
+    r.remainingLocalChanges === 0;
   if (noChange && outcome.status === "ok") return "已同步(无变化)";
 
   const head = outcome.status === "cancelled" ? "已取消" : "已同步";

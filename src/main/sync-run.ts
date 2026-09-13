@@ -12,11 +12,12 @@ import {
   createSyncStateStore,
   DEFAULT_SYNC_RETRY,
   DEFAULT_SYNC_THRESHOLDS,
+  probeRemoteChanges,
   SyncBusyError,
   type SyncProgress,
 } from "../../packages/sync";
 import { createWebdavClient } from "../../packages/sync/client";
-import { normalizeWorkspaceKey, redactSecrets, type SyncOutcome } from "@shared/sync";
+import { normalizeWorkspaceKey, redactSecrets, type SyncOutcome, type SyncProbeOutcome } from "@shared/sync";
 import { readWorkspaceSyncConfig } from "./sync-settings";
 import { createSyncFetch } from "./sync-fetch";
 import { createSyncLogger } from "./sync-log";
@@ -122,5 +123,43 @@ async function doRunSync(
     return { status: "error", message };
   } finally {
     activeAbort = null;
+  }
+}
+
+/**
+ * 启动只读探测(决议 8;主进程侧)。对远端根做**一次**列目录,回报有无本机未知变更。
+ *
+ * - 未配置同步(无配置 / 无地址 / 密码解密失败)→ 直接返回,**零网络请求**;
+ * - 探测本身只读:只 load 状态表 + list 远端,绝不写状态表 / 远端 / 本地;
+ * - 任何失败(离线、认证失败、目录不可达)都静默降级为 false,绝不打断启动、绝不抛。
+ */
+export async function probeSyncRun(workspacePath: string): Promise<SyncProbeOutcome> {
+  try {
+    const cfg = await readWorkspaceSyncConfig(workspacePath);
+    // 未配置 / 未填地址 / 密码无法解密 → 不发任何请求(验收:「未配置同步 → 零请求」)。
+    if (!cfg || !cfg.baseUrl || cfg.passwordUndecryptable) return { hasUnknownChanges: false };
+
+    const store = createSyncStateStore({
+      dir: join(app.getPath("userData"), "sync-state"),
+      workspacePath: normalizeWorkspaceKey(workspacePath),
+    });
+    const result = await probeRemoteChanges({
+      remoteBaseUrl: cfg.baseUrl,
+      store,
+      createClient: () =>
+        createWebdavClient({
+          baseUrl: cfg.baseUrl,
+          username: cfg.username,
+          password: cfg.password,
+          trustSelfSignedCert: cfg.trustSelfSignedCert,
+          fetch: createSyncFetch({ trustSelfSignedCert: cfg.trustSelfSignedCert }),
+        }),
+      maxFileSizeBytes: DEFAULT_SYNC_THRESHOLDS.maxFileSizeBytes,
+      logger: createSyncLogger(),
+    });
+    return { hasUnknownChanges: result.hasUnknownChanges };
+  } catch {
+    // 探测失败 / 配置读取异常 → 静默降级(不显示圆点,不打断启动)。
+    return { hasUnknownChanges: false };
   }
 }

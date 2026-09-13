@@ -23,6 +23,8 @@ export interface SyncFooterState {
   current: string | null;
   last: SyncOutcome | null;
   onCancel: () => void;
+  /** 07:远端有本机未知变更 → 小圆点(提示该同步了;同步进行中不显示)。 */
+  unknownChanges?: boolean;
 }
 
 export interface FooterProps {
@@ -175,6 +177,21 @@ export function Footer({ engine, tick, hasDoc, focusMode, typewriterMode, onTogg
           >
             {syncSummary}
           </span>
+        )}
+        {/* 07:远端有本机未知变更(决议 8)——小圆点,提示该同步了 */}
+        {sync && !sync.running && sync.unknownChanges && (
+          <span
+            data-testid="footer-sync-dot"
+            title="远端有改动尚未同步"
+            aria-label="远端有改动尚未同步"
+            style={{
+              width: 7,
+              height: 7,
+              borderRadius: "50%",
+              background: "var(--accent)",
+              flexShrink: 0,
+            }}
+          />
         )}
         {blockType && (
           <span data-testid="footer-block-type" style={{ color: "var(--muted)", opacity: 0.75 }}>

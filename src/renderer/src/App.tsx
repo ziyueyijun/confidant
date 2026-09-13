@@ -27,6 +27,7 @@ import { FormatToolbar } from "./components/FormatToolbar";
 import { EmptyWorkspaceGuidance, NotePickHint } from "./components/EmptyStates";
 import { SyncSettingsDialog } from "./sync/SyncSettingsDialog";
 import { useSyncRun } from "./sync/use-sync-run";
+import { useSyncProbe } from "./sync/use-sync-probe";
 import { countMdInTree, relPathOf, wsJoin, type Workspace } from "./workspace/workspace";
 import type { OpenNote } from "./session/types";
 import { useAppTheme } from "./hooks/use-app-theme";
@@ -120,6 +121,8 @@ export default function App() {
   const { preferences } = usePreferences();
   // ── 同步运行(02):进度/取消/结果;同步前强制 flush 由 syncNow 负责 ──
   const sync = useSyncRun();
+  // ── 启动探测(07):远端有本机未知变更 → 页脚小圆点;同步完成后消失(决议 8) ──
+  const unknownRemoteChanges = useSyncProbe(workspace?.root ?? null, sync.last);
 
   // ── 保存管线(02) ──
   useEffect(() => {
@@ -758,6 +761,7 @@ export default function App() {
                 current: sync.current,
                 last: sync.last,
                 onCancel: sync.cancel,
+                unknownChanges: unknownRemoteChanges,
               }
             : undefined
         }

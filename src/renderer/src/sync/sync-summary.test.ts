@@ -59,4 +59,19 @@ describe("formatSyncOutcome", () => {
       "同步失败:用户名或密码错误。",
     );
   });
+
+  it("收尾比对有未同步改动:追加「还有 N 个文件的改动未同步」", () => {
+    const o: SyncOutcome = {
+      status: "ok",
+      report: report({ uploaded: 3, downloaded: 2, remainingLocalChanges: 2 }),
+    };
+    expect(formatSyncOutcome(o)).toBe("已同步 · 上传 3 / 下载 2 / 还有 2 个文件的改动未同步");
+  });
+
+  it("只有未同步改动时不算「无变化」", () => {
+    const o: SyncOutcome = { status: "ok", report: report({ remainingLocalChanges: 1 }) };
+    const text = formatSyncOutcome(o)!;
+    expect(text).toContain("还有 1 个文件的改动未同步");
+    expect(text).not.toBe("已同步(无变化)");
+  });
 });

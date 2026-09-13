@@ -29,6 +29,8 @@ export interface LocalFileEntry {
   /** 绝对路径。 */
   absPath: string;
   size: number;
+  /** 修改时间(ms;lstat 侧读到的)。票 07 收尾比对据此筛「同步期间是否又被改动」。 */
+  mtimeMs: number;
 }
 
 export interface LocalSnapshot {
@@ -76,6 +78,7 @@ export async function scanLocal(
         continue;
       }
       let size: number;
+      let mtimeMs: number;
       try {
         // lstat:再次确认不是符号链接(读取瞬间的竞态也不跟随)。
         const st = await stat(join(dirAbs, name));
@@ -84,6 +87,7 @@ export async function scanLocal(
           continue;
         }
         size = st.size;
+        mtimeMs = st.mtimeMs;
       } catch {
         skipped.push({ relPath: rel, reason: "无法读取文件信息,已跳过" });
         continue;
@@ -95,7 +99,7 @@ export async function scanLocal(
         });
         continue;
       }
-      files.set(rel, { absPath: join(dirAbs, name), size });
+      files.set(rel, { absPath: join(dirAbs, name), size, mtimeMs });
     }
   }
 

@@ -6,6 +6,7 @@ import type {
   SyncConnectionInput,
   SyncConnectionResult,
   SyncOutcome,
+  SyncProbeOutcome,
   SyncProgress,
   SyncSettingsInput,
   SyncSettingsView,
@@ -18,6 +19,7 @@ export type {
   SyncConnectionResult,
   SyncOutcome,
   SyncPasswordStatus,
+  SyncProbeOutcome,
   SyncProgress,
   SyncSettingsInput,
   SyncSettingsView,
@@ -116,6 +118,8 @@ export const IPC = {
   syncCancel: "sync:cancel",
   /** 主进程 → 渲染层:同步进度(done/total/current)。 */
   syncProgress: "sync:progress",
+  /** 启动只读探测(决议 8):远端有无本机状态表里没有的变更(页脚圆点)。 */
+  syncProbe: "sync:probe",
 } as const;
 
 /** 外部变更原始事件(工作区监听批次内;树推送时一并携带,12 消费)。 */
@@ -272,6 +276,11 @@ export interface ConfidantApi {
   cancelSync(): void;
   /** 订阅同步进度。返回退订函数。 */
   onSyncProgress(cb: (p: SyncProgress) => void): () => void;
+  /**
+   * 启动只读探测(决议 8):对远端根做一次列目录,回报有无本机未知变更。
+   * 未配置同步 / 未打开工作区 / 探测失败 → hasUnknownChanges:false(静默降级)。
+   */
+  probeSync(workspacePath: string): Promise<SyncProbeOutcome>;
 }
 
 declare global {

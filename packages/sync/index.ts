@@ -17,6 +17,12 @@ export { SyncBusyError } from "./lib/lock";
 // 内容相同(内容相同只能由 hash 判定)。票 07 的启动探测复用此判定。
 export { remoteEntryChanged } from "./lib/change-detect";
 
+// ── 启动只读探测(票 07;决议 8) ─────────────────────────────────────────────
+// 对远端根做**一次**只读探测,回答「远端是否存在本机状态表里没有的变更」;
+// 只读(load 状态表 + list 远端)、不轮询、失败静默降级、未配置零请求。
+export { probeRemoteChanges } from "./lib/probe";
+export type { SyncProbeOptions, SyncProbeResult, SyncProbeStatus } from "./lib/probe";
+
 /** 默认阈值(决议 17、27):100 MB 上限;熔断 20 个 / 20%。测试传极小值。 */
 export const DEFAULT_SYNC_THRESHOLDS: SyncThresholds = {
   maxFileSizeBytes: 100 * 1024 * 1024,

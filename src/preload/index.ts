@@ -10,6 +10,7 @@ import {
   type SyncConnectionInput,
   type SyncConnectionResult,
   type SyncOutcome,
+  type SyncProbeOutcome,
   type SyncProgress,
   type SyncSettingsInput,
   type SyncSettingsView,
@@ -211,6 +212,9 @@ const api: ConfidantApi = {
       ipcRenderer.removeListener(IPC.syncProgress, listener);
     };
   },
+
+  probeSync: (workspacePath: string) =>
+    ipcRenderer.invoke(IPC.syncProbe, workspacePath) as Promise<SyncProbeOutcome>,
 };
 
 contextBridge.exposeInMainWorld("confidant", api);

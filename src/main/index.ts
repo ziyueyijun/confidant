@@ -71,8 +71,8 @@ import {
   testSyncConnection,
   writeSyncSettings,
 } from "./sync-settings";
-import { cancelSyncRun, runSync } from "./sync-run";
-import type { SyncConnectionInput, SyncOutcome, SyncSettingsInput } from "@shared/sync";
+import { cancelSyncRun, probeSyncRun, runSync } from "./sync-run";
+import type { SyncConnectionInput, SyncOutcome, SyncProbeOutcome, SyncSettingsInput } from "@shared/sync";
 
 const isDev = !!process.env["ELECTRON_RENDERER_URL"];
 const smoke = process.env["CONFIDANT_SMOKE"] === "1";
@@ -651,6 +651,14 @@ function registerIpc(): void {
   ipcMain.on(IPC.syncCancel, () => {
     cancelSyncRun();
   });
+
+  // 07:启动只读探测(决议 8)。未配置 / 未打开工作区 / 探测失败一律静默降级为 false。
+  ipcMain.handle(
+    IPC.syncProbe,
+    async (_e, workspacePath: string): Promise<SyncProbeOutcome> => {
+      return probeSyncRun(workspacePath);
+    },
+  );
 }
 
 // 退出前把防抖中的状态落盘

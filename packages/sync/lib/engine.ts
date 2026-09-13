@@ -14,9 +14,8 @@
 //   · 远端根列举返回 0 条而状态表非空 ⇒ 立即报错停止(列举闸门,决议 63);
 //   · 一次同步要删除的文件数超阈值 ⇒ 先经 deps.confirmDeletes 确认,拒绝则零删除。
 //
-// 后续票的插入点:
-//   · 收尾比对(remainingLocalChanges)→ 票 07;
-//   · 关窗/切工作区中断 → 票 06(run 的 signal 已支持取消)。
+// 票 07:执行循环之后的收尾比对(remainingLocalChanges)已落地,见 countRemainingLocalChanges。
+// 关窗/切工作区中断 → 票 06(run 的 signal 已支持取消)。
 
 
 import type { WebdavClient, WebdavEntry } from "./webdav-types";
@@ -424,6 +423,38 @@ export function createSyncEngine(opts: SyncEngineOptions): SyncEngine {
       log(`[sync] 删除远端(本地已删):${rel}`);
     }
 
+    /**
+     * 收尾比对(决议 11):同步期间被再次改动的本地文件数。
+     *
+     * 判定:重扫本地;与本次 run 开始时元数据(大小/修改时间)不同的文件(含同步期间
+     * 新增的),再算内容 hash 与**同步后的基准**比较——hash ≠ 基准才算「未同步的改动」。
+     * 这样引擎自己写的文件(下载落盘、冲突副本,基准已对齐)不会被误计。
+     *
+     * 只数数,不重跑同步(决议 11:不自动重跑,否则用户持续输入会形成循环)。
+     */
+    async function countRemainingLocalChanges(): Promise<number> {
+      throwIfAborted(); // 取消时不长扫本地
+      const after = await scanLocal(config.workspacePath, {
+        maxFileSizeBytes: config.thresholds.maxFileSizeBytes,
+      });
+      const finalState = await store.load(); // 只读:拿同步后的基准 hash
+      const baseByRel = finalState?.records ?? {};
+      let remaining = 0;
+      for (const [rel, entry] of after.files) {
+        const before = local.files.get(rel);
+        // 元数据未变 ⇒ 本次 run 期间没被碰过,跳过(不必读内容算 hash)。
+        if (before && before.mtimeMs === entry.mtimeMs && before.size === entry.size) continue;
+        let hash: string;
+        try {
+          hash = sha256Hex(await readLocalBytes(entry.absPath));
+        } catch {
+          continue; // 读不到:不误报(下次同步自会处理)
+        }
+        if (hash !== (baseByRel[rel]?.baseHash ?? null)) remaining++;
+      }
+      return remaining;
+    }
+
     async function runItem(item: PlanItem): Promise<void> {
       switch (item.type) {
         case "ensureDir": {
@@ -557,11 +588,14 @@ export function createSyncEngine(opts: SyncEngineOptions): SyncEngine {
         emit(item.relPath);
       }
 
-      // 票 07 的收尾比对插入点:统计同步期间又被改动的文件数(remainingLocalChanges)。
-      report.remainingLocalChanges = 0;
+      // 收尾比对(决议 11):统计同步期间又被改动的文件数;**绝不自动重跑**。
+      report.remainingLocalChanges = await countRemainingLocalChanges();
       log(
         `[sync] 完成:上传 ${report.uploaded} / 下载 ${report.downloaded} / 冲突 ${report.conflicts} ` +
-          `/ 跳过 ${report.skipped.length} / 失败 ${report.failed.length}`,
+          `/ 跳过 ${report.skipped.length} / 失败 ${report.failed.length}` +
+          (report.remainingLocalChanges > 0
+            ? ` / 还有 ${report.remainingLocalChanges} 个文件的改动未同步(不自动重跑)`
+            : ""),
       );
       return report;
     } catch (err) {

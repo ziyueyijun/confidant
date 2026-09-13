@@ -22,6 +22,16 @@ export interface SyncOutcome {
   message?: string;
 }
 
+/**
+ * 启动只读探测结果(决议 8;主进程 → 渲染层)。渲染层据 `hasUnknownChanges` 在页脚
+ * 状态条显示小圆点。探测失败(离线/认证失败/目录不可达)或未配置同步 → 恒 false,
+ * 不携带错误(静默降级,不打断启动)。
+ */
+export interface SyncProbeOutcome {
+  /** 远端存在本机状态表里没有的变更 → 圆点。 */
+  hasUnknownChanges: boolean;
+}
+
 // ─── 配置归一化 ──────────────────────────────────────────────────────────
 
 /**
