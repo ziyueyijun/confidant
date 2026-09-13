@@ -32,6 +32,12 @@ export interface WebfakeQuirks {
 export interface WebfakeOptions {
   credentials?: WebfakeCredentials | null;
   quirks?: WebfakeQuirks;
+  /**
+   * HTTPS 模式(票 02):`true` 用内置自签证书夹具;传 `{ cert, key }` 用自定义证书。
+   * 默认不启用(明文 http)。自签证书在完整校验下不可连——用于验证「信任此服务器
+   * 的证书」开关(决议 41)。
+   */
+  tls?: boolean | { cert: string; key: string };
 }
 
 export interface WebfakeRequestLogEntry {

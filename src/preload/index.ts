@@ -9,6 +9,8 @@ import {
   type Result,
   type SyncConnectionInput,
   type SyncConnectionResult,
+  type SyncOutcome,
+  type SyncProgress,
   type SyncSettingsInput,
   type SyncSettingsView,
   type TreeEntry,
@@ -194,6 +196,21 @@ const api: ConfidantApi = {
 
   testSyncConnection: (input: SyncConnectionInput) =>
     ipcRenderer.invoke(IPC.syncTestConnection, input) as Promise<SyncConnectionResult>,
+
+  startSync: (workspacePath: string) =>
+    ipcRenderer.invoke(IPC.syncStart, workspacePath) as Promise<Result<SyncOutcome>>,
+
+  cancelSync: () => {
+    ipcRenderer.send(IPC.syncCancel);
+  },
+
+  onSyncProgress: (cb: (p: SyncProgress) => void) => {
+    const listener = (_e: unknown, p: SyncProgress) => cb(p);
+    ipcRenderer.on(IPC.syncProgress, listener);
+    return () => {
+      ipcRenderer.removeListener(IPC.syncProgress, listener);
+    };
+  },
 };
 
 contextBridge.exposeInMainWorld("confidant", api);

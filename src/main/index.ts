@@ -71,7 +71,8 @@ import {
   testSyncConnection,
   writeSyncSettings,
 } from "./sync-settings";
-import type { SyncConnectionInput, SyncSettingsInput } from "@shared/sync";
+import { cancelSyncRun, runSync } from "./sync-run";
+import type { SyncConnectionInput, SyncOutcome, SyncSettingsInput } from "@shared/sync";
 
 const isDev = !!process.env["ELECTRON_RENDERER_URL"];
 const smoke = process.env["CONFIDANT_SMOKE"] === "1";
@@ -628,6 +629,27 @@ function registerIpc(): void {
 
   ipcMain.handle(IPC.syncTestConnection, async (_e, input: SyncConnectionInput) => {
     return testSyncConnection(input);
+  });
+
+  // 02:发起一次同步(前景 invoke 返回最终结果;进度经 sync:progress 推送同一窗口)。
+  ipcMain.handle(
+    IPC.syncStart,
+    async (e, workspacePath: string): Promise<Result<SyncOutcome>> => {
+      try {
+        const sender = e.sender;
+        const outcome = await runSync(workspacePath, (p) => {
+          if (!sender.isDestroyed()) sender.send(IPC.syncProgress, p);
+        });
+        return { ok: true, value: outcome };
+      } catch (err) {
+        return { ok: false, error: toError(err) };
+      }
+    },
+  );
+
+  // 02:取消进行中的同步(已完成的操作保留)。
+  ipcMain.on(IPC.syncCancel, () => {
+    cancelSyncRun();
   });
 }
 

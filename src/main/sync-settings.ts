@@ -167,6 +167,42 @@ async function loadStoredPassword(workspacePath: string | null | undefined): Pro
   return decryptPassword(entry.passwordCipher) ?? "";
 }
 
+/** 跑一次同步所需的完整配置(含**明文密码**;只在主进程内用,绝不回传渲染层)。 */
+export interface WorkspaceSyncConfig {
+  baseUrl: string;
+  username: string;
+  password: string;
+  trustSelfSignedCert: boolean;
+  /** true = 有密文但解密失败(换机器 / 换 Windows 账户,决议 36:提示重新输入)。 */
+  passwordUndecryptable: boolean;
+}
+
+/**
+ * 读某工作区跑同步所需的配置。无配置返回 null;密码解密失败时 `password` 为空串且
+ * `passwordUndecryptable` 为 true(调用方据此提示,不静默失败)。
+ */
+export async function readWorkspaceSyncConfig(
+  workspacePath: string,
+): Promise<WorkspaceSyncConfig | null> {
+  const file = await loadFile();
+  const entry = file.workspaces[normalizeWorkspaceKey(workspacePath)];
+  if (!entry) return null;
+  let password = "";
+  let passwordUndecryptable = false;
+  if (entry.passwordCipher) {
+    const dec = decryptPassword(entry.passwordCipher);
+    if (dec === null) passwordUndecryptable = true;
+    else password = dec;
+  }
+  return {
+    baseUrl: entry.baseUrl,
+    username: entry.username,
+    password,
+    trustSelfSignedCert: entry.trustSelfSignedCert,
+    passwordUndecryptable,
+  };
+}
+
 /**
  * 测试连接:PROPFIND 远端根(depth 1)。
  * 结果分三类——可达(带远端直接子项数,供「远端目录非空」提示)/ 认证失败 / 目录不存在;
