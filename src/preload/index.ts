@@ -7,6 +7,10 @@ import {
   type MenuItemState,
   type MenuItemTemplate,
   type Result,
+  type SyncConnectionInput,
+  type SyncConnectionResult,
+  type SyncSettingsInput,
+  type SyncSettingsView,
   type TreeEntry,
   type WorkspaceSearchFileHit,
   type WorkspaceTreeUpdate,
@@ -180,6 +184,16 @@ const api: ConfidantApi = {
     ipcRenderer.invoke(IPC.infoDialog, message, detail ?? "") as Promise<void>,
 
   pathExists: (path: string) => ipcRenderer.invoke(IPC.pathExists, path) as Promise<boolean>,
+
+  // ── WebDAV 同步(01b) ──
+  getSyncSettings: (workspacePath: string) =>
+    ipcRenderer.invoke(IPC.syncSettingsGet, workspacePath) as Promise<SyncSettingsView>,
+
+  saveSyncSettings: (workspacePath: string, input: SyncSettingsInput) =>
+    ipcRenderer.invoke(IPC.syncSettingsSave, workspacePath, input) as Promise<Result<void>>,
+
+  testSyncConnection: (input: SyncConnectionInput) =>
+    ipcRenderer.invoke(IPC.syncTestConnection, input) as Promise<SyncConnectionResult>,
 };
 
 contextBridge.exposeInMainWorld("confidant", api);

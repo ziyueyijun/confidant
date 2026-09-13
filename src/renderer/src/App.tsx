@@ -25,6 +25,7 @@ import { ChangeNoticeToast, DocMissingBanner } from "./components/OverlayBanners
 import { Footer } from "./components/Footer";
 import { FormatToolbar } from "./components/FormatToolbar";
 import { EmptyWorkspaceGuidance, NotePickHint } from "./components/EmptyStates";
+import { SyncSettingsDialog } from "./sync/SyncSettingsDialog";
 import { countMdInTree, relPathOf, wsJoin, type Workspace } from "./workspace/workspace";
 import type { OpenNote } from "./session/types";
 import { useAppTheme } from "./hooks/use-app-theme";
@@ -58,6 +59,8 @@ export default function App() {
   /** 引擎 UI 节拍:编辑/选区/命令后递增,驱动浮动条重算与派生视图(语言标签/大纲)。 */
   const [uiTick, setUiTick] = useState(0);
   const [linkRequest, setLinkRequest] = useState(0);
+  /** WebDAV 同步设置对话框可见性(01b:文件 → 同步设置…;工作区级模态)。 */
+  const [syncSettingsOpen, setSyncSettingsOpen] = useState(false);
   /** 源码模式(30):全屏原始 Markdown 文本编辑;文本区为磁盘字节级真相源。 */
   const [sourceMode, setSourceMode] = useState(false);
   const sourceModeRef = useRef(false);
@@ -463,6 +466,15 @@ export default function App() {
     (rel: string) => {
       const ws = workspaceRef.current;
       if (!ws) return;
+      // 非 .md 项(图片/PDF 等)在树里可见可操作,但不能当笔记打开(票 01b)。
+      // 明确提示,不静默无反应。
+      if (!/\.md$/i.test(rel)) {
+        void window.confidant.infoDialog(
+          "无法作为笔记打开",
+          `「${basename(rel)}」不是 Markdown 文件(.md)。`,
+        );
+        return;
+      }
       void openPath(wsJoin(ws.root, rel));
     },
     [openPath],
@@ -509,6 +521,7 @@ export default function App() {
     toggleSidebar, toggleCodeWrap, toggleCodeLineNumbers, insertImageViaDialog,
     applyTheme, openFolderViaDialog,
     doCreateNote, doDeleteEntry, setPrompt, showNotice, refreshMenuContext,
+    openSyncSettings: () => setSyncSettingsOpen(true),
   });
 
   // 当前文件自动展开与 toggle 持久化归 useTreeExpansion(22)。
@@ -734,6 +747,13 @@ export default function App() {
           onLink={() => setLinkRequest((r) => r + 1)}
           onInsertImage={() => void insertImageViaDialog()}
           bump={() => setUiTick((t) => t + 1)}
+        />
+      )}
+      {/* 同步设置对话框(01b;工作区级模态;02 在此接「同步」按钮与进度) */}
+      {syncSettingsOpen && (
+        <SyncSettingsDialog
+          workspacePath={workspace?.root ?? null}
+          onClose={() => setSyncSettingsOpen(false)}
         />
       )}
     </div>

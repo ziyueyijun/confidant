@@ -37,6 +37,8 @@ export const Cmd = {
   rename: "file-rename",
   delete: "file-delete",
   preferences: "preferences",
+  /** 文件 → 同步设置…(01b:当前工作区的 WebDAV 同步配置对话框)。 */
+  syncSettings: "sync-settings",
   quit: "quit",
   // 编辑
   undo: "undo",
@@ -138,6 +140,8 @@ export function buildMenuTemplate(recent: RecentItem[] = []): MenuItemTemplate[]
         disabledItem(Cmd.exportPdf, "导出 PDF"),
         disabledItem(Cmd.print, "打印"),
         sep(),
+        // 01b:「同步设置…」——工作区级 WebDAV 同步配置(靠近「偏好设置…」)
+        disabledItem(Cmd.syncSettings, "同步设置…"),
         // 07:「偏好设置…」(Ctrl+,;Typora asar 实测键位)打开偏好设置窗口
         disabledItem(Cmd.preferences, "偏好设置…", "Ctrl+,"),
         sep(),

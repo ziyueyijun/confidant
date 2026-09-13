@@ -2,7 +2,22 @@
 // 结果类型统一走 ok/error 判别式,跨上下文不丢错误信息。
 
 import type { TreeEntry } from "../../packages/files";
+import type {
+  SyncConnectionInput,
+  SyncConnectionResult,
+  SyncSettingsInput,
+  SyncSettingsView,
+} from "./sync";
 export type { TreeEntry } from "../../packages/files";
+export type {
+  CloudEnv,
+  SyncConnectionInput,
+  SyncConnectionKind,
+  SyncConnectionResult,
+  SyncPasswordStatus,
+  SyncSettingsInput,
+  SyncSettingsView,
+} from "./sync";
 
 export const IPC = {
   openNoteDialog: "dialog:open-note",
@@ -84,6 +99,13 @@ export const IPC = {
   printDataGet: "print:data-get",
   /** 打印窗渲染就绪回执。 */
   printReady: "print:ready",
+  // ── WebDAV 同步(01b 起建立;02–07 只在此块内追加通道) ──
+  /** 读取某工作区的同步设置视图(不含密码)。 */
+  syncSettingsGet: "sync:settings-get",
+  /** 保存某工作区的同步设置(密码经 safeStorage 加密落盘)。 */
+  syncSettingsSave: "sync:settings-save",
+  /** 测试连接(可达 / 认证失败 / 目录不存在)。 */
+  syncTestConnection: "sync:test-connection",
 } as const;
 
 /** 外部变更原始事件(工作区监听批次内;树推送时一并携带,12 消费)。 */
@@ -227,6 +249,13 @@ export interface ConfidantApi {
   infoDialog(message: string, detail?: string): Promise<void>;
   /** 路径是否存在(悬空引用判定)。 */
   pathExists(path: string): Promise<boolean>;
+  // ── WebDAV 同步(01b;02–07 在此追加) ──
+  /** 读取某工作区的同步设置视图(不含密码明文/密文)。 */
+  getSyncSettings(workspacePath: string): Promise<SyncSettingsView>;
+  /** 保存某工作区的同步设置;密码经 safeStorage 加密,不进工作区与远端。 */
+  saveSyncSettings(workspacePath: string, input: SyncSettingsInput): Promise<Result<void>>;
+  /** 测试连接(省略 password 时用已存密码);结果区分可达/认证失败/目录不存在。 */
+  testSyncConnection(input: SyncConnectionInput): Promise<SyncConnectionResult>;
 }
 
 declare global {
