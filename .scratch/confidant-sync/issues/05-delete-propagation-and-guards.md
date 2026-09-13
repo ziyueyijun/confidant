@@ -6,7 +6,7 @@
 
 规格依据：决议 24–28、63。
 
-**Blocked by:** 03
+**Blocked by:** [03](03-incremental-change-detection.md)
 
 **Status:** ready-for-agent
 

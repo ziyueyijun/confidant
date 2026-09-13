@@ -4,7 +4,7 @@
 
 规格依据：决议 6–19、29–34、50–55。
 
-**Blocked by:** 01
+**Blocked by:** [01a](01a-sync-package-and-webdav-client.md), [01b](01b-credentials-ipc-and-settings-dialog.md)（原票 01 已拆为这两张，见 [00-split-note.md](00-split-note.md)）
 
 **Status:** ready-for-agent
 

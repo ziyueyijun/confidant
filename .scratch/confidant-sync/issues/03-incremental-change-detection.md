@@ -4,7 +4,7 @@
 
 规格依据：决议 20–21、35、48–49。
 
-**Blocked by:** 02
+**Blocked by:** [02](02-first-sync-conservative-merge.md)
 
 **Status:** ready-for-agent
 
