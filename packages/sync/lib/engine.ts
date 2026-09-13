@@ -186,10 +186,34 @@ export function createSyncEngine(opts: SyncEngineOptions): SyncEngine {
     }
 
     /**
+     * 只本地改 → 上传并记基准。上传后回读校验失败则计失败(决议 47)。
+     * 用于两条路径:远端无变化信号时,以及远端验证符失真但内容仍等于基准时。
+     */
+    async function uploadLocal(
+      rel: string,
+      localBytes: Uint8Array,
+      localHash: string,
+      ifMatch: string | null,
+    ): Promise<void> {
+      const entry = await putAndVerify(rel, localBytes, { ifMatch });
+      if (!entry) {
+        report.failed.push({ relPath: rel, reason: "上传后校验失败(大小不一致或条目缺失)" });
+        return;
+      }
+      report.uploaded++;
+      await store.upsert(rel, makeRecord(rel, localHash, entry));
+    }
+
+    /**
      * 冲突处置 = 保留双份(决议 22–23):本地文件保持不动;远端版本落成本地冲突副本;
      * 副本作为普通文件上传到远端;本地版本覆盖远端主名(远端版本已存于副本,内容不丢)。
      * 终态:两侧都是「主名=本地版本 + 副本=远端版本」,下一次同步稳定无操作。
-     * 票 04 将在此基础上补冲突标记与计数口径。
+     *
+     * 覆盖远端主名是票 02 的裁决,票 04 独立复核后维持(见票 04 Answer):
+     * 若改成「远端主名不动」,则基准 hash 要么记本地(下次同步会把本地版本覆盖掉 =
+     * 丢内容),要么记远端(远端主名此后一直落后于本地,要再同步一次才收敛,第二台
+     * 机器也看不到冲突)。覆盖方案在一次同步内收敛,且远端那份内容先落副本再被替换,
+     * 不丢任何版本。
      */
     async function resolveConflict(
       rel: string,
@@ -228,30 +252,38 @@ export function createSyncEngine(opts: SyncEngineOptions): SyncEngine {
         const localChanged = localHash !== record.baseHash;
         if (!remoteChanged && !localChanged) return; // 未变更:不产生传输
         if (!remoteChanged && localChanged) {
-          const entry = await putAndVerify(rel, localBytes, { ifMatch: record.etag });
-          if (!entry) {
-            report.failed.push({ relPath: rel, reason: "上传后校验失败(大小不一致或条目缺失)" });
-            return;
-          }
-          report.uploaded++;
-          await store.upsert(rel, makeRecord(rel, localHash, entry));
+          // 远端无变化信号、本地内容不等于基准 ⇒ 只本地改 → 上传。
+          await uploadLocal(rel, localBytes, localHash, record.etag);
           return;
         }
         // 远端疑似已变:下载并算 hash 确认(决议 35;验证符只做变化探测)。
         const remoteBytes = await retry(() => client.get(rel));
         const remoteHash = sha256Hex(remoteBytes);
         if (remoteHash === localHash) {
-          // 内容未变、仅元数据变 → 只更新状态表,不写盘。
+          // 两侧内容一致:含「两侧都改且内容相同」(不冲突)与「仅验证符/时间/大小
+          // 失真」⇒ 只把基准对齐到该内容,不写盘。
           await store.upsert(rel, makeRecord(rel, localHash, remoteEntry));
           return;
         }
+        // 内容不一致:按「谁的内容真的离开了基准版本」判定(决议 21)。
+        // 依据是 hash,**绝不**用验证符 —— 验证符会失真(票 03 A4/A5)。
+        // 把远端 hash 与基准比较这一步是必要的:验证符变了但内容仍等于基准,
+        // 只是「仅本地改」,不是冲突。
+        const remoteLeftBase = remoteHash !== record.baseHash;
         if (!localChanged) {
+          // 仅远端内容变化 → 下载。
           await writeLocalAtomic(joinRoot(rel), remoteBytes);
           report.downloaded++;
           await store.upsert(rel, makeRecord(rel, remoteHash, remoteEntry));
           return;
         }
-        // 两侧都离开基准 → 冲突(票 04 的判定插入点)。
+        if (!remoteLeftBase) {
+          // 远端内容其实仍等于基准(被验证符/时间/大小失真误报)→ 仅本地改 → 上传。
+          // If-Match 用**本次观测到的**远端验证符(record.etag 已因失真而过时)。
+          await uploadLocal(rel, localBytes, localHash, remoteEntry.etag);
+          return;
+        }
+        // 两侧内容都离开基准且互不相同 → 冲突:保留双份。
         await resolveConflict(rel, localBytes, localHash, remoteBytes, remoteHash, remoteEntry);
         return;
       }

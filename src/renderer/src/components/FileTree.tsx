@@ -1,5 +1,6 @@
 // 文件树(规格 §8 树形态;数据来自主进程扫描/监听,渲染层只做展示与展开状态)。
 // 排序/过滤由扫描层完成;本组件处理:层级缩进、展开折叠、当前文件高亮(相对路径)。
+// 冲突副本按名称派生徽标(决议 55;见 sync/conflict-marker)。
 
 import {
   memo,
@@ -10,6 +11,11 @@ import {
 } from "react";
 import { ChevronRight, File, FileText, Folder, FolderOpen } from "lucide-react";
 import type { TreeEntry } from "@shared/ipc";
+import {
+  CONFLICT_COPY_BADGE,
+  CONFLICT_COPY_TITLE,
+  isConflictCopyName,
+} from "../sync/conflict-marker";
 
 export interface FileTreeProps {
   tree: TreeEntry[];
@@ -129,6 +135,26 @@ export const FileTree = memo(function FileTree({
               <span style={{ overflow: "hidden", textOverflow: "ellipsis", opacity: isMd ? 1 : 0.85 }}>
                 {isMd ? entry.name.replace(/\.md$/i, "") : entry.name}
               </span>
+              {isConflictCopyName(entry.name) && (
+                <span
+                  data-testid="tree-conflict-badge"
+                  title={CONFLICT_COPY_TITLE}
+                  style={{
+                    flexShrink: 0,
+                    marginLeft: 4,
+                    padding: "0 4px",
+                    fontSize: 10,
+                    lineHeight: "14px",
+                    borderRadius: 3,
+                    background: "var(--banner-bg)",
+                    border: "1px solid var(--banner-border)",
+                    color: "var(--muted)",
+                    whiteSpace: "nowrap",
+                  }}
+                >
+                  {CONFLICT_COPY_BADGE}
+                </span>
+              )}
             </button>
           )}
           {isOpen && entry.children && renderLevel(entry.children, depth + 1)}
