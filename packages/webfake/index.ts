@@ -5,6 +5,8 @@
 export { startWebfakeServer } from "./lib/server";
 export type {
   WebfakeCredentials,
+  WebfakeFileMeta,
+  WebfakeFileStat,
   WebfakeOptions,
   WebfakeQuirks,
   WebfakeRequestLogEntry,

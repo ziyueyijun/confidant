@@ -10,7 +10,8 @@
 // 后续票的插入点(见各函数注释):
 //   - 删除判定 / 熔断 / 列举闸门 → 票 05(merge.ts buildPlan 的 hasState 分支、run 里
 //     执行前的守卫、scanRemote 之后);
-//   - 增量变更探测 → 票 03(remoteEntryChanged 与 resolveBoth);
+//   - 增量变更探测 → 票 03(已实现:change-detect.ts 的 remoteEntryChanged +
+//     resolveBoth 的 hash 确认);
 //   - 冲突判定 → 票 04(resolveConflict);
 //   - 收尾比对(remainingLocalChanges)→ 票 07;
 //   - 关窗/切工作区中断 → 票 06(run 的 signal 已支持取消)。
@@ -29,6 +30,7 @@ import type {
 import { scanLocal, readLocalBytes, writeLocalAtomic, type LocalSnapshot } from "./fs-local";
 import { scanRemote, type RemoteSnapshot } from "./remote";
 import { actionableItems, buildPlan, type PlanItem } from "./merge";
+import { remoteEntryChanged } from "./change-detect";
 import { uniqueConflictCopyRelPath } from "./conflict";
 import { sha256Hex } from "./hash";
 import { acquireLock, SyncBusyError, type SyncLock } from "./lock";
@@ -89,20 +91,6 @@ function makeRecord(relPath: string, baseHash: string, entry: WebdavEntry | null
     remoteModified: entry?.lastModified ?? null,
     remoteSize: entry?.size ?? null,
   };
-}
-
-/** 远端条目的验证符/修改时间/大小**任一不同**即视为可能已变(决议 35)。 */
-function remoteEntryChanged(record: SyncFileRecord, entry: WebdavEntry): boolean {
-  if (record.etag !== null && entry.etag !== null && record.etag !== entry.etag) return true;
-  if (record.remoteSize !== null && entry.size !== null && record.remoteSize !== entry.size) return true;
-  if (
-    record.remoteModified !== null &&
-    entry.lastModified !== null &&
-    record.remoteModified !== entry.lastModified
-  ) {
-    return true;
-  }
-  return false;
 }
 
 export function createSyncEngine(opts: SyncEngineOptions): SyncEngine {
@@ -234,7 +222,8 @@ export function createSyncEngine(opts: SyncEngineOptions): SyncEngine {
       const localHash = sha256Hex(localBytes);
 
       if (hasState && record) {
-        // 票 03 的增量判定插入点(此处为「变更探测」的最小实现)。
+        // 增量变更探测(票 03):验证符/修改时间/大小任一不同 ⇒ 下载算 hash 确认。
+        // 内容 hash 才是权威;验证符只做变化探测(决议 35,见 change-detect.ts)。
         const remoteChanged = remoteEntryChanged(record, remoteEntry);
         const localChanged = localHash !== record.baseHash;
         if (!remoteChanged && !localChanged) return; // 未变更:不产生传输

@@ -9,6 +9,8 @@ import { randomBytes } from "node:crypto";
 import { escapeXml, xmlDocument } from "./xml";
 import { SELFSIGNED_CERT_PEM, SELFSIGNED_KEY_PEM } from "./cert";
 import type {
+  WebfakeFileMeta,
+  WebfakeFileStat,
   WebfakeOptions,
   WebfakeQuirks,
   WebfakeRequestLogEntry,
@@ -60,6 +62,16 @@ function toBytes(data: string | Uint8Array): Uint8Array {
 
 function makeEtag(): string {
   return `"${randomBytes(8).toString("hex")}"`;
+}
+
+/** 建文件节点;meta 可钉住验证符/修改时间(默认随机验证符 + 当前时间)。 */
+function makeFileNode(data: string | Uint8Array, meta?: WebfakeFileMeta): FileNode {
+  return {
+    kind: "file",
+    data: toBytes(data),
+    etag: meta?.etag ?? makeEtag(),
+    lastModified: meta?.lastModified ?? new Date().toUTCString(),
+  };
 }
 
 function sleep(ms: number): Promise<void> {
@@ -184,7 +196,8 @@ export async function startWebfakeServer(opts: WebfakeOptions = {}): Promise<Web
       return;
     }
     const ifMatch = req.headers["if-match"];
-    if (typeof ifMatch === "string" && ifMatch !== "*") {
+    // ignoreIfMatch:不支持条件写的服务端——验证「If-Match 尽力而为,不作为正确性保证」。
+    if (!quirks.ignoreIfMatch && typeof ifMatch === "string" && ifMatch !== "*") {
       const cur = nodes.get(path);
       if (!cur || cur.kind !== "file" || cur.etag !== ifMatch) {
         res.writeHead(412);
@@ -202,14 +215,9 @@ export async function startWebfakeServer(opts: WebfakeOptions = {}): Promise<Web
       res.end();
       return;
     }
-    const etag = makeEtag();
-    nodes.set(path, {
-      kind: "file",
-      data: new Uint8Array(body),
-      etag,
-      lastModified: new Date().toUTCString(),
-    });
-    res.writeHead(exists ? 204 : 201, { etag });
+    const node = makeFileNode(new Uint8Array(body));
+    nodes.set(path, node);
+    res.writeHead(exists ? 204 : 201, { etag: node.etag });
     res.end();
   }
 
@@ -303,7 +311,13 @@ export async function startWebfakeServer(opts: WebfakeOptions = {}): Promise<Web
     const u = new URL(req.url ?? "/", "http://localhost");
     const path = normPath(decodePathname(u.pathname));
     const method = req.method ?? "";
-    requests.push({ method, path, depth: typeof req.headers.depth === "string" ? req.headers.depth : null });
+    requests.push({
+      method,
+      path,
+      depth: typeof req.headers.depth === "string" ? req.headers.depth : null,
+      ifMatch: typeof req.headers["if-match"] === "string" ? req.headers["if-match"] : null,
+      ifNoneMatch: typeof req.headers["if-none-match"] === "string" ? req.headers["if-none-match"] : null,
+    });
 
     if (typeof quirks.delayMs === "number" && quirks.delayMs > 0) await sleep(quirks.delayMs);
 
@@ -381,19 +395,27 @@ export async function startWebfakeServer(opts: WebfakeOptions = {}): Promise<Web
         server.closeAllConnections?.();
         server.close((err) => (err ? reject(err) : resolve()));
       }),
-    putFile(path, data) {
+    putFile(path, data, meta) {
       const n = normPath(path);
       mkdirp(parentOf(n));
-      nodes.set(n, {
-        kind: "file",
-        data: toBytes(data),
-        etag: makeEtag(),
-        lastModified: new Date().toUTCString(),
-      });
+      nodes.set(n, makeFileNode(data, meta));
     },
     getFile(path) {
       const node = nodes.get(normPath(path));
       return node?.kind === "file" ? node.data : undefined;
+    },
+    stat(path) {
+      const node = nodes.get(normPath(path));
+      if (!node || node.kind !== "file") return undefined;
+      return { etag: node.etag, lastModified: node.lastModified, size: node.data.byteLength };
+    },
+    setEtag(path, etag) {
+      const node = nodes.get(normPath(path));
+      if (node && node.kind === "file") node.etag = etag;
+    },
+    setLastModified(path, lastModified) {
+      const node = nodes.get(normPath(path));
+      if (node && node.kind === "file") node.lastModified = lastModified;
     },
     mkdirp,
     has: (path) => nodes.has(normPath(path)),

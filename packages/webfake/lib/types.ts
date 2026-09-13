@@ -27,6 +27,26 @@ export interface WebfakeQuirks {
   delayMs?: number;
   /** href 不做百分号编码,改用 XML 实体转义(非标准服务端;测 XML 实体解码)。 */
   rawHrefNames?: boolean;
+  /**
+   * 忽略 If-Match(不支持条件写的服务端)。用于验证「If-Match 尽力而为、绝不作为
+   * 正确性保证」:服务端忽略它时结果仍须正确(决议 48,票 03)。
+   */
+  ignoreIfMatch?: boolean;
+}
+
+/** 布置文件时可钉住的元信息(省略则随机验证符 + 当前时间)。 */
+export interface WebfakeFileMeta {
+  /** 指定验证符原样返回(如强验证符 `"abc"`、弱验证符 `W/"abc"`、无引号 `abc`)。 */
+  etag?: string;
+  /** 指定 Last-Modified 原样返回(HTTP-date 字符串)。 */
+  lastModified?: string;
+}
+
+/** 某文件的元信息快照(用于构造「验证符失真」等畸形态前的取样)。 */
+export interface WebfakeFileStat {
+  etag: string;
+  lastModified: string;
+  size: number;
 }
 
 export interface WebfakeOptions {
@@ -46,6 +66,10 @@ export interface WebfakeRequestLogEntry {
   path: string;
   /** Depth 请求头(无则 null)。 */
   depth: string | null;
+  /** If-Match 请求头(无则 null);用于断言条件写形态。 */
+  ifMatch?: string | null;
+  /** If-None-Match 请求头(无则 null);用于断言创建保护。 */
+  ifNoneMatch?: string | null;
 }
 
 /** 内存版假 WebDAV 服务端句柄。 */
@@ -56,9 +80,18 @@ export interface WebfakeServer {
   /** 已处理请求日志(顺序即请求顺序;用于断言串行/单层建目录)。 */
   readonly requests: WebfakeRequestLogEntry[];
   close(): Promise<void>;
-  /** 直接布置/读取内存表(服务端绝对路径,如 "/dav/notes/a.md";根为 "")。 */
-  putFile(path: string, data: string | Uint8Array): void;
+  /**
+   * 直接布置/读取内存表(服务端绝对路径,如 "/dav/notes/a.md";根为 "")。
+   * 传 meta 可钉住验证符/修改时间,用于构造畸形态(如「验证符不变、内容已变」)。
+   */
+  putFile(path: string, data: string | Uint8Array, meta?: WebfakeFileMeta): void;
   getFile(path: string): Uint8Array | undefined;
+  /** 读取某文件的元信息(etag/lastModified/大小);不存在或为目录返回 undefined。 */
+  stat(path: string): WebfakeFileStat | undefined;
+  /** 改写某文件的验证符(内容不动),用于构造「验证符失真」。 */
+  setEtag(path: string, etag: string): void;
+  /** 改写某文件的 Last-Modified(内容不动)。 */
+  setLastModified(path: string, lastModified: string): void;
   mkdirp(path: string): void;
   has(path: string): boolean;
   list(): string[];

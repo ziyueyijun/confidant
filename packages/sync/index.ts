@@ -12,6 +12,11 @@ export type { SyncEngineOptions } from "./lib/engine";
 /** 另一个同步任务持锁时抛出(决议 37)。 */
 export { SyncBusyError } from "./lib/lock";
 
+// ── 远端变更探测(票 03;决议 35) ────────────────────────────────────────────
+// 验证符/修改时间/大小任一不同 ⇒ 疑似已变,须下载算 hash 确认;**绝不**据此断言
+// 内容相同(内容相同只能由 hash 判定)。票 07 的启动探测复用此判定。
+export { remoteEntryChanged } from "./lib/change-detect";
+
 /** 默认阈值(决议 17、27):100 MB 上限;熔断 20 个 / 20%。测试传极小值。 */
 export const DEFAULT_SYNC_THRESHOLDS: SyncThresholds = {
   maxFileSizeBytes: 100 * 1024 * 1024,
