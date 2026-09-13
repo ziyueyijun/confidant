@@ -14,7 +14,7 @@
 
 **Blocked by:** None (can start immediately)
 
-**Status:** ready-for-agent
+**Status:** done
 
 ## 包边界（重要）
 
@@ -74,23 +74,23 @@ packages/webfake/
 
 ## 验收清单
 
-- [ ] `packages/sync` 与 `packages/webfake` 建立，各自通过 `npm run lint:boundaries`
-- [ ] WebDAV 客户端实现列目录 / 下载 / 上传 / 删除 / 建目录 / 移动六个动词
-- [ ] 列目录只用深度 1；逐层遍历由调用方完成
-- [ ] 建目录逐级创建，一次一层；**400 与 405 都当作「已存在」**
-- [ ] 上传带 `If-None-Match: *`；`If-Match` 尽力而为
-- [ ] Basic 认证；`http` 与 `https` 均可用；`trustSelfSignedCert` 开关存在（默认关）
-- [ ] 显式请求超时；超时可配置
-- [ ] 认证失败可与其它失败区分
-- [ ] 路径编码与 href 归一化有单测覆盖：中文、空格、`#`、`%`、非 ASCII 目录名、base 前缀不同、末尾斜杠
-- [ ] XML 实体（`&`、`<`）在文件名里正确往返
-- [ ] 假服务端可应答六个动词，且能模拟上列全部畸形行为
-- [ ] 假服务端挂在真实 `http.Server` 上（测试里起真端口，走真 `fetch`）
-- [ ] 同步状态表的读写单测：按工作区为键、每完成一个文件写一次、**读取失败退化为「无状态表」而非静默重建为空表**
-- [ ] `TreeEntryKind` 扩展为 `"dir" | "md" | "file"`；扫描收下全部非点开头文件（含图片/PDF）
-- [ ] 点开头条目、`Thumbs.db`、`desktop.ini` 仍被排除
-- [ ] 排序口径不变（文件夹在前、组内名称自然序）；`collectMarkdownPaths` 仍只收 `.md`
-- [ ] `npm run typecheck`、`npm test`、`npm run lint:boundaries` 全绿
+- [x] `packages/sync` 与 `packages/webfake` 建立，各自通过 `npm run lint:boundaries`
+- [x] WebDAV 客户端实现列目录 / 下载 / 上传 / 删除 / 建目录 / 移动六个动词
+- [x] 列目录只用深度 1；逐层遍历由调用方完成
+- [x] 建目录逐级创建，一次一层；**400 与 405 都当作「已存在」**
+- [x] 上传带 `If-None-Match: *`；`If-Match` 尽力而为
+- [x] Basic 认证；`http` 与 `https` 均可用；`trustSelfSignedCert` 开关存在（默认关）
+- [x] 显式请求超时；超时可配置
+- [x] 认证失败可与其它失败区分
+- [x] 路径编码与 href 归一化有单测覆盖：中文、空格、`#`、`%`、非 ASCII 目录名、base 前缀不同、末尾斜杠
+- [x] XML 实体（`&`、`<`）在文件名里正确往返
+- [x] 假服务端可应答六个动词，且能模拟上列全部畸形行为
+- [x] 假服务端挂在真实 `http.Server` 上（测试里起真端口，走真 `fetch`）
+- [x] 同步状态表的读写单测：按工作区为键、每完成一个文件写一次、**读取失败退化为「无状态表」而非静默重建为空表**
+- [x] `TreeEntryKind` 扩展为 `"dir" | "md" | "file"`；扫描收下全部非点开头文件（含图片/PDF）
+- [x] 点开头条目、`Thumbs.db`、`desktop.ini` 仍被排除
+- [x] 排序口径不变（文件夹在前、组内名称自然序）；`collectMarkdownPaths` 仍只收 `.md`
+- [x] `npm run typecheck`、`npm test`、`npm run lint:boundaries` 全绿
 
 ## 单测覆盖（穷举，不要只测顺路）
 
@@ -100,3 +100,49 @@ packages/webfake/
 - PROPFIND 的三种应答：正常 / 无 ETag / 空结果；
 - 认证失败 401、403；
 - 状态表：正常读写 / 文件损坏 / 文件不存在 / 中间写入。
+
+## Answer
+
+**收官 2026-09-14**（commit `8178a29`，分支 `sync-01a`，已并入 `feat/webdav-sync`）。
+
+三件套实测：`npm run typecheck` 通过；`npm test` **255 用例 / 32 文件全过**（基线 192 / 27，本票新增 5 个测试文件）；`npm run lint:boundaries` 通过（154 modules，282 dependencies，零违规）。
+
+### 交付的接口形状（02–07 长在这上面）
+
+`packages/sync/client.ts`：
+
+```ts
+createWebdavClient(config: WebdavConfig): WebdavClient
+interface WebdavConfig { baseUrl; username; password; trustSelfSignedCert?; timeoutMs?; fetch? }
+interface WebdavClient {
+  list(relPath): Promise<WebdavEntry[]>;   // Depth:1,已滤掉自身、只留直接子项
+  get(relPath): Promise<Uint8Array>;
+  put(relPath, data, opts?: { createOnly?; ifMatch? }): Promise<{ etag: string | null }>;
+  remove(relPath): Promise<void>;
+  mkcol(relPath): Promise<"created" | "exists">;   // 400/405 → "exists"
+  move(fromRelPath, toRelPath): Promise<void>;
+  ensureDir(relPath): Promise<void>;               // 逐级、一次一层
+}
+type WebdavErrorKind = "auth" | "not-found" | "conflict" | "precondition" | "timeout" | "network" | "http";
+```
+
+`relPath` 一律是相对 `baseUrl` 的正斜杠路径，根为 `""`。另导出 `buildUrl` / `normalizeHref` / `normalizeUrlPath` / `decodePathname` / `nameOfRelPath` / `parentOfRelPath` / `parseMultistatus`。
+
+`packages/sync/index.ts`：`SyncDeps` / `SyncConfig` / `SyncThresholds` / `SyncRetryPolicy` / `SyncProgress` / `SyncReport` / `SyncEngine` 类型，`createSyncStateStore`，`DEFAULT_SYNC_THRESHOLDS`（100 MB / 20 个 / 20%）、`DEFAULT_SYNC_RETRY`（2 次，退避 200ms 起）。
+
+`packages/webfake/index.ts`：`startWebfakeServer({ credentials?, quirks? })` → 真 `http.Server`；`quirks` 可开 `mkcolMultiLevel405` / `mkcolExisting400` / `omitEtag` / `emptyListing` / `listingStatus` / `authFailureStatus` / `delayMs` / `rawHrefNames`。
+
+**本票未提供 `createSyncEngine`** —— 引擎工厂的形状留给票 02 决定并在 `lib/` 加模块。
+
+### 留给后续票的坑（已记入工程简报 §2.5）
+
+- `store.upsert()` 在表不存在时**会建新表**。引擎只能在「已判定为首次同步」时这样做，**绝不能因 `load()` 返回 null 就 upsert 空表再据此删文件**。`load()` 本身从不写盘。
+- `state.workspace` 与 `opts.workspacePath` 严格相等比较；Windows 大小写不敏感，`src/main` 侧传入前要归一化。
+- 决议 63 的列举闸门不在本票：客户端用「返回 `[]`」区分空列举、「抛 `WebdavError`」区分非成功状态码，闸门判定留给票 05。
+- `trustSelfSignedCert` 只是配置字段，本包不做 TLS 处置（Node fetch 无 agent 选项），需注入的 `fetch`（如 Electron `net.fetch`）承担。
+- `webfake` 的 `rawHrefNames` 模式无法往返文件名里的裸 `#`（URL 片段分隔符）；`#` 只在默认百分号编码模式测。
+- `src/test/setup.ts` 新增的 DOM 存在性守卫是 node 环境测试的前提，**不要回退**。
+
+### 顺带改动
+
+树类目扩展（`packages/files/lib/tree.ts` 的 `TreeEntryKind` → `dir|md|file`、新增 `isExcludedName` 导出）落地在此，界面侧归票 01b。`src/shared/tree.ts` 的计数口径不变。
