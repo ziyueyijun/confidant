@@ -95,4 +95,8 @@ export interface WebfakeServer {
   mkdirp(path: string): void;
   has(path: string): boolean;
   list(): string[];
+  /** 删除一个文件或集合子树(模拟「在别处删了远端文件」)。 */
+  removeFile(path: string): void;
+  /** 运行时改畸形开关(用于「先正常同步建状态,再模拟列举异常」)。 */
+  setQuirks(patch: Partial<WebfakeQuirks>): void;
 }

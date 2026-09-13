@@ -420,5 +420,13 @@ export async function startWebfakeServer(opts: WebfakeOptions = {}): Promise<Web
     mkdirp,
     has: (path) => nodes.has(normPath(path)),
     list: () => [...nodes.keys()],
+    removeFile(path) {
+      const n = normPath(path);
+      if (n === "" || !nodes.has(n)) return;
+      removeSubtree(n);
+    },
+    setQuirks(patch) {
+      Object.assign(quirks, patch);
+    },
   };
 }

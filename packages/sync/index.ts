@@ -28,6 +28,7 @@ export const DEFAULT_SYNC_THRESHOLDS: SyncThresholds = {
 export const DEFAULT_SYNC_RETRY: SyncRetryPolicy = { attempts: 2, baseDelayMs: 200 };
 
 export type {
+  DeleteGuardPrompt,
   SyncConfig,
   SyncDeps,
   SyncEngine,

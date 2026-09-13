@@ -10,8 +10,37 @@ import type { WebdavClient, WebdavConfig } from "./webdav-types";
 export interface SyncDeps {
   createClient: (config: WebdavConfig) => WebdavClient;
   trashFile: (absPath: string) => Promise<void>;
+  /**
+   * 熔断确认(决议 27)。一次同步计划删除的文件数超阈值时调用;返回 false ⇒ 整次同步
+   * **零删除**。省略 ⇒ 视为拒绝(引擎绝不自行弹窗;主进程接 dialog.showMessageBox)。
+   */
+  confirmDeletes?: (prompt: DeleteGuardPrompt) => Promise<boolean>;
   now?: () => number;
   logger?: (line: string) => void;
+}
+
+/** 熔断确认信息(决议 27);供界面展示「要删多少、占比多少」。 */
+export interface DeleteGuardPrompt {
+  /** 本次同步计划删除的文件总数(本地 + 远端)。 */
+  count: number;
+  /** 其中进本地回收站的数量(远端已删)。 */
+  localDeletes: number;
+  /** 其中删除远端文件的数量(本地已删)。 */
+  remoteDeletes: number;
+  /** 本地当前文件总数。 */
+  localTotal: number;
+  /** 远端当前文件总数。 */
+  remoteTotal: number;
+  /** 阈值:绝对数量上限。 */
+  maxFiles: number;
+  /** 阈值:占该侧文件总数的比例上限。 */
+  ratioLimit: number;
+  /** 是否由「数量超限」触发。 */
+  triggeredByMax: boolean;
+  /** 是否由「占比超限」触发。 */
+  triggeredByRatio: boolean;
+  /** 拟删除文件的相对路径(供界面摘要)。 */
+  relPaths: string[];
 }
 
 /** 阈值类参数进配置对象(决议 17、27、58;测试传极小值,不造大文件)。 */

@@ -340,14 +340,15 @@ describe("增量同步(状态表存在时)", () => {
     expect(await readWs(h.ws, copyName)).toBe("remote-2");
   });
 
-  it("本地删除但票 05 未实现 → 不删远端(defer)", async () => {
-    const h = await harness();
+  it("本地删除 → 远端对应文件被删除(删除传播;票 05)", async () => {
+    // 阈值放宽:本用例只验证传播本身;熔断与闸门见 deletion.test.ts。
+    const h = await harness({ thresholds: { deleteGuardMax: 100, deleteGuardRatio: 1 } });
     await writeWs(h.ws, "a.md", "x");
     await h.run();
     await rm(join(h.ws, "a.md"));
     const r = await h.run();
-    expect(r.deletedRemote).toBe(0);
+    expect(r.deletedRemote).toBe(1);
     expect(r.deletedLocal).toBe(0);
-    expect(remoteText(h.server, "a.md")).toBe("x"); // 远端仍在(绝不静默丢内容)
+    expect(remoteText(h.server, "a.md")).toBeUndefined(); // 远端已删
   });
 });

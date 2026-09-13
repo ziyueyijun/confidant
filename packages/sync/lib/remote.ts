@@ -10,6 +10,12 @@ export interface RemoteSnapshot {
   files: Map<string, WebdavEntry>;
   dirs: Set<string>;
   skipped: SyncIssue[];
+  /**
+   * 远端根(`""`)一次列举返回的**原始**条目数——在排除名单过滤之前。决议 63 的列举
+   * 闸门用它区分「远端真的空」与「列举静默返回空」:若为 0 而状态表非空 → 停止。
+   * 根目录只含点开头条目时该值仍 > 0,不会误触闸门。
+   */
+  rootRawCount: number;
 }
 
 /**
@@ -24,6 +30,7 @@ export async function scanRemote(
   const files = new Map<string, WebdavEntry>();
   const dirs = new Set<string>();
   const skipped: SyncIssue[] = [];
+  let rootRawCount = 0;
   const queue: string[] = [""];
   const seen = new Set<string>();
 
@@ -34,6 +41,7 @@ export async function scanRemote(
     opts.throwIfAborted();
 
     const entries = await client.list(rel);
+    if (rel === "") rootRawCount = entries.length; // 原始条目数(过滤前);列举闸门用
     for (const e of entries) {
       if (isExcludedName(e.name)) continue;
       const childRel = rel ? `${rel}/${e.name}` : e.name;
@@ -57,5 +65,5 @@ export async function scanRemote(
     }
   }
 
-  return { files, dirs, skipped };
+  return { files, dirs, skipped, rootRawCount };
 }

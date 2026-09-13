@@ -1,24 +1,28 @@
-// 同步引擎本体(票 02)。
+// 同步引擎本体(票 02;删除传播/熔断/列举闸门＝票 05)。
 //
 // 一次 run = 一次同步:
 //   1. (可选)取锁 → 2. 读状态表(load() 为 null ⇒ 保守合并)→ 3. 枚举本地(不跟随符号
-//   链接)与远端(深度 1 逐层)→ 4. 决策表产出计划 → 5. **串行**执行,每完成一个文件
-//   写一次状态表 → 6. 汇总报告。
+//   链接)与远端(深度 1 逐层)→ 4. 列举闸门 → 5. 决策表产出计划 → 6. 熔断守卫 →
+//   7. **串行**执行,每完成一个文件写一次状态表 → 8. 汇总报告。
 //
-// 红线(决议 33 + 工程简报 §2.5):状态表为空时**绝不删除任何文件**;删除判定交给票 05。
+// 红线(决议 26/27/33/63 + 工程简报 §2.5):
+//   · load() 为 null(无状态表)⇒ 保守合并,**绝不删除任何文件**;删除判定只允许出现
+//     在 hasState 分支里;
+//   · 远端删除必须靠基准版本:状态表有记录且本地内容仍等于基准,才认定「远端删除」;
+//     本地已改 ⇒ 改 vs 删冲突,绝不删本地;
+//   · 本地删除永远走 deps.trashFile(主进程 = shell.trashItem),绝不用不可恢复删除;
+//   · 远端根列举返回 0 条而状态表非空 ⇒ 立即报错停止(列举闸门,决议 63);
+//   · 一次同步要删除的文件数超阈值 ⇒ 先经 deps.confirmDeletes 确认,拒绝则零删除。
 //
-// 后续票的插入点(见各函数注释):
-//   - 删除判定 / 熔断 / 列举闸门 → 票 05(merge.ts buildPlan 的 hasState 分支、run 里
-//     执行前的守卫、scanRemote 之后);
-//   - 增量变更探测 → 票 03(已实现:change-detect.ts 的 remoteEntryChanged +
-//     resolveBoth 的 hash 确认);
-//   - 冲突判定 → 票 04(resolveConflict);
-//   - 收尾比对(remainingLocalChanges)→ 票 07;
-//   - 关窗/切工作区中断 → 票 06(run 的 signal 已支持取消)。
+// 后续票的插入点:
+//   · 收尾比对(remainingLocalChanges)→ 票 07;
+//   · 关窗/切工作区中断 → 票 06(run 的 signal 已支持取消)。
+
 
 import type { WebdavClient, WebdavEntry } from "./webdav-types";
 import { WebdavError } from "./webdav-types";
 import type {
+  DeleteGuardPrompt,
   SyncConfig,
   SyncDeps,
   SyncEngine,
@@ -29,7 +33,7 @@ import type {
 } from "./sync-types";
 import { scanLocal, readLocalBytes, writeLocalAtomic, type LocalSnapshot } from "./fs-local";
 import { scanRemote, type RemoteSnapshot } from "./remote";
-import { actionableItems, buildPlan, type PlanItem } from "./merge";
+import { buildPlan, type PlanItem } from "./merge";
 import { remoteEntryChanged } from "./change-detect";
 import { uniqueConflictCopyRelPath } from "./conflict";
 import { sha256Hex } from "./hash";
@@ -205,6 +209,59 @@ export function createSyncEngine(opts: SyncEngineOptions): SyncEngine {
     }
 
     /**
+     * 熔断守卫(决议 27)。统计计划中的删除项(deleteLocal + deleteRemote);数量
+     * **超过** deleteGuardMax,或**超过**该侧文件总数的 deleteGuardRatio → 先经
+     * deps.confirmDeletes 请用户确认。拒绝(或未注入回调)→ SyncFatalError,整次
+     * 同步零删除。注意:「恰好等于阈值」不触发(边界取「超过」)。
+     */
+    async function enforceDeleteGuard(items: PlanItem[]): Promise<void> {
+      const deletes = items.filter(
+        (i): i is Extract<PlanItem, { type: "deleteLocal" | "deleteRemote" }> =>
+          i.type === "deleteLocal" || i.type === "deleteRemote",
+      );
+      if (deletes.length === 0) return;
+
+      const localDeletes = deletes.filter((i) => i.type === "deleteLocal").length;
+      const remoteDeletes = deletes.length - localDeletes;
+      const localTotal = local.files.size;
+      const remoteTotal = remote.files.size;
+      const maxFiles = config.thresholds.deleteGuardMax;
+      const ratioLimit = config.thresholds.deleteGuardRatio;
+      const localRatio = localTotal > 0 ? localDeletes / localTotal : 0;
+      const remoteRatio = remoteTotal > 0 ? remoteDeletes / remoteTotal : 0;
+      const triggeredByMax = deletes.length > maxFiles;
+      const triggeredByRatio = localRatio > ratioLimit || remoteRatio > ratioLimit;
+      if (!triggeredByMax && !triggeredByRatio) return;
+
+      const prompt: DeleteGuardPrompt = {
+        count: deletes.length,
+        localDeletes,
+        remoteDeletes,
+        localTotal,
+        remoteTotal,
+        maxFiles,
+        ratioLimit,
+        triggeredByMax,
+        triggeredByRatio,
+        relPaths: deletes.map((i) => i.relPath),
+      };
+      log(
+        `[sync] 熔断:计划删除 ${deletes.length} 个(本地 ${localDeletes} / 远端 ${remoteDeletes})` +
+          `,阈值 ${maxFiles} 个 / ${Math.round(ratioLimit * 100)}%`,
+      );
+      const confirmed = deps.confirmDeletes ? await deps.confirmDeletes(prompt) : false;
+      if (!confirmed) {
+        throw new SyncFatalError(
+          `本次同步计划删除 ${deletes.length} 个文件(本地 ${localDeletes} 个 / 远端 ${remoteDeletes} 个),` +
+            `超过安全阈值(超过 ${maxFiles} 个,或超过该侧文件总数的 ${Math.round(ratioLimit * 100)}%)。` +
+            `已停止,未删除任何文件。请确认后重试。`,
+          "delete-guard",
+        );
+      }
+      log(`[sync] 熔断已确认:继续,将删除 ${deletes.length} 个文件`);
+    }
+
+    /**
      * 冲突处置 = 保留双份(决议 22–23):本地文件保持不动;远端版本落成本地冲突副本;
      * 副本作为普通文件上传到远端;本地版本覆盖远端主名(远端版本已存于副本,内容不丢)。
      * 终态:两侧都是「主名=本地版本 + 副本=远端版本」,下一次同步稳定无操作。
@@ -300,7 +357,74 @@ export function createSyncEngine(opts: SyncEngineOptions): SyncEngine {
       await resolveConflict(rel, localBytes, localHash, remoteBytes, remoteHash, remoteEntry);
     }
 
-    async function runItem(item: Exclude<PlanItem, { type: "defer" }>): Promise<void> {
+    /**
+     * 改 vs 删冲突(决议 26):本地内容已离开基准、远端已删。保留本地(绝不删除),
+     * 并把本地版本恢复回远端——「修改胜过删除」,内容不因删除而丢。计入 conflicts。
+     */
+    async function resolveModifyDeleteConflict(
+      rel: string,
+      localBytes: Uint8Array,
+      localHash: string,
+    ): Promise<void> {
+      report.conflicts++;
+      // 远端已无该文件 → createOnly 创建,避免覆盖同步期间被别处恢复的内容。
+      const entry = await putAndVerify(rel, localBytes, { createOnly: true });
+      if (!entry) {
+        report.failed.push({ relPath: rel, reason: "改/删冲突:本地版本已保留,但恢复远端未完成" });
+        log(`[sync] 冲突(本地已改/远端已删):${rel} → 本地保留,远端恢复失败`);
+        return;
+      }
+      await store.upsert(rel, makeRecord(rel, localHash, entry));
+      log(`[sync] 冲突(本地已改/远端已删):${rel} → 保留本地并恢复远端`);
+    }
+
+    /**
+     * 计划项 deleteLocal(远端已删候选)。红线(决议 26):只有本地内容**仍等于基准**
+     * 才认定「远端删除」→ 本地进回收站(决议 25:deps.trashFile,绝不不可恢复删除);
+     * 本地已改 ⇒ 改 vs 删冲突,保留本地。
+     */
+    async function runDeleteLocal(rel: string): Promise<void> {
+      const entry = local.files.get(rel);
+      const record = records[rel];
+      if (!entry || !record) return; // 计划项只在两侧状态齐备时产出;防御式早退
+      const bytes = await readLocalBytes(entry.absPath);
+      const hash = sha256Hex(bytes);
+      if (hash !== record.baseHash) {
+        await resolveModifyDeleteConflict(rel, bytes, hash);
+        return;
+      }
+      await deps.trashFile(entry.absPath);
+      report.deletedLocal++;
+      await store.forget(rel); // 记录清除 ⇒ 远端若恢复该文件,下次同步按「远端新增」拉回(决议 28)
+      log(`[sync] 删除本地(远端已删):${rel} → 回收站`);
+    }
+
+    /**
+     * 计划项 deleteRemote(本地已删候选)。红线(决议 26 的对称判定 + 决议 35):
+     * 远端 DELETE 不可恢复,所以**下载并算内容 hash**,只有内容仍等于基准才认定
+     * 「本地删除是唯一改动」→ 删除远端;远端已改 ⇒ 删 vs 改冲突,保留远端内容。
+     */
+    async function runDeleteRemote(rel: string): Promise<void> {
+      const record = records[rel];
+      const remoteEntry = remote.files.get(rel);
+      if (!record || !remoteEntry) return; // 防御式早退
+      const remoteBytes = await retry(() => client.get(rel));
+      const remoteHash = sha256Hex(remoteBytes);
+      if (remoteHash !== record.baseHash) {
+        // 删 vs 改:远端已改 → 冲突,把远端内容恢复到本地;绝不删远端。
+        report.conflicts++;
+        await writeLocalAtomic(joinRoot(rel), remoteBytes);
+        await store.upsert(rel, makeRecord(rel, remoteHash, remoteEntry));
+        log(`[sync] 冲突(本地已删/远端已改):${rel} → 保留远端内容并恢复到本地,不删远端`);
+        return;
+      }
+      await retry(() => client.remove(rel));
+      report.deletedRemote++;
+      await store.forget(rel); // 远端恢复该文件时按「远端新增」处理(决议 28)
+      log(`[sync] 删除远端(本地已删):${rel}`);
+    }
+
+    async function runItem(item: PlanItem): Promise<void> {
       switch (item.type) {
         case "ensureDir": {
           await retry(() => client.ensureDir(item.relPath));
@@ -330,6 +454,19 @@ export function createSyncEngine(opts: SyncEngineOptions): SyncEngine {
         }
         case "resolveBoth": {
           await runResolveBoth(item.relPath);
+          return;
+        }
+        case "deleteLocal": {
+          await runDeleteLocal(item.relPath);
+          return;
+        }
+        case "deleteRemote": {
+          await runDeleteRemote(item.relPath);
+          return;
+        }
+        case "forgetRecord": {
+          // 两侧皆无 → 只清记录,不碰任何文件(不是删除)。
+          await store.forget(item.relPath);
           return;
         }
       }
@@ -362,7 +499,19 @@ export function createSyncEngine(opts: SyncEngineOptions): SyncEngine {
       });
       report.skipped.push(...remote.skipped);
 
-      // ── 计划(删除相关组合产出 defer;票 05 在此改判) ──
+      // ── 列举闸门(决议 63):远端根列举返回 0 条,而状态表里存在该远端的历史记录 ──
+      // 立即报错停止,不做任何删除。依据:存在「上传正常、列举静默为空」的客户端
+      // 编码缺陷,它一旦与删除传播相遇就是「本地全删」。无状态表时无历史 → 不触发。
+      const recordCount = Object.keys(records).length;
+      if (hasState && remote.rootRawCount === 0 && recordCount > 0) {
+        throw new SyncFatalError(
+          `远端目录列举返回 0 条,但本机状态表里有 ${recordCount} 条历史记录。` +
+            `为避免把「列举异常」当成「远端已清空」而删光本地笔记,已停止,未做任何删除。`,
+          "listing-guard",
+        );
+      }
+
+      // ── 计划(删除组合只在 hasState && record 时产出 deleteLocal/deleteRemote/forget) ──
       const plan = buildPlan({
         localFiles: local.files,
         localDirs: local.dirs,
@@ -371,8 +520,11 @@ export function createSyncEngine(opts: SyncEngineOptions): SyncEngine {
         records,
         hasState,
       });
-      // 票 05 的熔断守卫插入点:此处对 plan 里的删除项做阈值判定。
-      const work = actionableItems(plan);
+
+      // ── 熔断守卫(决议 27):执行循环**之前**。检查完再做任何删除。 ──
+      await enforceDeleteGuard(plan);
+
+      const work: PlanItem[] = plan;
 
       const total = work.length;
       let done = 0;
