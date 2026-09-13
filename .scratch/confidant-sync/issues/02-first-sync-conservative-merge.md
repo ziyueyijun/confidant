@@ -4,6 +4,17 @@
 
 规格依据：决议 6–19、29–34、50–55。
 
+## 本票额外承接：传输层与自签证书（01b 交付时暴露的缺口）
+
+01b 把「信任此服务器的证书」开关**存下来并透传**了，但**没有任何代码消费它**：`packages/sync` 默认走全局 `fetch`，Node/Electron 的 `fetch` 不接受自签证书，于是自签服务器**根本连不上**。
+
+决议 41 与票 08 都要求这个开关可用（绿联默认 HTTPS 端口 5006 的证书链不完整）。所以本票在 `src/main` 侧提供**注入的传输层**：
+
+- 用 Node 内置 `node:http` / `node:https` 实现一个 `FetchLike`（**不加新依赖**：`undici` 需额外安装，Node 的全局 `fetch` 无法在不引入 dispatcher 包的前提下按请求关闭证书校验）；
+- `trustSelfSignedCert` 为真时，仅对该请求用 `rejectUnauthorized: false` 的 agent；**默认路径必须走完整证书校验，绝不静默接受任何证书**（决议 41）；
+- `packages/webfake` 补一个自签 HTTPS 模式 + 配套用例（默认可连的信道 + 自签信道仅在该开关下可连）；证书可用内置的自签夹具。
+- `http` 保持可用（决议 40）；`trustSelfSignedCert` 对 `http` 无影响。
+
 **Blocked by:** [01a](01a-sync-package-and-webdav-client.md), [01b](01b-credentials-ipc-and-settings-dialog.md)（原票 01 已拆为这两张，见 [00-split-note.md](00-split-note.md)）
 
 **Status:** ready-for-agent
