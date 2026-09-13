@@ -165,6 +165,34 @@ describe("A. 有本机未知变更 → hasUnknownChanges", () => {
     expect(r.hasUnknownChanges).toBe(true);
     expect(r.changeCount).toBe(1);
   });
+
+  it("A4 有状态表且远端**删掉**了有记录的文件 → 亮(对称的一半)", async () => {
+    // 只遍历远端存在的条目会漏掉删除:圆点永远不亮,用户在手动同步前毫无提示。
+    const h = await harness();
+    await writeWs(h.ws, "a.md", "one");
+    await writeWs(h.ws, "b.md", "two");
+    h.server.putFile(`${DAV}/a.md`, "one");
+    h.server.putFile(`${DAV}/b.md`, "two");
+    await h.run(); // 建基准:a.md + b.md
+
+    h.server.removeFile(`${DAV}/b.md`); // 另一端删了 b.md
+    const r = await h.probe();
+    expect(r.hasUnknownChanges).toBe(true);
+    expect(r.changeCount).toBe(1); // 恰好 b.md 这一个「远端已无」
+  });
+
+  it("A5 本机新记录的文件远端从未有过 → 不算「远端删除」的误报", async () => {
+    // 未同步过的本地新文件不产生记录,故不该被算成远端删除。
+    const h = await harness();
+    await writeWs(h.ws, "a.md", "one");
+    h.server.putFile(`${DAV}/a.md`, "one");
+    await h.run();
+    await writeWs(h.ws, "local-only.md", "not yet synced"); // 本地新增,未同步
+
+    const r = await h.probe();
+    expect(r.hasUnknownChanges).toBe(false);
+    expect(r.changeCount).toBe(0);
+  });
 });
 
 // ─── B. 无变更 → 圆点不亮 ───────────────────────────────────────────────────

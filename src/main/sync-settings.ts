@@ -12,6 +12,7 @@ import { join } from "node:path";
 import { access, mkdir, readFile } from "node:fs/promises";
 import { writeTextFileAtomic } from "../../packages/files";
 import { createWebdavClient } from "../../packages/sync/client";
+import { createSyncFetch } from "./sync-fetch";
 import {
   connectionResultFromError,
   normalizeBaseUrl,
@@ -208,9 +209,6 @@ export async function readWorkspaceSyncConfig(
  * 结果分三类——可达(带远端直接子项数,供「远端目录非空」提示)/ 认证失败 / 目录不存在;
  * 其它错误归为 error 且 detail 已遮蔽密码(决议 43、59)。
  * 密码来源:input.password 优先,省略则用已存密码。渲染层不掌握明文。
- *
- * 注:`trustSelfSignedCert` 按 01a 契约透传给客户端;真正的 TLS 接受路径由注入的
- * 传输层承担(v1 走默认 fetch,自签证书的真机验证见票 08)。
  */
 export async function testSyncConnection(input: SyncConnectionInput): Promise<SyncConnectionResult> {
   let password = input.password;
@@ -224,6 +222,9 @@ export async function testSyncConnection(input: SyncConnectionInput): Promise<Sy
     username: input.username.trim(),
     password,
     trustSelfSignedCert: input.trustSelfSignedCert,
+    // 与同步/探测同一传输层:否则自签服务器的「测试连接」必失败(决议 41),
+    // 而这个按钮正是用户诊断配置的地方。默认路径仍走完整证书校验。
+    fetch: createSyncFetch({ trustSelfSignedCert: input.trustSelfSignedCert }),
   });
 
   try {

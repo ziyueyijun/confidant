@@ -8,7 +8,10 @@
 import { randomBytes } from "node:crypto";
 import { lstat, mkdir, readdir, readFile, rename, unlink, writeFile } from "node:fs/promises";
 import { basename, dirname, join } from "node:path";
+import { isExcludedName } from "../../files";
 import type { SyncIssue } from "./sync-types";
+
+export { isExcludedName };
 
 /**
  * Windows 传统 MAX_PATH(title 上限 260,决议 61:超长路径跳过并报告)。
@@ -45,12 +48,11 @@ export function classifyLocalDirent(d: {
 /**
  * 硬排除名单(决议 16,不可关闭):所有点开头条目(一次覆盖 `.git`、`.DS_Store` 与
  * 原子写临时文件 `.{名}.confidant-tmp-...`),以及 `Thumbs.db` / `desktop.ini`。
+ *
+ * **实现只有一处**:复用 `packages/files` 入口点的 `isExcludedName`。这是决议 16 的
+ * 「不可关闭」不变量 —— 工作区树与同步枚举必须永远同意哪些条目被排除,两份实现一旦
+ * 漂移,就会出现「一边同步、另一边隐藏」的文件。
  */
-export function isExcludedName(name: string): boolean {
-  if (name.startsWith(".")) return true;
-  const lower = name.toLowerCase();
-  return lower === "thumbs.db" || lower === "desktop.ini";
-}
 
 /** Windows 文件名非法字符(决议 61):这类远端条目无法安全落盘 → 跳过并报告。 */
 export function hasIllegalWindowsName(name: string): boolean {

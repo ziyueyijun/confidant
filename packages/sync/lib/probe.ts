@@ -18,10 +18,7 @@ import type { WebdavClient, WebdavConfig } from "./webdav-types";
 import type { SyncStateStore } from "./sync-types";
 import { scanRemote } from "./remote";
 import { remoteEntryChanged } from "./change-detect";
-
-/** 与 index.ts 的 `DEFAULT_SYNC_THRESHOLDS.maxFileSizeBytes` 一致(本模块被 lib 依赖,
- *  不能反向 import 入口点,故就地取默认值;调用方可显式覆盖)。 */
-const DEFAULT_MAX_FILE_SIZE_BYTES = 100 * 1024 * 1024;
+import { DEFAULT_SYNC_THRESHOLDS } from "./sync-types";
 
 export interface SyncProbeOptions {
   /**
@@ -31,8 +28,9 @@ export interface SyncProbeOptions {
   remoteBaseUrl: string | null | undefined;
   /** 状态表(只读:`load()`)。启动探测绝不写状态表。 */
   store: SyncStateStore;
-  /** 客户端工厂(生产:真地址;测试:webfake 端口)。未配置时**不会被调用**。 */
-  createClient: (config: WebdavConfig) => WebdavClient;
+  /** 客户端工厂(生产:真地址;测试:webfake 端口)。未配置时**不会被调用**。
+   *  不收参数:凭据由注入方在自己的闭包里持有(与引擎一致)。 */
+  createClient: () => WebdavClient;
   maxFileSizeBytes?: number;
   logger?: (line: string) => void;
 }
@@ -63,10 +61,10 @@ export async function probeRemoteChanges(opts: SyncProbeOptions): Promise<SyncPr
     const state = await opts.store.load();
     const records = state?.records ?? {};
 
-    const client = opts.createClient({ baseUrl, username: "", password: "" });
+    const client = opts.createClient();
     // 一次深度 1 逐层遍历;不做任何轮询/重试。
     const remote = await scanRemote(client, {
-      maxFileSizeBytes: opts.maxFileSizeBytes ?? DEFAULT_MAX_FILE_SIZE_BYTES,
+      maxFileSizeBytes: opts.maxFileSizeBytes ?? DEFAULT_SYNC_THRESHOLDS.maxFileSizeBytes,
       throwIfAborted: (): void => undefined,
     });
 
@@ -75,6 +73,14 @@ export async function probeRemoteChanges(opts: SyncProbeOptions): Promise<SyncPr
       const record = records[relPath];
       // 状态表里没有记录 → 本机未知;有记录 → 复用「疑似已变」判定(不另写一套)。
       if (!record || remoteEntryChanged(record, entry)) changeCount++;
+    }
+    // 对称的一半:**记录仍在、远端已无** = 远端删除,也是一种「本机不知道的变更」。
+    // 只遍历远端条目会漏掉它,圆点就永远不亮(决议 8 的「远端存在本机状态表里没有的
+    // 变更」,用户故事 15)。这里只做「有没有」的粗判,不复制引擎的删/改冲突判定 ——
+    // 引擎仍会在真正同步时用本地 hash 与基准比对,决定是删本地还是保留双份。
+    for (const [relPath, record] of Object.entries(records)) {
+      if (record.tombstone) continue;
+      if (!remote.files.has(relPath)) changeCount++;
     }
 
     log(

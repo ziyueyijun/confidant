@@ -20,6 +20,8 @@ export type MenuContext = {
   hasSelection: boolean;
   /** 源码模式(30):WYSIWYG 专属命令(段落/格式/查找)置灰,撤销重做转发文本区。 */
   sourceMode: boolean;
+  /** 同步进行中(决议 12):「立即同步」置灰,不做重入。 */
+  syncRunning: boolean;
 };
 
 export type CommandRun = () => void | Promise<void>;
@@ -270,6 +272,7 @@ export function createMenuBridge(): MenuBridge {
     hasWorkspace: false,
     hasSelection: false,
     sourceMode: false,
+    syncRunning: false,
   };
   let recentItems: RecentItem[] = [];
   const lastState = new Map<string, boolean>();

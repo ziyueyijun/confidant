@@ -16,6 +16,13 @@ export interface RemoteSnapshot {
    * 根目录只含点开头条目时该值仍 > 0,不会误触闸门。
    */
   rootRawCount: number;
+  /**
+   * **每个**已列举目录的原始条目数(过滤前),键为相对路径,根为 `""`。
+   * 决议 63 的列举闸门按目录逐条判定:某目录返回 0 条、而状态表在该目录下仍有历史
+   * 记录 → 可疑,报错停止。只护根不够 —— 子目录「列举静默为空」会让其中的文件被判成
+   * 「远端已删」而进本地回收站,仅靠熔断兜底(阈值以下就放过了)。
+   */
+  rawCounts: Map<string, number>;
 }
 
 /**
@@ -37,6 +44,7 @@ export async function scanRemote(
   const dirs = new Set<string>();
   const skipped: SyncIssue[] = [];
   let rootRawCount = 0;
+  const rawCounts = new Map<string, number>();
   const queue: string[] = [""];
   const seen = new Set<string>();
 
@@ -47,7 +55,8 @@ export async function scanRemote(
     opts.throwIfAborted();
 
     const entries = await client.list(rel);
-    if (rel === "") rootRawCount = entries.length; // 原始条目数(过滤前);列举闸门用
+    rawCounts.set(rel, entries.length); // 原始条目数(过滤前);逐目录列举闸门用
+    if (rel === "") rootRawCount = entries.length;
 
     // 同一目录内大小写冲突(决议 61):`Note.md` 与 `note.md` 并存时,Windows 无法
     // 同时落盘两者,且无法判断哪一份才是用户要的 → 整组跳过并报告,不递归、不落盘。
@@ -99,5 +108,5 @@ export async function scanRemote(
     }
   }
 
-  return { files, dirs, skipped, rootRawCount };
+  return { files, dirs, skipped, rootRawCount, rawCounts };
 }

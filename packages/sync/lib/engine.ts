@@ -48,9 +48,12 @@ export class SyncAbortedError extends Error {
 }
 
 /** 整体失败(决议 59/60:认证失败、列举失败等 → 停下并提示,不回退为部分成功)。 */
+/** 整体失败的分类(界面据此区分提示与重试入口;决议 59–60)。 */
+export type SyncFatalKind = "fatal" | "auth" | "delete-guard" | "listing-guard";
+
 export class SyncFatalError extends Error {
-  readonly kind: string;
-  constructor(message: string, kind = "fatal") {
+  readonly kind: SyncFatalKind;
+  constructor(message: string, kind: SyncFatalKind = "fatal") {
     super(message);
     this.name = "SyncFatalError";
     this.kind = kind;
@@ -525,8 +528,8 @@ export function createSyncEngine(opts: SyncEngineOptions): SyncEngine {
       throwIfAborted();
 
       // ── 远端客户端 + 枚举(决议 45:深度 1 逐层;列举失败按整体失败抛出) ──
-      // 凭据由注入的 createClient 提供,引擎不掌握密码。
-      client = deps.createClient({ baseUrl: config.remoteBaseUrl, username: "", password: "" });
+      // 凭据由注入的 createClient 在自己的闭包里持有,引擎不掌握密码。
+      client = deps.createClient();
       remote = await scanRemote(client, {
         maxFileSizeBytes: config.thresholds.maxFileSizeBytes,
         localRootAbs: config.workspacePath,
@@ -542,16 +545,30 @@ export function createSyncEngine(opts: SyncEngineOptions): SyncEngine {
         ...remote.skipped.map((s) => s.relPath),
       ]);
 
-      // ── 列举闸门(决议 63):远端根列举返回 0 条,而状态表里存在该远端的历史记录 ──
+      // ── 列举闸门(决议 63):某目录列举返回 0 条,而状态表在该目录下仍有历史记录 ──
       // 立即报错停止,不做任何删除。依据:存在「上传正常、列举静默为空」的客户端
       // 编码缺陷,它一旦与删除传播相遇就是「本地全删」。无状态表时无历史 → 不触发。
+      //
+      // **逐目录判定,不只护根**:子目录列举静默为空会让其中的文件被判成「远端已删」
+      // 而进本地回收站;根闸门看不见它,仅靠熔断兜底(阈值以下就放过了)。某目录列举
+      // 出 0 条、而状态表里还有 `该目录/…` 的记录 —— 这是「列举不可信」而非「内容已删」。
       const recordCount = Object.keys(records).length;
-      if (hasState && remote.rootRawCount === 0 && recordCount > 0) {
-        throw new SyncFatalError(
-          `远端目录列举返回 0 条,但本机状态表里有 ${recordCount} 条历史记录。` +
-            `为避免把「列举异常」当成「远端已清空」而删光本地笔记,已停止,未做任何删除。`,
-          "listing-guard",
-        );
+      if (hasState && recordCount > 0) {
+        const recordPaths = Object.keys(records);
+        const suspicious = [...remote.rawCounts].find(([dir, raw]) => {
+          if (raw !== 0) return false;
+          const prefix = dir === "" ? "" : `${dir}/`;
+          return recordPaths.some((p) => p.startsWith(prefix));
+        });
+        if (suspicious) {
+          const [dir] = suspicious;
+          const where = dir === "" ? "远端根目录" : `远端目录「${dir}」`;
+          throw new SyncFatalError(
+            `${where}列举返回 0 条,但本机状态表里还有该目录下的历史记录(共 ${recordCount} 条)。` +
+              `为避免把「列举异常」当成「远端已清空」而删光本地笔记,已停止,未做任何删除。`,
+            "listing-guard",
+          );
+        }
       }
 
       // ── 计划(删除组合只在 hasState && record 时产出 deleteLocal/deleteRemote/forget) ──

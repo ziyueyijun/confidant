@@ -180,8 +180,8 @@ export function useMenuBridgeRegistration(api: MenuRegistrationApi): void {
     menu.register(Cmd.preferences, () => true, () => window.confidant.openPreferences());
     // 01b:同步设置…(文件 → 同步设置…;始终可点,未打开工作区时对话框给明确空态,决议 50)
     menu.register(Cmd.syncSettings, () => true, openSyncSettings);
-    // 02:立即同步(有工作区时可点;同步前由 syncNow 内部 flush)
-    menu.register(Cmd.syncNow, (ctx) => ctx.hasWorkspace, syncNow);
+    // 02:立即同步(有工作区且未在同步中;同步前由 syncNow 内部 flush。决议 12:进行中禁用)
+    menu.register(Cmd.syncNow, (ctx) => ctx.hasWorkspace && !ctx.syncRunning, syncNow);
     // 主题三态(01):勾选态由 useAppTheme 经 setChecked 同步
     menu.register(Cmd.themeGithub, () => true, () => applyTheme("github"));
     menu.register(Cmd.themeNight, () => true, () => applyTheme("night"));

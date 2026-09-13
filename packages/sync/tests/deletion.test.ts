@@ -331,8 +331,34 @@ describe("D. 列举闸门", () => {
     expect(await readWs(h.ws, "a.md")).toBe("aaa");
   });
 
-  it("D3 列举返回非成功状态码 → 整体失败,绝不当作远端为空", async () => {
+  it("D2b 子目录列举 0 条而状态表在该目录下有记录 → 同样报错,零删除", async () => {
+    // 只护根不够:子目录「列举静默为空」会让其中的文件被判成「远端已删」而进本地
+    // 回收站,而根闸门看不见它 —— 仅靠熔断兜底,阈值以下就放过了。
     const h = await harness();
+    await writeWs(h.ws, "root.md", "root");
+    await writeWs(h.ws, "sub/a.md", "aaa");
+    await writeWs(h.ws, "sub/b.md", "bbb");
+    await h.run();
+
+    // 另一端删掉整个子目录 —— 至少 sub 自己还在(空目录),故根不是 0 条
+    h.server.removeFile(`${WS_PATH}/sub/a.md`);
+    h.server.removeFile(`${WS_PATH}/sub/b.md`);
+    const mark = h.server.requests.length;
+    let caught: unknown;
+    try {
+      await h.run();
+    } catch (err) {
+      caught = err;
+    }
+
+    expect(caught).toBeInstanceOf(SyncFatalError);
+    expect((caught as SyncFatalError).kind).toBe("listing-guard");
+    expect(methods(h.since(mark), "DELETE")).toEqual([]); // 零删除
+    expect(await readWs(h.ws, "sub/a.md")).toBe("aaa"); // 本地一份不少
+    expect(await readWs(h.ws, "sub/b.md")).toBe("bbb");
+  });
+
+  it("D3 列举返回非成功状态码 → 整体失败,绝不当作远端为空", async () => {    const h = await harness();
     await writeWs(h.ws, "a.md", "aaa");
     await h.run();
     expect(remoteText(h.server, "a.md")).toBe("aaa");

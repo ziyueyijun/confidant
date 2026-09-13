@@ -2,13 +2,14 @@
 // 本票立形状(依赖注入 SyncDeps、配置/进度/报告类型、状态表读写);同步算法由
 // 后续票(02–07)在 lib/ 自己的模块上生长,不整文件重写。本包不依赖 Electron。
 
-import type { SyncRetryPolicy, SyncThresholds } from "./lib/sync-types";
-
+// 默认阈值/重试常量定义在 lib/sync-types.ts(与它们的类型同处,且 lib 模块可引用);
+// 这里从入口点转出,包外仍只认入口点。
 export { createSyncStateStore } from "./lib/state-store";
+export { DEFAULT_SYNC_RETRY, DEFAULT_SYNC_THRESHOLDS } from "./lib/sync-types";
 
 // ── 同步引擎(票 02) ────────────────────────────────────────────────────────
 export { createSyncEngine, SyncAbortedError, SyncFatalError } from "./lib/engine";
-export type { SyncEngineOptions } from "./lib/engine";
+export type { SyncEngineOptions, SyncFatalKind } from "./lib/engine";
 /** 另一个同步任务持锁时抛出(决议 37)。 */
 export { SyncBusyError } from "./lib/lock";
 
@@ -32,16 +33,6 @@ export {
   WINDOWS_MAX_PATH_CHARS,
   type LocalDirentKind,
 } from "./lib/fs-local";
-
-/** 默认阈值(决议 17、27):100 MB 上限;熔断 20 个 / 20%。测试传极小值。 */
-export const DEFAULT_SYNC_THRESHOLDS: SyncThresholds = {
-  maxFileSizeBytes: 100 * 1024 * 1024,
-  deleteGuardMax: 20,
-  deleteGuardRatio: 0.2,
-};
-
-/** 默认重试(决议 58):2 次重试,指数退避 200ms 起。 */
-export const DEFAULT_SYNC_RETRY: SyncRetryPolicy = { attempts: 2, baseDelayMs: 200 };
 
 export type {
   DeleteGuardPrompt,

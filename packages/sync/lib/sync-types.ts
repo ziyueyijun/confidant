@@ -1,14 +1,18 @@
 // 同步引擎与状态表的类型骨架(入口点 index.ts 转发)。
 // 本票只立形状,同步算法由后续票(02–07)在此之上生长。
 
-import type { WebdavClient, WebdavConfig } from "./webdav-types";
+import type { WebdavClient } from "./webdav-types";
 
 /**
  * 引擎的依赖注入形状(工程简报 §1)。生产:createClient 指真地址;测试:指向
  * webfake 起的端口。trashFile 走回收站(与 Cmd.delete 一致)。本地文件系统不注入。
+ *
+ * `createClient` **不收参数**:凭据由注入方在自己的闭包里持有(生产见 src/main/sync-run.ts),
+ * 引擎不掌握密码。早先的签名收一个 WebdavConfig,但引擎只能递空凭据、实现又全部忽略它,
+ * 徒然让读者以为引擎管凭据 —— 故收成零参。
  */
 export interface SyncDeps {
-  createClient: (config: WebdavConfig) => WebdavClient;
+  createClient: () => WebdavClient;
   trashFile: (absPath: string) => Promise<void>;
   /**
    * 熔断确认(决议 27)。一次同步计划删除的文件数超阈值时调用;返回 false ⇒ 整次同步
@@ -65,6 +69,19 @@ export interface SyncRetryPolicy {
   /** 指数退避基准(ms)。 */
   baseDelayMs: number;
 }
+
+/**
+ * 默认阈值(决议 17、27):100 MB 上限;熔断 20 个 / 20%。测试传极小值。
+ * 定义在 lib 而非入口点:lib 模块(如 probe)要引用它,而 lib 不能反向 import 入口点。
+ */
+export const DEFAULT_SYNC_THRESHOLDS: SyncThresholds = {
+  maxFileSizeBytes: 100 * 1024 * 1024,
+  deleteGuardMax: 20,
+  deleteGuardRatio: 0.2,
+};
+
+/** 默认重试(决议 58):2 次重试,指数退避 200ms 起。 */
+export const DEFAULT_SYNC_RETRY: SyncRetryPolicy = { attempts: 2, baseDelayMs: 200 };
 
 export interface SyncConfig {
   /** 工作区绝对路径(状态表的键)。 */
