@@ -6,6 +6,12 @@ import type { SyncRetryPolicy, SyncThresholds } from "./lib/sync-types";
 
 export { createSyncStateStore } from "./lib/state-store";
 
+// ── 同步引擎(票 02) ────────────────────────────────────────────────────────
+export { createSyncEngine, SyncAbortedError, SyncFatalError } from "./lib/engine";
+export type { SyncEngineOptions } from "./lib/engine";
+/** 另一个同步任务持锁时抛出(决议 37)。 */
+export { SyncBusyError } from "./lib/lock";
+
 /** 默认阈值(决议 17、27):100 MB 上限;熔断 20 个 / 20%。测试传极小值。 */
 export const DEFAULT_SYNC_THRESHOLDS: SyncThresholds = {
   maxFileSizeBytes: 100 * 1024 * 1024,
