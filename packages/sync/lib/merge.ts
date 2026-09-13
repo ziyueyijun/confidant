@@ -44,6 +44,13 @@ export interface PlanInput {
   records: Record<string, SyncFileRecord>;
   /** 状态表是否存在(load() !== null)。false ⇒ 保守合并,绝不删除。 */
   hasState: boolean;
+  /**
+   * 被跳过、无法安全处理的相对路径(决议 61:符号链接、超上限、非法字符、大小写冲突、
+   * 超长路径、未知类型)。这些条目在 `localFiles` / `remoteFiles` 里缺失,**但缺失不等于
+   * 「对方已删」**——若不排除,跳过会退化成「把另一侧的文件当远端/本地删除处理掉」。
+   * 因此这些键一律不产出任何计划项(既不删,也不传),留待下次重新判定。
+   */
+  unmanaged?: ReadonlySet<string>;
 }
 
 /**
@@ -68,6 +75,9 @@ export function buildPlan(input: PlanInput): PlanItem[] {
   ]);
 
   for (const rel of [...keys].sort()) {
+    // 跳过项(决议 61)绝不产出计划项:缺失是「无法处理」,不是「对方已删」。
+    if (input.unmanaged?.has(rel)) continue;
+
     const hasLocal = input.localFiles.has(rel);
     const hasRemote = input.remoteFiles.has(rel);
     const record: SyncFileRecord | undefined = input.hasState ? input.records[rel] : undefined;

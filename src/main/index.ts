@@ -71,7 +71,8 @@ import {
   testSyncConnection,
   writeSyncSettings,
 } from "./sync-settings";
-import { cancelSyncRun, probeSyncRun, runSync } from "./sync-run";
+import { cancelSyncRun, getSyncProgress, isSyncRunning, probeSyncRun, runSync } from "./sync-run";
+import { cancelSyncForWorkspaceSwitch, handleCloseInterrupt } from "./sync-interrupt";
 import type { SyncConnectionInput, SyncOutcome, SyncProbeOutcome, SyncSettingsInput } from "@shared/sync";
 
 const isDev = !!process.env["ELECTRON_RENDERER_URL"];
@@ -104,6 +105,8 @@ function toError(err: unknown): ErrorInfo {
 /**
  * 窗口关闭前的数据保护(规格 §9.3):close 时先请求渲染层 flush 未落盘内容,
  * 收到回执(或 2s 超时,渲染层卡死不阻塞退出)后再销毁窗口。
+ * 决议 64:若同步进行中,先弹**一次**确认「关闭将中断」;确认后取消同步(已完成
+ * 的进度已按文件落盘)并正常关窗,**不阻止关窗**;否认则不关。
  */
 function armCloseFlush(win: BrowserWindow): void {
   let flushing = false;
@@ -111,21 +114,49 @@ function armCloseFlush(win: BrowserWindow): void {
     if (flushing) return;
     e.preventDefault();
     flushing = true;
-    const acked = new Promise<void>((resolve) => {
-      const ack = () => resolve();
-      ipcMain.once(IPC.flushAck, ack);
-      try {
-        win.webContents.send(IPC.flushRequest);
-      } catch {
-        resolve();
+    void (async () => {
+      const proceed = await handleCloseInterrupt({
+        isSyncRunning,
+        progress: () => {
+          const p = getSyncProgress();
+          return { done: p.done, total: p.total };
+        },
+        confirm: async (message, detail) => {
+          const res = await dialog.showMessageBox(win, {
+            type: "warning",
+            title: "关闭窗口",
+            message,
+            detail,
+            buttons: ["取消", "关闭"],
+            defaultId: 0,
+            cancelId: 0,
+            noLink: true,
+          });
+          return res.response === 1;
+        },
+        cancel: cancelSyncRun,
+      });
+      if (!proceed) {
+        flushing = false; // 用户取消关窗:恢复,下次 close 可再次触发
         return;
       }
-      setTimeout(() => {
-        ipcMain.removeListener(IPC.flushAck, ack);
-        resolve();
-      }, 2000);
-    });
-    void acked.finally(() => win.destroy());
+      const acked = new Promise<void>((resolve) => {
+        const ack = () => resolve();
+        ipcMain.once(IPC.flushAck, ack);
+        try {
+          win.webContents.send(IPC.flushRequest);
+        } catch {
+          resolve();
+          return;
+        }
+        setTimeout(() => {
+          ipcMain.removeListener(IPC.flushAck, ack);
+          resolve();
+        }, 2000);
+      });
+      await acked;
+      win.destroy();
+    })();
   });
 }
 
@@ -263,6 +294,8 @@ function registerIpc(): void {
 
   ipcMain.handle(IPC.workspaceOpen, async (e, path: string): Promise<Result<TreeEntry[]>> => {
     const wc = e.sender;
+    // 决议 64:切换工作区 → 取消当前同步(已完成的进度已按文件落盘)。
+    cancelSyncForWorkspaceSwitch({ isSyncRunning, cancel: cancelSyncRun });
     try {
       const tree = await startWorkspaceWatch(path, (update) => {
         if (!wc.isDestroyed()) wc.send(IPC.workspaceTreeUpdated, update);
@@ -276,6 +309,8 @@ function registerIpc(): void {
   });
 
   ipcMain.handle(IPC.workspaceClose, async () => {
+    // 决议 64:关闭工作区 → 取消当前同步并落盘。
+    cancelSyncForWorkspaceSwitch({ isSyncRunning, cancel: cancelSyncRun });
     await stopWorkspaceWatch();
   });
 

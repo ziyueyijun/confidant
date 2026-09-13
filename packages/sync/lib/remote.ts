@@ -4,7 +4,7 @@
 
 import type { WebdavClient, WebdavEntry } from "./webdav-types";
 import type { SyncIssue } from "./sync-types";
-import { hasIllegalWindowsName, isExcludedName } from "./fs-local";
+import { exceedsWindowsPathLimit, hasIllegalWindowsName, isExcludedName } from "./fs-local";
 
 export interface RemoteSnapshot {
   files: Map<string, WebdavEntry>;
@@ -25,7 +25,13 @@ export interface RemoteSnapshot {
  */
 export async function scanRemote(
   client: WebdavClient,
-  opts: { maxFileSizeBytes: number; signal?: AbortSignal; throwIfAborted: () => void },
+  opts: {
+    maxFileSizeBytes: number;
+    /** 本地工作区根绝对路径(判「远端条目落到本地会超 Windows 路径上限」)。 */
+    localRootAbs?: string;
+    signal?: AbortSignal;
+    throwIfAborted: () => void;
+  },
 ): Promise<RemoteSnapshot> {
   const files = new Map<string, WebdavEntry>();
   const dirs = new Set<string>();
@@ -42,8 +48,29 @@ export async function scanRemote(
 
     const entries = await client.list(rel);
     if (rel === "") rootRawCount = entries.length; // 原始条目数(过滤前);列举闸门用
+
+    // 同一目录内大小写冲突(决议 61):`Note.md` 与 `note.md` 并存时,Windows 无法
+    // 同时落盘两者,且无法判断哪一份才是用户要的 → 整组跳过并报告,不递归、不落盘。
+    const byLowerName = new Map<string, WebdavEntry[]>();
     for (const e of entries) {
       if (isExcludedName(e.name)) continue;
+      const key = e.name.toLowerCase();
+      const group = byLowerName.get(key);
+      if (group) group.push(e);
+      else byLowerName.set(key, [e]);
+    }
+
+    for (const group of byLowerName.values()) {
+      if (group.length > 1) {
+        for (const e of group) {
+          skipped.push({
+            relPath: rel ? `${rel}/${e.name}` : e.name,
+            reason: "文件名大小写冲突(与同目录另一条目大小写不同但同名),已跳过",
+          });
+        }
+        continue;
+      }
+      const e = group[0]!;
       const childRel = rel ? `${rel}/${e.name}` : e.name;
       if (e.isCollection) {
         dirs.add(childRel);
@@ -58,6 +85,13 @@ export async function scanRemote(
         skipped.push({
           relPath: childRel,
           reason: `超过单文件上限(${opts.maxFileSizeBytes} 字节),已跳过`,
+        });
+        continue;
+      }
+      if (opts.localRootAbs && exceedsWindowsPathLimit(opts.localRootAbs, childRel)) {
+        skipped.push({
+          relPath: childRel,
+          reason: "超过 Windows 路径长度上限,已跳过",
         });
         continue;
       }

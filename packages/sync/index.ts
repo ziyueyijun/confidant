@@ -23,6 +23,16 @@ export { remoteEntryChanged } from "./lib/change-detect";
 export { probeRemoteChanges } from "./lib/probe";
 export type { SyncProbeOptions, SyncProbeResult, SyncProbeStatus } from "./lib/probe";
 
+// ── 边界条目分类(票 06;决议 61) ────────────────────────────────────────────
+// 无法安全处理的条目一律跳过并报告;这些纯函数供单测穷举分类(Windows 上无法造出
+// 具名管道等特殊文件,故分类逻辑单独可测)。
+export {
+  classifyLocalDirent,
+  exceedsWindowsPathLimit,
+  WINDOWS_MAX_PATH_CHARS,
+  type LocalDirentKind,
+} from "./lib/fs-local";
+
 /** 默认阈值(决议 17、27):100 MB 上限;熔断 20 个 / 20%。测试传极小值。 */
 export const DEFAULT_SYNC_THRESHOLDS: SyncThresholds = {
   maxFileSizeBytes: 100 * 1024 * 1024,

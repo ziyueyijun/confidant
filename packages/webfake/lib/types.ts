@@ -7,10 +7,27 @@ export interface WebfakeCredentials {
 }
 
 /**
+ * 请求级失败注入规则(票 06 重试/放弃/认证中断用):对匹配的请求,前 `times` 次
+ * 返回 `status`(默认 500);用尽后正常处理。`path` 省略 = 匹配该方法的全部路径。
+ * 计数按规则对象保存,`setQuirks` 换成新规则即重置。
+ */
+export interface WebfakeFailRule {
+  method: string;
+  /** 服务端绝对路径(如 "/dav/notes/a.md");省略 = 该方法的任何路径。 */
+  path?: string | null;
+  /** 前几次失败;`Infinity` 表示一直失败。 */
+  times: number;
+  /** 失败状态码,默认 500。 */
+  status?: number;
+}
+
+/**
  * 畸形/降级行为开关(规格决议 66)。全部默认关闭,即标准 WebDAV 行为。
  * 每个开关对应一个真实发生过的服务端缺陷(见规格 Further Notes)。
  */
 export interface WebfakeQuirks {
+  /** 请求级失败注入(票 06):见 WebfakeFailRule。 */
+  failRules?: WebfakeFailRule[];
   /** 中间层不存在的 MKCOL 返 405(标准为 409)。绿联 NAS 行为。 */
   mkcolMultiLevel405?: boolean;
   /** 对已存在集合的 MKCOL 返 400(标准为 405)。绿联 NAS 行为。 */

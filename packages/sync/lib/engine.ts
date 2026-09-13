@@ -82,7 +82,7 @@ function isAuthError(err: unknown): boolean {
   return err instanceof WebdavError && err.kind === "auth";
 }
 
-function describeError(err: unknown): string {
+function rawDescribe(err: unknown): string {
   return (err as { message?: string })?.message ?? String(err);
 }
 
@@ -99,7 +99,11 @@ function makeRecord(relPath: string, baseHash: string, entry: WebdavEntry | null
 export function createSyncEngine(opts: SyncEngineOptions): SyncEngine {
   const { config, deps, store } = opts;
   const now = deps.now ?? ((): number => Date.now());
-  const log = deps.logger ?? ((): void => undefined);
+  // 决议 43:日志与错误原因一律先过注入的遮蔽器(生产 = redactSecrets,含密码)。
+  const redact = deps.redact ?? ((text: string): string => text);
+  const sink = deps.logger;
+  const log = (line: string): void => sink?.(redact(line));
+  const describe = (err: unknown): string => redact(rawDescribe(err));
 
   async function run(
     signal?: AbortSignal,
@@ -146,7 +150,7 @@ export function createSyncEngine(opts: SyncEngineOptions): SyncEngine {
           if (isAuthError(err)) throw new SyncFatalError("用户名或密码错误。", "auth");
           if (attempt >= config.retry.attempts) throw err;
           const delay = config.retry.baseDelayMs * 2 ** attempt;
-          log(`[sync] 重试 ${attempt + 1}/${config.retry.attempts}:${describeError(err)}`);
+          log(`[sync] 重试 ${attempt + 1}/${config.retry.attempts}:${describe(err)}`);
           if (delay > 0) await sleepAbortable(delay);
         }
       }
@@ -525,10 +529,18 @@ export function createSyncEngine(opts: SyncEngineOptions): SyncEngine {
       client = deps.createClient({ baseUrl: config.remoteBaseUrl, username: "", password: "" });
       remote = await scanRemote(client, {
         maxFileSizeBytes: config.thresholds.maxFileSizeBytes,
+        localRootAbs: config.workspacePath,
         signal,
         throwIfAborted,
       });
       report.skipped.push(...remote.skipped);
+
+      // 被跳过的条目(决议 61)在 files 表里是缺失的;缺失 **不等于**「对方已删」。
+      // 把它们交给决策表排除,防止「跳过」退化成「把另一侧的文件当删除处理掉」。
+      const unmanaged = new Set<string>([
+        ...local.skipped.map((s) => s.relPath),
+        ...remote.skipped.map((s) => s.relPath),
+      ]);
 
       // ── 列举闸门(决议 63):远端根列举返回 0 条,而状态表里存在该远端的历史记录 ──
       // 立即报错停止,不做任何删除。依据:存在「上传正常、列举静默为空」的客户端
@@ -550,6 +562,7 @@ export function createSyncEngine(opts: SyncEngineOptions): SyncEngine {
         remoteDirs: remote.dirs,
         records,
         hasState,
+        unmanaged,
       });
 
       // ── 熔断守卫(决议 27):执行循环**之前**。检查完再做任何删除。 ──
@@ -581,8 +594,8 @@ export function createSyncEngine(opts: SyncEngineOptions): SyncEngine {
             throw err;
           }
           if (isAuthError(err)) throw new SyncFatalError("用户名或密码错误。", "auth");
-          report.failed.push({ relPath: item.relPath, reason: describeError(err) });
-          log(`[sync] 失败 ${item.relPath}:${describeError(err)}`);
+          report.failed.push({ relPath: item.relPath, reason: describe(err) });
+          log(`[sync] 失败 ${item.relPath}:${describe(err)}`);
         }
         done++;
         emit(item.relPath);
@@ -604,6 +617,12 @@ export function createSyncEngine(opts: SyncEngineOptions): SyncEngine {
           `[sync] 已取消:已完成 上传 ${report.uploaded} / 下载 ${report.downloaded} / 冲突 ${report.conflicts}`,
         );
         return report; // 取消:已完成的操作保留
+      }
+      // 决议 59:认证失败在**任何阶段**(含枚举)都单独识别、立即停下、绝不重试,
+      // 以免触发服务端登录失败锁定。转成统一的致命错误,供界面提示「用户名或密码错误」。
+      if (isAuthError(err)) {
+        log("[sync] 认证失败:立即停止(不重试)");
+        throw new SyncFatalError("用户名或密码错误。", "auth");
       }
       throw err;
     } finally {

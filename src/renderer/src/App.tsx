@@ -761,6 +761,7 @@ export default function App() {
                 current: sync.current,
                 last: sync.last,
                 onCancel: sync.cancel,
+                onRetry: () => void syncNow(),
                 unknownChanges: unknownRemoteChanges,
               }
             : undefined

@@ -133,6 +133,29 @@ export async function startWebfakeServer(opts: WebfakeOptions = {}): Promise<Web
   const credentials = opts.credentials ?? null;
   const nodes = new Map<string, Node>([["", { kind: "dir" }]]);
   const requests: WebfakeRequestLogEntry[] = [];
+  /** failRules 的剩余次数(按规则对象计;换新规则即重置)。 */
+  const failRemaining = new Map<object, number>();
+
+  /**
+   * 请求级失败注入(票 06):命中则本次返回失败状态。返回 true 表示已应答。
+   * 计数按规则对象保存,`setQuirks` 换成新规则对象后自动从 `times` 重算。
+   */
+  function applyFailRule(method: string, path: string, res: ServerResponse): boolean {
+    const rules = quirks.failRules;
+    if (!rules || rules.length === 0) return false;
+    for (const rule of rules) {
+      if (rule.method !== method) continue;
+      if (rule.path && normPath(rule.path) !== path) continue;
+      if (!failRemaining.has(rule)) failRemaining.set(rule, rule.times);
+      const left = failRemaining.get(rule)!;
+      if (left <= 0) continue;
+      failRemaining.set(rule, left - 1);
+      res.writeHead(rule.status ?? 500);
+      res.end("injected failure");
+      return true;
+    }
+    return false;
+  }
 
   function childrenOf(dirPath: string): string[] {
     const out: string[] = [];
@@ -328,6 +351,9 @@ export async function startWebfakeServer(opts: WebfakeOptions = {}): Promise<Web
       res.end("auth failed");
       return;
     }
+
+    // 请求级失败注入(票 06):在真实语义之前应答,用于测重试与放弃。
+    if (applyFailRule(method, path, res)) return;
 
     switch (method) {
       case "PROPFIND":

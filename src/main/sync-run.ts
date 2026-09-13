@@ -5,7 +5,7 @@
 // 多工作区串行(决议 12):经模块级 promise 链排队,一次只跑一个。
 // 凭据只在本进程内解密;绝不进渲染层、绝不进日志。
 
-import { app, shell } from "electron";
+import { app, BrowserWindow, dialog, shell } from "electron";
 import { join } from "node:path";
 import {
   createSyncEngine,
@@ -21,9 +21,12 @@ import { normalizeWorkspaceKey, redactSecrets, type SyncOutcome, type SyncProbeO
 import { readWorkspaceSyncConfig } from "./sync-settings";
 import { createSyncFetch } from "./sync-fetch";
 import { createSyncLogger } from "./sync-log";
+import { buildDeleteGuardMessage } from "./sync-interrupt";
 
 /** 进行中的同步的中止控制器(取消通道用)。 */
 let activeAbort: AbortController | null = null;
+/** 进行中同步的最新进度(关窗确认要报「已完成 123 / 540」)。 */
+let activeProgress: SyncProgress = { done: 0, total: 0, current: null };
 /** 串行队列:多个工作区的同步任务一次一个(决议 12)。 */
 let chain: Promise<unknown> = Promise.resolve();
 
@@ -35,6 +38,11 @@ export function cancelSyncRun(): void {
 /** 是否有同步在跑。 */
 export function isSyncRunning(): boolean {
   return activeAbort !== null;
+}
+
+/** 进行中同步的最新进度(无同步时为 0 / 0)。 */
+export function getSyncProgress(): SyncProgress {
+  return activeProgress;
 }
 
 /**
@@ -71,10 +79,12 @@ async function doRunSync(
     };
   }
 
-  const logger = createSyncLogger();
+  const logger = createSyncLogger([cfg.password]); // 决议 43:每行再兜底遮蔽密码
+  const redact = (text: string): string => redactSecrets(text, [cfg.password]);
   const abort = new AbortController();
   activeAbort = abort;
-  logger(`[sync-run] 开始 workspace=${workspacePath} remote=${cfg.baseUrl}`);
+  activeProgress = { done: 0, total: 0, current: null };
+  logger(`[sync-run] 开始 workspace=${workspacePath} remote=${redact(cfg.baseUrl)}`);
 
   try {
     const store = createSyncStateStore({
@@ -102,13 +112,20 @@ async function doRunSync(
         trashFile: async (absPath) => {
           await shell.trashItem(absPath); // 本地删除永远走回收站(决议 25;票 05 用)
         },
+        // 决议 43:引擎的日志与错误原因经此遮蔽,密码绝不进报告/日志。
+        redact,
+        // 决议 27:熔断确认接到主进程对话框(票 05 遗留,票 06 接线)。
+        confirmDeletes: confirmDeletesViaDialog,
         logger,
       },
       store,
       lockDir: join(app.getPath("userData"), "sync-locks"),
     });
 
-    const report = await engine.run(abort.signal, onProgress);
+    const report = await engine.run(abort.signal, (p) => {
+      activeProgress = p;
+      onProgress(p);
+    });
     const status = abort.signal.aborted ? "cancelled" : "ok";
     logger(
       `[sync-run] 结束 status=${status} 上传 ${report.uploaded} / 下载 ${report.downloaded} ` +
@@ -117,7 +134,7 @@ async function doRunSync(
     return { status, report };
   } catch (err) {
     const raw = err instanceof Error ? err.message : String(err);
-    const message = redactSecrets(raw, [cfg.password]); // 决议 43:错误信息遮蔽密码
+    const message = redact(raw); // 决议 43:错误信息遮蔽密码
     logger(`[sync-run] 失败:${message}`);
     if (err instanceof SyncBusyError) return { status: "error", message: err.message };
     return { status: "error", message };
@@ -162,4 +179,25 @@ export async function probeSyncRun(workspacePath: string): Promise<SyncProbeOutc
     // 探测失败 / 配置读取异常 → 静默降级(不显示圆点,不打断启动)。
     return { hasUnknownChanges: false };
   }
+}
+
+/**
+ * 熔断确认(决议 27):弹主进程原生对话框。返回 true = 用户确认继续删除。
+ * 默认按钮为「取消」,用户不主动确认即零删除(引擎侧未确认即 SyncFatalError)。
+ */
+async function confirmDeletesViaDialog(prompt: Parameters<typeof buildDeleteGuardMessage>[0]): Promise<boolean> {
+  const { message, detail, buttons } = buildDeleteGuardMessage(prompt);
+  const win = BrowserWindow.getFocusedWindow() ?? BrowserWindow.getAllWindows()[0] ?? null;
+  const opts: Electron.MessageBoxOptions = {
+    type: "warning",
+    title: "同步删除确认",
+    message,
+    detail,
+    buttons: [...buttons],
+    defaultId: 0,
+    cancelId: 0,
+    noLink: true,
+  };
+  const res = win ? await dialog.showMessageBox(win, opts) : await dialog.showMessageBox(opts);
+  return res.response === 1;
 }

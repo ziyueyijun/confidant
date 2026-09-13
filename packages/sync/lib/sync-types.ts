@@ -15,6 +15,12 @@ export interface SyncDeps {
    * **零删除**。省略 ⇒ 视为拒绝(引擎绝不自行弹窗;主进程接 dialog.showMessageBox)。
    */
   confirmDeletes?: (prompt: DeleteGuardPrompt) => Promise<boolean>;
+  /**
+   * 遮蔽敏感串(决议 43:日志与错误信息不含密码)。省略 = 原样。生产由主进程注入
+   * `redactSecrets`(密码只有主进程掌握,引擎自身不持有凭据)。引擎把它套在**每一条
+   * 日志**与**每一个进入报告的错误原因**上。
+   */
+  redact?: (text: string) => string;
   now?: () => number;
   logger?: (line: string) => void;
 }

@@ -13,7 +13,7 @@ import {
   type DocStats,
   type WordCountMetric,
 } from "../editor/doc-stats";
-import { formatSyncOutcome } from "../sync/sync-summary";
+import { formatSyncOutcome, isRetryable, summarizeIssues } from "../sync/sync-summary";
 
 /** 同步状态条(02):进行中显示「同步中 已完成 / 总数」+ 取消;结束后显示摘要。 */
 export interface SyncFooterState {
@@ -25,6 +25,8 @@ export interface SyncFooterState {
   onCancel: () => void;
   /** 07:远端有本机未知变更 → 小圆点(提示该同步了;同步进行中不显示)。 */
   unknownChanges?: boolean;
+  /** 整体失败或存在失败项时的「重试」入口(决议 60)。 */
+  onRetry?: () => void;
 }
 
 export interface FooterProps {
@@ -93,6 +95,8 @@ export function Footer({ engine, tick, hasDoc, focusMode, typewriterMode, onTogg
   );
   const metricValue = stats[metric];
   const syncSummary = sync ? formatSyncOutcome(sync.last) : null;
+  const syncRetryable = !!sync && !sync.running && isRetryable(sync.last) && !!sync.onRetry;
+  const syncDetail = sync ? summarizeIssues(sync.last?.report) : "";
 
   return (
     <footer
@@ -173,6 +177,7 @@ export function Footer({ engine, tick, hasDoc, focusMode, typewriterMode, onTogg
         {sync && !sync.running && syncSummary && (
           <span
             data-testid="footer-sync-summary"
+            title={syncDetail || undefined}
             style={{ color: sync.last?.status === "error" ? "var(--danger)" : "var(--muted)" }}
           >
             {syncSummary}
@@ -192,6 +197,24 @@ export function Footer({ engine, tick, hasDoc, focusMode, typewriterMode, onTogg
               flexShrink: 0,
             }}
           />
+        )}
+        {syncRetryable && (
+          <button
+            type="button"
+            data-testid="footer-sync-retry"
+            onClick={sync!.onRetry}
+            style={{
+              padding: "2px 8px",
+              fontSize: 12,
+              border: "1px solid var(--border)",
+              borderRadius: 4,
+              background: "transparent",
+              color: "inherit",
+              cursor: "pointer",
+            }}
+          >
+            重试
+          </button>
         )}
         {blockType && (
           <span data-testid="footer-block-type" style={{ color: "var(--muted)", opacity: 0.75 }}>

@@ -6,9 +6,41 @@
 // 本包不依赖 Electron;本地文件系统不注入(测试用真临时目录)。
 
 import { randomBytes } from "node:crypto";
-import { mkdir, readdir, readFile, rename, stat, unlink, writeFile } from "node:fs/promises";
+import { lstat, mkdir, readdir, readFile, rename, unlink, writeFile } from "node:fs/promises";
 import { basename, dirname, join } from "node:path";
 import type { SyncIssue } from "./sync-types";
+
+/**
+ * Windows 传统 MAX_PATH(title 上限 260,决议 61:超长路径跳过并报告)。
+ * 同步只在本机 Windows 落盘,故以该值判定「远端条目落到本地会超限」。
+ */
+export const WINDOWS_MAX_PATH_CHARS = 260;
+
+/** 相对路径 relPath 落在 rootAbs 下后,绝对路径长度是否超 Windows 上限。 */
+export function exceedsWindowsPathLimit(rootAbs: string, relPath: string): boolean {
+  const root = rootAbs.replace(/[\\/]+$/, "");
+  // 绝对路径长度 = root + 1 个分隔符 + rel(rel 内分隔符按 1 字符计)。
+  return root.length + 1 + relPath.length > WINDOWS_MAX_PATH_CHARS;
+}
+
+/** 本地目录条目的分类(决议 61:未知条目类型跳过并报告)。 */
+export type LocalDirentKind = "symlink" | "dir" | "file" | "unknown";
+
+/**
+ * 把 readdir 的 Dirent 分类。符号链接单独一类(决议 18:不跟随);既非文件又非
+ * 目录的条目(具名管道、套接字、设备等)归 `unknown` → 跳过并报告。抽成纯函数
+ * 以便在无特殊文件系统的平台(Windows CI)上仍能穷举这类条目的处置。
+ */
+export function classifyLocalDirent(d: {
+  isSymbolicLink(): boolean;
+  isDirectory(): boolean;
+  isFile(): boolean;
+}): LocalDirentKind {
+  if (d.isSymbolicLink()) return "symlink";
+  if (d.isDirectory()) return "dir";
+  if (d.isFile()) return "file";
+  return "unknown";
+}
 
 /**
  * 硬排除名单(决议 16,不可关闭):所有点开头条目(一次覆盖 `.git`、`.DS_Store` 与
@@ -63,25 +95,26 @@ export async function scanLocal(
       const name = d.name;
       if (isExcludedName(name)) continue;
       const rel = relPrefix ? `${relPrefix}/${name}` : name;
-      if (d.isSymbolicLink()) {
+      const kind = classifyLocalDirent(d);
+      if (kind === "symlink") {
         // 决议 18:不跟随符号链接(目标可能在workspace 之外)。
         skipped.push({ relPath: rel, reason: "符号链接(不跟随),已跳过" });
         continue;
       }
-      if (d.isDirectory()) {
+      if (kind === "dir") {
         dirs.push(rel);
         await walk(join(dirAbs, name), rel);
         continue;
       }
-      if (!d.isFile()) {
+      if (kind === "unknown") {
         skipped.push({ relPath: rel, reason: "未知条目类型,已跳过" });
         continue;
       }
       let size: number;
       let mtimeMs: number;
       try {
-        // lstat:再次确认不是符号链接(读取瞬间的竞态也不跟随)。
-        const st = await stat(join(dirAbs, name));
+        // lstat:再次确认不是符号链接(读取瞬间的竞态也不跟随目标)。
+        const st = await lstat(join(dirAbs, name));
         if (!st.isFile()) {
           skipped.push({ relPath: rel, reason: "未知条目类型,已跳过" });
           continue;
