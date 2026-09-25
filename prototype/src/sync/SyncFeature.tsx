@@ -4,6 +4,7 @@ import { AppMenu } from './AppMenu'
 import { StatusBar } from './StatusBar'
 import { SyncCenterDialog } from './SyncCenterDialog'
 import { SettingsDialog, FirstSyncDialog, DeleteDialog } from './SettingsDialog'
+import { WorkspaceDialog } from './WorkspaceDialog'
 import { ConflictCompare } from './SyncCenterDialog'
 import { 取场景, type ScenarioKey, type Conflict } from './data'
 import type { SyntaxReveal } from '../editor/markdownLivePreview'
@@ -15,7 +16,8 @@ import type { SyntaxReveal } from '../editor/markdownLivePreview'
  * - **状态栏**：同步是**环境**。默认闭嘴，只在「正在进行 / 需要处理 /
  *   本次会话同步过」时说话。
  * - **同步中心**（弹窗）：专门处理一件事的界面，处理完就关掉。
- * - **设置**（菜单进入）：**不只服务 WebDAV**。
+ * - **设置**（菜单进入）：编辑器 / 外观 / 快捷键 / 同步 / 更新。
+ * - **工作空间**（菜单进入）：打开、切换、在文件管理器里看。
  */
 export function SyncFeature({
   scenario,
@@ -35,12 +37,14 @@ export function SyncFeature({
   const mock = 取场景(scenario)
   const [syncOpen, setSyncOpen] = useState(false)
   const [settingsOpen, setSettingsOpen] = useState(false)
+  const [workspaceOpen, setWorkspaceOpen] = useState(false)
   const [overlay, setOverlay] = useState<null | 'first' | 'delete' | { conflict: Conflict }>(null)
   const [armed, setArmed] = useState<null | '上传' | '下载'>(null)
 
   // 切场景时重置——否则上一个场景的弹窗会挂在新场景上
   useEffect(() => {
     setSettingsOpen(false)
+    setWorkspaceOpen(false)
     setOverlay(null)
     setArmed(null)
     // 有处境要说的场景直接把同步中心推到眼前
@@ -65,6 +69,7 @@ export function SyncFeature({
       menu={
         <AppMenu
           onOpenSettings={() => setSettingsOpen(true)}
+          onOpenWorkspace={() => setWorkspaceOpen(true)}
           onOpenSyncCenter={openSync}
         />
       }
@@ -79,6 +84,7 @@ export function SyncFeature({
           )}
 
           {settingsOpen && <SettingsDialog onClose={() => setSettingsOpen(false)} />}
+          {workspaceOpen && <WorkspaceDialog onClose={() => setWorkspaceOpen(false)} />}
 
           {overlay === 'first' && <FirstSyncDialog mock={mock} onClose={() => setOverlay(null)} />}
           {overlay === 'delete' && (

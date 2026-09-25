@@ -2,29 +2,32 @@ import { useState } from 'react'
 import { 配置, 远端目录, type SyncMock, type TestOutcome } from './data'
 
 /**
- * 设置——**从菜单进入的弹窗**，且**不只服务 WebDAV**。
+ * 设置——**从菜单进入的弹窗**。
  *
- * 按设置项分五组：WebDAV / 同步 / 文件关联 / 更新 / 笔记库。
- * 这一节的存在理由就是：文件关联、自动更新、库切换同样是设置，
- * 它们不该挤进同步中心。后续加新设置只需加一组。
+ * 分组与顺序：编辑器 / 外观 / 快捷键 / 同步 / 更新。
+ *
+ * **没有「文件关联」。** 装好 exe 之后用户在 Windows 设置里自己决定
+ * 要不要设为默认程序——应用不该在这里再给一个入口，更不该检测与提醒。
+ *
+ * 「工作空间」不在这里——它是**菜单里的一项**（见 `AppMenu`），
+ * 因为它管的是「打开哪个文件夹」这种应用级动作，不是一项偏好设置。
  */
 const 设置分组 = [
-  { key: 'webdav', label: 'WebDAV' },
+  { key: 'editor', label: '编辑器' },
+  { key: 'appearance', label: '外观' },
+  { key: 'shortcuts', label: '快捷键' },
   { key: 'sync', label: '同步' },
-  { key: 'files', label: '文件关联' },
   { key: 'update', label: '更新' },
-  { key: 'vault', label: '笔记库' },
 ] as const
 
 export function SettingsDialog({ onClose }: { onClose: () => void }) {
-  const [section, setSection] = useState<(typeof 设置分组)[number]['key']>('webdav')
+  const [section, setSection] = useState<(typeof 设置分组)[number]['key']>('editor')
 
   return (
     <div className="fixed inset-0 z-40 flex items-center justify-center bg-slate-900/30 p-6">
-      {/* 高度**随内容**（`max-h` 而非固定 `h`）——五组设置里四组只有几个字段，
-          固定 80vh 会让它们撑在一片空白里。加宽到 4xl 是为了让 WebDAV
-          那两栏各自有足够宽度。 */}
-      <div className="flex max-h-[80vh] w-full max-w-4xl flex-col overflow-hidden rounded-lg bg-white shadow-2xl">
+      {/* 高度随内容（`max-h` 而非固定 `h`）——多数分组只有几个字段，
+          固定高度会让它们撑在一片空白里。 */}
+      <div className="flex max-h-[80vh] w-full max-w-3xl flex-col overflow-hidden rounded-lg bg-white shadow-2xl">
         <div className="flex shrink-0 items-center border-b border-slate-200 px-4 py-2.5">
           <span className="text-sm font-medium text-slate-700">设置</span>
           <button
@@ -36,7 +39,6 @@ export function SettingsDialog({ onClose }: { onClose: () => void }) {
         </div>
 
         <div className="flex min-h-0 flex-1">
-          {/* 侧栏收窄：五项都是两个字，w-40 是浪费 */}
           <nav className="w-28 shrink-0 border-r border-slate-200 bg-slate-50/70 py-2">
             {设置分组.map((g) => (
               <button
@@ -53,26 +55,22 @@ export function SettingsDialog({ onClose }: { onClose: () => void }) {
             ))}
           </nav>
 
-          <div className="flex min-h-0 min-w-0 flex-1 flex-col bg-slate-50">
-            {section === 'webdav' ? (
-              // WebDAV 自己管布局（两栏 + 固定底栏），不套统一的内边距
-              <WebdavSection />
-            ) : (
-              <div className="h-full overflow-auto">
-                <div className="p-5">
-                  {section === 'sync' && <SyncSection />}
-                  {section === 'files' && <FilesSection />}
-                  {section === 'update' && <UpdateSection />}
-                  {section === 'vault' && <VaultSection />}
-                </div>
-              </div>
-            )}
+          <div className="min-h-0 min-w-0 flex-1 overflow-auto bg-slate-50">
+            <div className="p-5">
+              {section === 'editor' && <EditorSection />}
+              {section === 'appearance' && <AppearanceSection />}
+              {section === 'shortcuts' && <ShortcutsSection />}
+              {section === 'sync' && <SyncSection />}
+              {section === 'update' && <UpdateSection />}
+            </div>
           </div>
         </div>
       </div>
     </div>
   )
 }
+
+// ---------------------------------------------------------------- 基元
 
 function Card({ title, children }: { title: string; children: React.ReactNode }) {
   return (
@@ -83,19 +81,265 @@ function Card({ title, children }: { title: string; children: React.ReactNode })
   )
 }
 
+/** 一行设置：左边是名称与说明，右边是控件。 */
+function Row({
+  label,
+  desc,
+  children,
+}: {
+  label: string
+  desc?: string
+  children: React.ReactNode
+}) {
+  return (
+    <div className="flex items-center gap-4 border-b border-slate-100 py-2 last:border-b-0">
+      <div className="min-w-0 flex-1">
+        <div className="text-xs text-slate-700">{label}</div>
+        {desc && <div className="mt-0.5 text-[10px] leading-relaxed text-slate-400">{desc}</div>}
+      </div>
+      <div className="shrink-0">{children}</div>
+    </div>
+  )
+}
+
+function Segmented<T extends string>({
+  value,
+  options,
+  onChange,
+}: {
+  value: T
+  options: { value: T; label: string }[]
+  onChange: (v: T) => void
+}) {
+  return (
+    <div className="flex rounded border border-slate-300 p-0.5">
+      {options.map((o) => (
+        <button
+          key={o.value}
+          onClick={() => onChange(o.value)}
+          className={`rounded px-2 py-0.5 text-[11px] transition ${
+            value === o.value
+              ? 'bg-slate-800 text-white'
+              : 'text-slate-600 hover:bg-slate-100'
+          }`}
+        >
+          {o.label}
+        </button>
+      ))}
+    </div>
+  )
+}
+
+function Toggle({ on }: { on: boolean }) {
+  const [v, setV] = useState(on)
+  return (
+    <button
+      onClick={() => setV((x) => !x)}
+      className={`flex h-4 w-7 items-center rounded-full px-0.5 transition ${
+        v ? 'bg-sky-500' : 'bg-slate-300'
+      }`}
+    >
+      <span
+        className={`h-3 w-3 rounded-full bg-white transition ${v ? 'translate-x-3' : ''}`}
+      />
+    </button>
+  )
+}
+
+function Select({ value, options }: { value: string; options: string[] }) {
+  return (
+    <select
+      defaultValue={value}
+      className="rounded border border-slate-300 bg-white px-1.5 py-0.5 text-[11px] outline-none focus:border-sky-500"
+    >
+      {options.map((o) => (
+        <option key={o}>{o}</option>
+      ))}
+    </select>
+  )
+}
+
+function NumberInput({ value, suffix }: { value: string; suffix?: string }) {
+  return (
+    <span className="flex items-center gap-1 text-[11px] text-slate-500">
+      <input
+        defaultValue={value}
+        className="w-12 rounded border border-slate-300 px-1.5 py-0.5 text-[11px] outline-none focus:border-sky-500"
+      />
+      {suffix}
+    </span>
+  )
+}
+
+// ---------------------------------------------------------------- 1 编辑器
+
+function EditorSection() {
+  const [reveal, setReveal] = useState<'line' | 'marker' | 'never'>('line')
+
+  return (
+    <>
+      <Card title="语法标记">
+        <Row
+          label="显示方式"
+          desc="Markdown 标记（** 、## 、` 等）在正文里怎么显示"
+        >
+          <Segmented
+            value={reveal}
+            onChange={setReveal}
+            options={[
+              { value: 'line', label: '整行' },
+              { value: 'marker', label: '标记' },
+              { value: 'never', label: '不展开' },
+            ]}
+          />
+        </Row>
+        <Row label="源码视图" desc="始终以 Markdown 原文显示，不做渲染">
+          <Toggle on={false} />
+        </Row>
+      </Card>
+
+      <Card title="代码块">
+        <Row label="等宽字体">
+          <Select value="Cascadia Code" options={['Cascadia Code', 'Consolas', 'JetBrains Mono', '系统默认']} />
+        </Row>
+        <Row label="自动换行" desc="长行不出现横向滚动条">
+          <Toggle on />
+        </Row>
+        <Row label="显示行号">
+          <Toggle on={false} />
+        </Row>
+      </Card>
+
+      <Card title="编辑">
+        <Row label="Tab 宽度">
+          <NumberInput value="4" suffix="空格" />
+        </Row>
+        <Row label="表格渲染" desc="光标不在表内时显示为真实表格">
+          <Toggle on />
+        </Row>
+        <Row label="自动保存" desc="停止输入后自动写入磁盘">
+          <Toggle on />
+        </Row>
+      </Card>
+    </>
+  )
+}
+
+// ---------------------------------------------------------------- 2 外观
+
+function AppearanceSection() {
+  const [theme, setTheme] = useState<'light' | 'dark' | 'system'>('system')
+
+  return (
+    <>
+      <Card title="主题">
+        <Row label="模式">
+          <Segmented
+            value={theme}
+            onChange={setTheme}
+            options={[
+              { value: 'light', label: '亮色' },
+              { value: 'dark', label: '深色' },
+              { value: 'system', label: '跟随系统' },
+            ]}
+          />
+        </Row>
+        <Row label="代码块配色">
+          <Select value="浅色（与主题一致）" options={['浅色（与主题一致）', 'GitHub', 'Monokai', 'Solarized']} />
+        </Row>
+      </Card>
+
+      <Card title="字体">
+        <Row label="正文字体">
+          <Select value="系统默认" options={['系统默认', '微软雅黑', '思源黑体', '霞鹜文楷']} />
+        </Row>
+        <Row label="字号">
+          <NumberInput value="16" suffix="px" />
+        </Row>
+        <Row label="行高">
+          <NumberInput value="1.85" />
+        </Row>
+      </Card>
+
+      <Card title="语言">
+        <Row label="界面语言">
+          <Select value="简体中文" options={['简体中文', '繁體中文', 'English']} />
+        </Row>
+        <Row label="拼写检查" desc="只对拉丁字母生效">
+          <Toggle on={false} />
+        </Row>
+      </Card>
+    </>
+  )
+}
+
+// ---------------------------------------------------------------- 3 快捷键
+
 /**
- * WebDAV 设置。
+ * 快捷键列表。
  *
- * 流程是**连接 → 选择 → 保存**三步，不能跳：
- * 1. **测试连接**——先证明地址、用户名、密码是对的。错了就不必往下走。
- * 2. 连上之后**列出远端的目录**，让用户**手动选**要同步哪一个。
- *    这一步不能省：远端往往不止一个目录，猜错会把笔记同步到别人家的库上。
- * 3. **保存**——记住配置。保存前必须已经选定了目录。
- *
- * 「库标识」不在这里填——它是应用自己认领远端那一份用的，用户不需要理解它。
+ * ⚠️ **这份清单是占位**——spec 里还没有快捷键表（除了原型里的
+ * Ctrl+/ 切源码视图）。列出来是为了把「设置里该有什么」摆出来看，
+ * 真正定案时要连同「是否允许自定义」一起定：允许自定义就要做冲突检测，
+ * 那是另一块工作量。
  */
+const 快捷键表: [string, string][] = [
+  ['新建笔记', 'Ctrl + N'],
+  ['搜索', 'Ctrl + K'],
+  ['源码视图开关', 'Ctrl + /'],
+  ['打开工作空间', 'Ctrl + O'],
+  ['立即同步', 'Ctrl + Shift + S'],
+  ['打开设置', 'Ctrl + ,'],
+]
+
+function ShortcutsSection() {
+  return (
+    <Card title="快捷键">
+      <div className="mb-3 text-[11px] leading-relaxed text-slate-400">
+        第一版只列出这些，暂不允许自定义。
+      </div>
+      {快捷键表.map(([name, keys]) => (
+        <Row key={name} label={name}>
+          <kbd className="rounded border border-slate-300 bg-slate-50 px-2 py-0.5 font-mono text-[11px] text-slate-600">
+            {keys}
+          </kbd>
+        </Row>
+      ))}
+    </Card>
+  )
+}
+
+// ---------------------------------------------------------------- 4 同步
+
+function SyncSection() {
+  return (
+    <>
+      <WebdavBlock />
+
+      <Card title="自动同步">
+        {/* 默认不勾选——软件装好后不该自己开始动用户的笔记。 */}
+        <Row label="启用自动同步" desc="默认关闭。不勾选时应用不会在后台动你的笔记">
+          <Toggle on={false} />
+        </Row>
+        <Row label="间隔" desc="另有两次：应用启动时、本地攒下一批改动之后">
+          <NumberInput value="10" suffix="分钟" />
+        </Row>
+      </Card>
+
+      <Card title="批量删除保护">
+        <Row
+          label="一次删除超过多少篇时先确认"
+          desc="误判的 stat 曾让别家的同步器删光过整个库，所以这一步故意做得不顺手"
+        >
+          <NumberInput value="10" suffix="篇" />
+        </Row>
+      </Card>
+    </>
+  )
+}
+
 /**
- * WebDAV 设置。
+ * WebDAV 连接（同步 → 4.1）。
  *
  * 流程是**连接 → 选择 → 保存**三步，不能跳：
  * 1. **测试连接**——先证明地址、用户名、密码是对的。错了就不必往下走。
@@ -103,18 +347,15 @@ function Card({ title, children }: { title: string; children: React.ReactNode })
  *    这一步不能省：远端往往不止一个目录，猜错会把笔记同步到别人家的库上。
  * 3. **保存**——记住配置。保存前必须已经选定了目录。
  *
- * ## 布局：两栏 + 固定底栏
+ * ## 布局：两栏 + 底部保存行
  *
- * 三张卡竖着堆会变成一长条（实测 837px，要滚到底才按得到保存），
- * 而且**连接表单被拉到 534px 宽**——服务器地址根本用不了那么宽。
- * 所以：
+ * 三张卡竖着堆时实测 837px，要滚到底才按得到保存；而且**连接表单的
+ * 输入框被拉到 534px 宽**——服务器地址根本用不了那么宽。所以：
  * - **左窄栏**放连接表单（输入框本来就短）
  * - **右宽栏**放远端目录（路径长，需要宽度）
- * - **保存固定在底部**——它是这三步的终点，不该需要滚动才能到达
- *
- * 「库标识」不在这里填——它是应用自己认领远端那一份用的，用户不需要理解它。
+ * - **保存行贴在这个区块底部**——它是这三步的终点
  */
-function WebdavSection() {
+function WebdavBlock() {
   const [server, setServer] = useState(配置.server)
   const [username, setUsername] = useState(配置.username)
   const [password, setPassword] = useState('')
@@ -152,11 +393,14 @@ function WebdavSection() {
   const chosen = 目录.find((e) => e.path === picked)
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col">
-      <div className="flex min-h-0 flex-1">
+    <section className="mb-4 overflow-hidden rounded-lg border border-slate-200 bg-white">
+      <div className="border-b border-slate-100 px-4 py-2.5 text-xs font-medium text-slate-700">
+        4.1　WebDAV 同步
+      </div>
+
+      <div className="flex">
         {/* ---- 左：连接。窄栏——输入框本来就短，不需要 500px ---- */}
-        <div className="w-56 shrink-0 overflow-auto border-r border-slate-200 bg-white p-4">
-          <div className="mb-3 text-xs font-medium text-slate-700">连接</div>
+        <div className="w-56 shrink-0 border-r border-slate-100 p-4">
           <div className="space-y-3">
             <Field label="服务器地址" value={server} onChange={dirty(setServer)} />
             <Field label="用户名" value={username} onChange={dirty(setUsername)} />
@@ -231,14 +475,14 @@ function WebdavSection() {
         </div>
 
         {/* ---- 右：远端目录。宽栏，路径长 ---- */}
-        <div className="min-w-0 flex-1 overflow-auto bg-slate-50 p-4">
-          <div className="mb-3 text-xs font-medium text-slate-700">选择远端目录</div>
+        <div className="min-w-0 flex-1 bg-slate-50/60 p-4">
+          <div className="mb-2.5 text-[11px] font-medium text-slate-600">选择远端目录</div>
 
           {test !== 'ok' ? (
-            <div className="rounded-lg border border-dashed border-slate-300 bg-white py-14 text-center">
+            <div className="rounded-lg border border-dashed border-slate-300 bg-white py-12 text-center">
               <div className="text-xs text-slate-400">先测试连接</div>
               <div className="mt-1 text-[11px] text-slate-400">
-                连上之后这里会列出服务器上的目录，供你挑选要同步哪一个
+                连上之后这里会列出服务器上的目录
               </div>
             </div>
           ) : (
@@ -304,8 +548,8 @@ function WebdavSection() {
         </div>
       </div>
 
-      {/* ---- 底：保存。固定，不随内容滚走 ---- */}
-      <div className="flex shrink-0 items-center gap-3 border-t border-slate-200 bg-white px-4 py-2.5">
+      {/* ---- 底部：保存。贴在这个区块底部，不随内容滚走 ---- */}
+      <div className="flex items-center gap-3 border-t border-slate-100 bg-white px-4 py-2.5">
         <div className="flex min-w-0 items-center gap-3 text-[11px]">
           <span className="shrink-0 text-slate-400">将保存</span>
           <span className="truncate font-mono text-slate-700">{server || '（未填服务器）'}</span>
@@ -340,70 +584,11 @@ function WebdavSection() {
           </button>
         </div>
       </div>
-    </div>
+    </section>
   )
 }
 
-function SyncSection() {
-  return (
-    <>
-      <Card title="自动同步">
-        {/* 默认不勾选——这是刻意的：软件装好后不该自己开始动用户的笔记。
-            用户明确打开它，才意味着「我接受它在后台跑」。 */}
-        <label className="flex items-center gap-2 text-xs text-slate-600">
-          <input type="checkbox" />
-          启用自动同步
-        </label>
-        <div className="mt-2 flex items-center gap-2 text-[11px] text-slate-500">
-          间隔
-          <input
-            defaultValue="10"
-            className="w-12 rounded border border-slate-300 px-1.5 py-0.5 text-xs outline-none focus:border-sky-500"
-          />
-          分钟
-        </div>
-        <div className="mt-2 text-[11px] leading-relaxed text-slate-400">
-          另有两次自动同步：应用启动时、本地攒下一批改动之后。
-        </div>
-        <div className="mt-2 rounded border border-slate-200 bg-slate-50 px-2.5 py-2 text-[11px] leading-relaxed text-slate-500">
-          <b className="text-slate-600">默认关闭。</b>
-          不勾选时应用不会在后台动你的笔记——你仍然可以随时手动同步。
-          勾选后左下角会出现同步状态；不勾选时它保持安静。
-        </div>
-      </Card>
-      <Card title="批量删除保护">
-        <div className="flex items-center gap-2 text-[11px] text-slate-500">
-          一次删除超过
-          <input
-            defaultValue="10"
-            className="w-12 rounded border border-slate-300 px-1.5 py-0.5 text-xs outline-none focus:border-sky-500"
-          />
-          篇时先确认
-        </div>
-        <div className="mt-2 text-[11px] leading-relaxed text-slate-400">
-          误判的 stat 曾让别家的同步器删光过整个库，所以这一步故意做得不顺手。
-        </div>
-      </Card>
-    </>
-  )
-}
-
-function FilesSection() {
-  return (
-    <Card title="打开方式">
-      <div className="text-[11px] leading-relaxed text-slate-600">
-        知己笔记目前不是 <code className="rounded bg-slate-100 px-1">.md</code>{' '}
-        文件的默认打开程序。
-      </div>
-      <div className="mt-1 text-[11px] leading-relaxed text-slate-400">
-        Windows 不允许应用自行设置，需要在系统设置中手动选择。
-      </div>
-      <button className="mt-2.5 rounded border border-slate-300 bg-white px-3 py-1.5 text-xs hover:bg-slate-100">
-        打开系统设置
-      </button>
-    </Card>
-  )
-}
+// ---------------------------------------------------------------- 5 更新
 
 function UpdateSection() {
   return (
@@ -427,25 +612,6 @@ function UpdateSection() {
       </button>
       <div className="mt-2 text-[11px] leading-relaxed text-slate-400">
         启动时与每 24 小时自动检查。下载完会提示你，不会自动重启。
-      </div>
-    </Card>
-  )
-}
-
-function VaultSection() {
-  return (
-    <Card title="当前笔记库">
-      <div className="mb-2 font-mono text-[11px] text-slate-700">%USERPROFILE%\知己笔记</div>
-      <div className="mb-3 text-[11px] leading-relaxed text-slate-400">
-        同一时刻打开一个库。切换库会重新建立索引——搜索与反向链接都只作用于当前库。
-      </div>
-      <div className="flex gap-2">
-        <button className="rounded border border-slate-300 bg-white px-3 py-1.5 text-xs hover:bg-slate-100">
-          切换笔记库…
-        </button>
-        <button className="rounded border border-slate-300 bg-white px-3 py-1.5 text-xs hover:bg-slate-100">
-          在文件管理器中打开
-        </button>
       </div>
     </Card>
   )
