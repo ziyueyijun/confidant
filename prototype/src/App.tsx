@@ -145,7 +145,17 @@ export default function App() {
           )}
         </>
       ) : (
-        <SyncPrototype variant={state.variant} scenario={state.scenario} dialogLayout={state.dialogLayout} />
+        <SyncPrototype
+          variant={state.variant}
+          scenario={state.scenario}
+          dialogLayout={state.dialogLayout}
+          reveal={shared.reveal}
+          sourceMode={shared.sourceMode}
+          renderTables={shared.renderTables}
+          onCapture={shared.onCapture}
+          currentPath={shared.currentPath}
+          onSelect={shared.onSelect}
+        />
       )}
 
       <ControlBar state={state} onChange={update} onCapture={() => setCaptureOpen(true)} />

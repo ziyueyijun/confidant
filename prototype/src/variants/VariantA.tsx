@@ -14,6 +14,12 @@ interface Props {
   onCapture: () => void
   currentPath: string
   onSelect: (path: string) => void
+  /** 侧栏顶部「☰」点了做什么。不传则不显示菜单按钮。 */
+  menu?: React.ReactNode
+  /** 浮在界面之上的东西（同步中心弹窗等） */
+  overlay?: React.ReactNode
+  /** 底部状态栏。外壳提供**文档信息**（字数、行数），同步信息由调用方给。 */
+  statusBar?: (stats: { chars: number; lines: number }) => React.ReactNode
 }
 
 /** 递归渲染任意层级文件树 */
@@ -74,7 +80,15 @@ function FileTreeNodeView({ node, depth, activePath, onEnter }: {
  *
  * 默认不预选笔记——内容区留白，等用户从左侧文件树点进来。
  */
-export function VariantA({ reveal, sourceMode, renderTables, onCapture }: Props) {
+export function VariantA({
+  reveal,
+  sourceMode,
+  renderTables,
+  onCapture,
+  menu,
+  overlay,
+  statusBar,
+}: Props) {
   const ws = useWorkspace()
   const editorRefs = useRef<Record<string, EditorApi | null>>({})
   // 待确认关闭的标签；非空时弹保存确认
@@ -87,113 +101,127 @@ export function VariantA({ reveal, sourceMode, renderTables, onCapture }: Props)
 
   const activePath = ws.activeDoc?.path ?? ''
 
+  // 状态栏要的字数——从当前标签的编辑内容算，与大纲同源
+  const body = ws.activeDoc?.draft ?? ''
+  const plain = body.replace(/[#*`>|\-\[\]()]/g, '')
+  const stats = {
+    chars: plain.replace(/\s/g, '').length,
+    lines: body ? body.split('\n').length : 0,
+  }
+
   return (
-    <div className="flex h-full bg-white">
-      {/* 左：知识库文件树 */}
-      <aside className="flex w-56 shrink-0 flex-col border-r border-slate-200 bg-slate-50/70">
-        <div className="flex items-center justify-between px-3 py-2.5">
-          <span className="text-xs font-medium tracking-wide text-slate-500">知己笔记</span>
-          <button
-            onClick={onCapture}
-            className="rounded px-1.5 py-0.5 text-xs text-slate-500 hover:bg-slate-200"
-            title="捕捉（Ctrl+Shift+Space）"
-          >
-            ＋
-          </button>
-        </div>
-        <nav className="flex-1 overflow-auto px-1 pb-2">
-          {文件树.map((node, i) => (
-            <FileTreeNodeView
-              key={i}
-              node={node}
-              depth={0}
-              activePath={activePath}
-              onEnter={(p) => ws.open(p)}
-            />
-          ))}
-        </nav>
-      </aside>
-
-      {/* 中：分屏区，每块一条标签栏 + 一个编辑器 */}
-      <div className="flex min-w-0 flex-1">
-        {ws.panes.map((pane) => {
-          const doc = pane.active ? ws.docs[pane.active] : null
-          const tabs: TabItem[] = pane.tabs.map((p) => ({
-            path: p,
-            title: ws.docs[p]?.title ?? p,
-            dirty: ws.isDirty(p),
-          }))
-
-          return (
-            <div
-              key={pane.id}
-              className="flex min-w-0 flex-1 flex-col border-r border-slate-200 last:border-r-0"
+    <div className="flex h-full flex-col bg-white">
+      <div className="flex min-h-0 flex-1">
+        {/* 左：知识库文件树 */}
+        <aside className="flex w-56 shrink-0 flex-col border-r border-slate-200 bg-slate-50/70">
+          <div className="flex items-center gap-1 px-2 py-2.5">
+            {menu}
+            <span className="text-xs font-medium tracking-wide text-slate-500">知己笔记</span>
+            <button
+              onClick={onCapture}
+              className="ml-auto rounded px-1.5 py-0.5 text-xs text-slate-500 hover:bg-slate-200"
+              title="捕捉（Ctrl+Shift+Space）"
             >
-              <TabBar
-                paneId={pane.id}
-                tabs={tabs}
-                active={pane.active}
-                moveLabel={ws.moveLabel(pane.id)}
-                onActivate={ws.activate}
-                onCloseRequest={requestClose}
-                onCloseOthers={ws.closeOthers}
-                onMove={ws.moveAcross}
-                onRefresh={(_paneId, path) => ws.revert(path)}
-                onSave={ws.save}
+              ＋
+            </button>
+          </div>
+          <nav className="flex-1 overflow-auto px-1 pb-2">
+            {文件树.map((node, i) => (
+              <FileTreeNodeView
+                key={i}
+                node={node}
+                depth={0}
+                activePath={activePath}
+                onEnter={(p) => ws.open(p)}
               />
+            ))}
+          </nav>
+        </aside>
 
-              {doc ? (
-                <div className="min-h-0 flex-1 overflow-auto">
-                  <div className="mx-auto max-w-[46rem] px-10 py-8">
-                    <MarkdownEditor
-                      // path + rev：换笔记或刷新都重挂，其余时候由编辑器自己持有状态
-                      key={`${doc.path}:${doc.rev}`}
-                      ref={(el) => {
-                        editorRefs.current[pane.id] = el
-                      }}
-                      initialDoc={doc.draft}
-                      reveal={reveal}
-                      sourceMode={sourceMode}
-                      renderTables={renderTables}
-                      onChange={(text) => ws.updateDraft(doc.path, text)}
-                    />
+        {/* 中：分屏区，每块一条标签栏 + 一个编辑器 */}
+        <div className="flex min-w-0 flex-1">
+          {ws.panes.map((pane) => {
+            const doc = pane.active ? ws.docs[pane.active] : null
+            const tabs: TabItem[] = pane.tabs.map((p) => ({
+              path: p,
+              title: ws.docs[p]?.title ?? p,
+              dirty: ws.isDirty(p),
+            }))
+
+            return (
+              <div
+                key={pane.id}
+                className="flex min-w-0 flex-1 flex-col border-r border-slate-200 last:border-r-0"
+              >
+                <TabBar
+                  paneId={pane.id}
+                  tabs={tabs}
+                  active={pane.active}
+                  moveLabel={ws.moveLabel(pane.id)}
+                  onActivate={ws.activate}
+                  onCloseRequest={requestClose}
+                  onCloseOthers={ws.closeOthers}
+                  onMove={ws.moveAcross}
+                  onRefresh={(_paneId, path) => ws.revert(path)}
+                  onSave={ws.save}
+                />
+
+                {doc ? (
+                  <div className="min-h-0 flex-1 overflow-auto">
+                    <div className="mx-auto max-w-[46rem] px-10 py-8">
+                      <MarkdownEditor
+                        // path + rev：换笔记或刷新都重挂，其余时候由编辑器自己持有状态
+                        key={`${doc.path}:${doc.rev}`}
+                        ref={(el) => {
+                          editorRefs.current[pane.id] = el
+                        }}
+                        initialDoc={doc.draft}
+                        reveal={reveal}
+                        sourceMode={sourceMode}
+                        renderTables={renderTables}
+                        onChange={(text) => ws.updateDraft(doc.path, text)}
+                      />
+                    </div>
                   </div>
-                </div>
-              ) : (
-                <div className="flex flex-1 items-center justify-center">
-                  <p className="text-sm text-slate-300">从左侧选择一篇笔记</p>
-                </div>
-              )}
-            </div>
-          )
-        })}
+                ) : (
+                  <div className="flex flex-1 items-center justify-center">
+                    <p className="text-sm text-slate-300">从左侧选择一篇笔记</p>
+                  </div>
+                )}
+              </div>
+            )
+          })}
+        </div>
+
+        {/* 右：大纲（跟随当前分屏的当前标签） */}
+        {ws.activeDoc && (
+          <Outline
+            key={ws.activeDoc.path}
+            body={ws.activeDoc.draft}
+            onJump={(line) => editorRefs.current[ws.activePane]?.scrollToLine(line)}
+          />
+        )}
+
+        {pendingClose && (
+          <SavePrompt
+            title={ws.docs[pendingClose.path]?.title ?? pendingClose.path}
+            onSave={() => {
+              ws.save(pendingClose.path)
+              ws.close(pendingClose.paneId, pendingClose.path)
+              setPendingClose(null)
+            }}
+            onDiscard={() => {
+              ws.revert(pendingClose.path)
+              ws.close(pendingClose.paneId, pendingClose.path)
+              setPendingClose(null)
+            }}
+            onCancel={() => setPendingClose(null)}
+          />
+        )}
       </div>
 
-      {/* 右：大纲（跟随当前分屏的当前标签） */}
-      {ws.activeDoc && (
-        <Outline
-          key={ws.activeDoc.path}
-          body={ws.activeDoc.draft}
-          onJump={(line) => editorRefs.current[ws.activePane]?.scrollToLine(line)}
-        />
-      )}
-
-      {pendingClose && (
-        <SavePrompt
-          title={ws.docs[pendingClose.path]?.title ?? pendingClose.path}
-          onSave={() => {
-            ws.save(pendingClose.path)
-            ws.close(pendingClose.paneId, pendingClose.path)
-            setPendingClose(null)
-          }}
-          onDiscard={() => {
-            ws.revert(pendingClose.path)
-            ws.close(pendingClose.paneId, pendingClose.path)
-            setPendingClose(null)
-          }}
-          onCancel={() => setPendingClose(null)}
-        />
-      )}
+      {overlay}
+      {statusBar?.(stats)}
     </div>
   )
 }

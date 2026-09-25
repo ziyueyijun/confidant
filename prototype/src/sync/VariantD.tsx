@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
-import { AppShell, type DocStats } from './AppShell'
+import { VariantA } from '../variants/VariantA'
+import { AppMenu } from './AppMenu'
 import { StatusBar } from './StatusBar'
 import { SyncCenterDialog, type DialogLayout } from './SyncCenterDialog'
 import { SettingsDialog, FirstSyncDialog, DeleteDialog } from './SettingsDialog'
@@ -9,21 +10,36 @@ import { 取场景, type ScenarioKey, type Conflict } from './data'
 /**
  * 拼装版 —— **状态栏 + 同步中心弹窗 + 菜单里的设置**。
  *
+ * ## 外壳复用布局原型
+ *
+ * 它直接跑在 `VariantA` 上（文件树 / 标签页 / 编辑器 / 大纲），
+ * 不另做一套简化外壳——同步界面必须在**真实密度**里被评判，
+ * 而一个只有文件树和静态正文的空壳会让每个方案都显得成立。
+ *
  * 三个部件各答一个问题，不重叠：
- * - **状态栏**（常驻底部）：同步是**环境**。左边同步信息，右边文档字数。
- *   只做指示与入口，**不做操作**——避免同一件事有两个入口、两套样子。
- * - **同步中心**（**弹窗**）：一个要专门处理事情的界面，处理完就关掉。
- *   冲突是「要干活的地方」，弹窗够大、够专注，且不长期占着内容区。
- * - **设置**（**从菜单进入**）：**不只服务 WebDAV**——文件关联、自动更新、
- *   库切换都是设置，它们不该挤进同步中心。
+ * - **状态栏**（常驻底部）：同步是**环境**。左同步、右字数，且默认闭嘴。
+ * - **同步中心**（**弹窗**）：专门处理一件事的界面，处理完就关掉。
+ * - **设置**（**从菜单进入**）：**不只服务 WebDAV**。
  */
 export function VariantD({
   scenario,
   layout,
+  reveal,
+  sourceMode,
+  renderTables,
+  onCapture,
+  currentPath,
+  onSelect,
 }: {
   scenario: ScenarioKey
   /** 弹窗内部布局：选项卡 vs 单页（冲突只在有冲突时出现）。原型里可对比。 */
   layout: DialogLayout
+  reveal: Parameters<typeof VariantA>[0]['reveal']
+  sourceMode: boolean
+  renderTables: boolean
+  onCapture: () => void
+  currentPath: string
+  onSelect: (path: string) => void
 }) {
   const mock = 取场景(scenario)
   const [syncOpen, setSyncOpen] = useState(false)
@@ -54,9 +70,19 @@ export function VariantD({
   }
 
   return (
-    <AppShell
-      onOpenSyncCenter={() => openSync('overview')}
-      onOpenSettings={() => setSettingsOpen(true)}
+    <VariantA
+      reveal={reveal}
+      sourceMode={sourceMode}
+      renderTables={renderTables}
+      onCapture={onCapture}
+      currentPath={currentPath}
+      onSelect={onSelect}
+      menu={
+        <AppMenu
+          onOpenSettings={() => setSettingsOpen(true)}
+          onOpenSyncCenter={() => openSync('overview')}
+        />
+      }
       overlay={
         <>
           {syncOpen && (
@@ -83,7 +109,7 @@ export function VariantD({
           )}
         </>
       }
-      statusBar={(stats: DocStats) => (
+      statusBar={(stats) => (
         <StatusBar mock={mock} stats={stats} onOpenSync={() => openSync('overview')} />
       )}
     />
