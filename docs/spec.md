@@ -859,19 +859,36 @@ WebDAV 无文件持久 ID，改名在协议层是「删 + 建」。
 4. **大量笔记下的时间流可读性**（Variant C）
 5. **标签页系统在真实文件读写下的行为**——原型里「保存」只改内存状态，无落盘、无冲突处理
 
-### 8.3 需要设计的界面（属 [同步的用户界面](https://github.com/ziyueyijun/confidant/issues/19)）
+### 8.3 同步界面
 
-- 同步状态显示（在哪里显示「正在同步 / 上次同步于 X 分钟前 / 同步失败」）
-- 自动同步的开关与频率设置
-- 「同步」/「上传」/「下载」三个按钮的区分与呈现（§6.4 的警告）
-- 上传 / 下载的确认流程与快照
-- 冲突面板
-- WebDAV 配置界面
-- 首次同步的对话框
-- 批量删除确认
-- 同步进行中的状态；能否取消
+> 已在原型中定形（`prototype/src/sync/`，见 [同步的用户界面](https://github.com/ziyueyijun/confidant/issues/19)）。三种候选形态（状态栏 / 同步中心 / 事件流）做过对照，最终形态是**拼装**的。
 
-**「悄悄进行」可以，但「悄悄失败」不可接受**——必须有一个地方能看见当前状态与失败原因。
+#### 三个部件，各答一个问题，不重叠
+
+| 部件 | 位置 | 答什么问题 | 不放什么 |
+|---|---|---|---|
+| **状态栏** | 常驻屏幕底部，28px | 同步是**环境**——平时不占地方，坏了才吭声 | **不放操作**——避免同一件事有两个入口、两套样子 |
+| **同步中心** | 整页 | 冲突是**要干活的地方**——配得上一个房间而不是抽屉 | 不放 WebDAV 配置 |
+| **设置** | 整页，独立 | **不只服务 WebDAV**——文件关联、自动更新、库切换同样是设置 | 不放同步操作 |
+
+**状态栏**只做指示与入口：状态点 + 「上次同步于 X 分钟前 · N 个文件」；同步中的进度条直接长在这里（那是「悄悄进行」的可见性）；**失败时的具体原因直接摊在栏上，不藏进弹窗**（「悄悄进行」可以，「悄悄失败」不可接受）。右侧是「冲突 N」「待删 N」与「设置」入口。点「冲突 N」落在**冲突页**而非概览页。
+
+**同步中心**两个页签（概览 / 冲突），有冲突时默认停在冲突页。概览含状态卡、待处理统计、操作区。操作区**每条命令占一整行、右侧直写后果**：
+
+| 命令 | 呈现 |
+|---|---|
+| 同步 | 普通按钮，「合并两边的改动」 |
+| 上传 / 下载 | 归进视觉上明显不同的**覆盖**区，执行前要求**输入确认词**，并显示具体影响范围（「将覆盖远端 N 个不同的文件」） |
+
+**设置**按设置项分五组：WebDAV / 同步 / 文件关联 / 更新 / 笔记库。**后续加新设置只需加一组**——这正是它不该挤进同步中心的理由。
+
+#### 七个必须覆盖的场景
+
+界面必须在这些处境下都站得住（原型里逐个验证过）：空闲、同步中、失败、首次同步、有冲突、批量删除、未配置。
+
+#### 仍然只能实机验证的
+
+**状态栏 28px、11px 中文在真机上够不够看清**——原型答不了。若偏小，把状态栏加高到 32px 即可，结构不变。
 
 ### 8.4 库外文件
 
@@ -979,10 +996,10 @@ WebDAV 无文件持久 ID，改名在协议层是「删 + 建」。
 | §5 检索方案 | [中文检索的能力边界](https://github.com/ziyueyijun/confidant/issues/5)、[中文检索方案在真实库上的验证](https://github.com/ziyueyijun/confidant/issues/4) |
 | §6 同步方案 | [WebDAV 同步的冲突处理策略](https://github.com/ziyueyijun/confidant/issues/3)、[同步方向：双向还是单主多从](https://github.com/ziyueyijun/confidant/issues/18)、[WebDAV 同步的技术事实](https://github.com/ziyueyijun/confidant/issues/2) |
 | §7 数据安全 | [写入安全网](https://github.com/ziyueyijun/confidant/issues/10) |
-| §8 界面 | [编辑器与捕捉窗口的交互原型](https://github.com/ziyueyijun/confidant/issues/8)；同步界面仍待 [同步的用户界面](https://github.com/ziyueyijun/confidant/issues/19) |
+| §8 界面 | [编辑器与捕捉窗口的交互原型](https://github.com/ziyueyijun/confidant/issues/8)、[同步的用户界面](https://github.com/ziyueyijun/confidant/issues/19) |
 | §9 验收标准 | map Notes |
 | §10 开工前定死 | [自动更新与分发形态](https://github.com/ziyueyijun/confidant/issues/17)、[Windows 文件关联](https://github.com/ziyueyijun/confidant/issues/16) |
 
 **实测数据与源码级证据**：`docs/research/0001-技术事实基础.md`（索引式总集）、`0002-webdav-同步事实.md`、`0003-中文检索实测.md`、`0006-windows-集成与更新.md`。复现脚本在 `docs/research/spikes/`。
 
-**仍未关闭的票**：[同步的用户界面](https://github.com/ziyueyijun/confidant/issues/19)（`wayfinder:prototype`）——它依赖本文，是 MVP 内最后一块需要设计的东西。
+**map 上全部 16 张票均已解决。** 本文覆盖 MVP 的全部范围，开工无待决项。
