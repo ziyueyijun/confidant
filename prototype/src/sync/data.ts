@@ -133,6 +133,20 @@ export const 冲突列表: Conflict[] = [
   },
 ]
 
+/** 大批量冲突——用来回答「冲突多了会不会放不下」 */
+export const 大量冲突: Conflict[] = [
+  ...冲突列表,
+  ...Array.from({ length: 10 }, (_, i) => ({
+    id: `cx${i}`,
+    path: `技术/待整理/草稿-${String(i + 3).padStart(2, '0')}.md`,
+    copyName: `草稿-${String(i + 3).padStart(2, '0')}.conflict-2026092${i % 9}-1${i % 10}00-home.md`,
+    at: `${i + 2} 天前`,
+    from: 'home',
+    localBody: `本地版本 ${i + 3}\n\n这一段在本地被改过。`,
+    remoteBody: `远端版本 ${i + 3}\n\n这一段在远端被改过，内容不一样。`,
+  })),
+]
+
 // ---- 场景 ----
 
 export type ScenarioKey =
@@ -141,6 +155,7 @@ export type ScenarioKey =
   | 'failed'
   | 'first'
   | 'conflicts'
+  | 'manyConflicts'
   | 'danger'
   | 'unconfigured'
 
@@ -157,6 +172,7 @@ export const 场景: Scenario[] = [
   { key: 'failed', label: '失败', note: '「悄悄进行」可以，「悄悄失败」不可接受——错误必须具体' },
   { key: 'first', label: '首次同步', note: '两边都有内容且不同——绝不自动合并，停下来问用户' },
   { key: 'conflicts', label: '有冲突', note: '待处理的副本列表，每条要能并排看两份' },
+  { key: 'manyConflicts', label: '冲突很多', note: '12 条冲突——检验冲突列表放不下时怎么办' },
   { key: 'danger', label: '批量删除', note: '一次要删 47 篇，超过阈值先停下问用户' },
   { key: 'unconfigured', label: '未配置', note: '还没填 WebDAV 信息时的样子' },
 ]
@@ -219,6 +235,14 @@ const 状态: Record<ScenarioKey, SyncStatus> = {
     progress: null,
     currentFile: null,
   },
+  manyConflicts: {
+    phase: 'idle',
+    minutesAgo: 8,
+    syncedFiles: 1284,
+    error: null,
+    progress: null,
+    currentFile: null,
+  },
   danger: {
     phase: 'idle',
     minutesAgo: 8,
@@ -243,7 +267,7 @@ export function 取场景(key: ScenarioKey): SyncMock {
     status: 状态[key],
     // 只有相关场景才给出待处理清单，其余留空——免得每个场景都长得一样
     changes: key === 'idle' || key === 'unconfigured' ? [] : 待处理,
-    conflicts: key === 'conflicts' ? 冲突列表 : [],
+    conflicts: key === 'conflicts' ? 冲突列表 : key === 'manyConflicts' ? 大量冲突 : [],
     pendingDeletes: key === 'danger' ? 47 : 0,
     firstSync:
       key === 'first'

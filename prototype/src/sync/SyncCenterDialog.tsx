@@ -105,11 +105,13 @@ export function SyncCenterDialog({
                   {mock.pendingDeletes > 0 && (
                     <DeleteWarning count={mock.pendingDeletes} onOverlay={onOverlay} />
                   )}
-                  {/* 单页布局的核心：冲突只在有冲突时出现 */}
+                  {/* 单页布局的核心：冲突只在有冲突时出现。
+                      用可滚动列表——冲突多时不能把下面的操作区顶出屏幕。 */}
                   {hasConflicts && (
                     <ConflictList
                       conflicts={mock.conflicts}
                       onOpen={(c) => onOverlay({ conflict: c })}
+                      scrollable
                     />
                   )}
                   <PendingSection mock={mock} />
@@ -432,9 +434,12 @@ function ConfirmInline({
 function ConflictList({
   conflicts,
   onOpen,
+  /** 折叠成有上限的滚动区——冲突多时不能把下面的操作区顶出屏幕 */
+  scrollable,
 }: {
   conflicts: Conflict[]
   onOpen: (c: Conflict) => void
+  scrollable?: boolean
 }) {
   if (conflicts.length === 0) {
     return (
@@ -452,6 +457,9 @@ function ConflictList({
       <div className="flex items-baseline gap-2">
         <span className="text-xs font-medium text-slate-700">待处理的冲突</span>
         <span className="text-[11px] text-amber-700">{conflicts.length} 条</span>
+        {scrollable && conflicts.length > 3 && (
+          <span className="text-[10px] text-slate-400">· 列表可滚动</span>
+        )}
       </div>
       <p className="mt-1 text-[11px] leading-relaxed text-slate-500">
         两处都改了同一篇、且无法自动合并。副本存在{' '}
@@ -460,7 +468,8 @@ function ConflictList({
         用记事本也能打开。处理完就从这里消失。
       </p>
 
-      <div className="mt-3 space-y-2">
+      {/* 有上限的滚动区：冲突再多也占这么高，操作区始终留在屏幕内 */}
+      <div className={`mt-3 space-y-2 ${scrollable ? 'max-h-72 overflow-auto pr-1' : ''}`}>
         {conflicts.map((c) => (
           <div key={c.id} className="rounded border border-amber-200 bg-amber-50/50 p-3">
             <div className="flex items-baseline gap-2">

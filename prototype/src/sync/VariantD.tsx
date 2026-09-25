@@ -37,13 +37,14 @@ export function VariantD({
     setSettingsOpen(false)
     setOverlay(null)
     setArmed(null)
-    setTab(scenario === 'conflicts' ? 'conflicts' : 'overview')
-    // 有处境要说的场景（失败 / 未配置 / 首次同步 / 有冲突 / 批量删除）直接把同步中心推到眼前
+    setTab(scenario === 'conflicts' || scenario === 'manyConflicts' ? 'conflicts' : 'overview')
+    // 有处境要说的场景直接把同步中心推到眼前
     setSyncOpen(
       scenario === 'failed' ||
         scenario === 'unconfigured' ||
         scenario === 'first' ||
         scenario === 'conflicts' ||
+        scenario === 'manyConflicts' ||
         scenario === 'danger',
     )
   }, [scenario])
