@@ -386,3 +386,36 @@ export const 语义说明 = {
   上传: '以本地为准，把本地内容推送到远端。会无条件覆盖远端不同的文件。',
   下载: '以远端为准，把远端内容拉取到本地。会无条件覆盖本地不同的文件。',
 }
+
+// ---- WebDAV 连接与远端目录 ----
+
+/**
+ * 远端的一个目录项。
+ *
+ * `isVault` 表示「这个目录里已经有 `.confidant/`」——也就是它已经是一个
+ * 知己笔记的库。选中它意味着**接上一个已有的库**，而不是新建一个。
+ * 这个区别必须让用户看见：接错了会把两边的笔记混在一起。
+ */
+export interface RemoteEntry {
+  name: string
+  /** 相对于服务器根的完整路径 */
+  path: string
+  /** 里面的条目数（文件 + 目录） */
+  count: number
+  /** 这个目录里已经有 `.confidant/` */
+  isVault: boolean
+  /** 最后改动时间 */
+  modified: string
+}
+
+export const 远端目录: RemoteEntry[] = [
+  { name: '知己笔记', path: '/知己笔记/', count: 1284, isVault: true, modified: '8 分钟前' },
+  { name: 'obsidian-vault', path: '/obsidian-vault/', count: 342, isVault: false, modified: '3 天前' },
+  { name: 'notes', path: '/notes/', count: 57, isVault: false, modified: '2 周前' },
+  { name: 'Documents', path: '/Documents/', count: 8, isVault: false, modified: '1 个月前' },
+  { name: 'backup-2025', path: '/backup-2025/', count: 2109, isVault: true, modified: '5 个月前' },
+]
+
+/** 测试连接的三种结果。原型里可手动切换，好把三种样子都看一遍。 */
+export type TestOutcome = 'idle' | 'testing' | 'ok' | 'fail'
+
