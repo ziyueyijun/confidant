@@ -51,7 +51,6 @@ export function AppMenu({
           <MenuItem onClick={go(onOpenSettings)}>设置…</MenuItem>
           <MenuItem onClick={go(onOpenSyncCenter)}>同步中心…</MenuItem>
           <div className="my-1 h-px bg-slate-100" />
-          <MenuItem onClick={() => setOpen(false)}>检查更新…</MenuItem>
           <MenuItem onClick={() => setOpen(false)}>在文件管理器中打开笔记库</MenuItem>
           <div className="my-1 h-px bg-slate-100" />
           <MenuItem onClick={() => setOpen(false)}>关于知己笔记</MenuItem>
