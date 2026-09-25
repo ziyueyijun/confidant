@@ -21,7 +21,10 @@ export function SettingsDialog({ onClose }: { onClose: () => void }) {
 
   return (
     <div className="fixed inset-0 z-40 flex items-center justify-center bg-slate-900/30 p-6">
-      <div className="flex h-[80vh] w-full max-w-3xl flex-col overflow-hidden rounded-lg bg-white shadow-2xl">
+      {/* 高度**随内容**（`max-h` 而非固定 `h`）——五组设置里四组只有几个字段，
+          固定 80vh 会让它们撑在一片空白里。加宽到 4xl 是为了让 WebDAV
+          那两栏各自有足够宽度。 */}
+      <div className="flex max-h-[80vh] w-full max-w-4xl flex-col overflow-hidden rounded-lg bg-white shadow-2xl">
         <div className="flex shrink-0 items-center border-b border-slate-200 px-4 py-2.5">
           <span className="text-sm font-medium text-slate-700">设置</span>
           <button
@@ -33,7 +36,8 @@ export function SettingsDialog({ onClose }: { onClose: () => void }) {
         </div>
 
         <div className="flex min-h-0 flex-1">
-          <nav className="w-40 shrink-0 border-r border-slate-200 bg-slate-50/70 py-2">
+          {/* 侧栏收窄：五项都是两个字，w-40 是浪费 */}
+          <nav className="w-28 shrink-0 border-r border-slate-200 bg-slate-50/70 py-2">
             {设置分组.map((g) => (
               <button
                 key={g.key}
@@ -49,14 +53,20 @@ export function SettingsDialog({ onClose }: { onClose: () => void }) {
             ))}
           </nav>
 
-          <div className="min-h-0 flex-1 overflow-auto bg-slate-50">
-            <div className="p-5">
-              {section === 'webdav' && <WebdavSection />}
-              {section === 'sync' && <SyncSection />}
-              {section === 'files' && <FilesSection />}
-              {section === 'update' && <UpdateSection />}
-              {section === 'vault' && <VaultSection />}
-            </div>
+          <div className="flex min-h-0 min-w-0 flex-1 flex-col bg-slate-50">
+            {section === 'webdav' ? (
+              // WebDAV 自己管布局（两栏 + 固定底栏），不套统一的内边距
+              <WebdavSection />
+            ) : (
+              <div className="h-full overflow-auto">
+                <div className="p-5">
+                  {section === 'sync' && <SyncSection />}
+                  {section === 'files' && <FilesSection />}
+                  {section === 'update' && <UpdateSection />}
+                  {section === 'vault' && <VaultSection />}
+                </div>
+              </div>
+            )}
           </div>
         </div>
       </div>
@@ -81,6 +91,26 @@ function Card({ title, children }: { title: string; children: React.ReactNode })
  * 2. 连上之后**列出远端的目录**，让用户**手动选**要同步哪一个。
  *    这一步不能省：远端往往不止一个目录，猜错会把笔记同步到别人家的库上。
  * 3. **保存**——记住配置。保存前必须已经选定了目录。
+ *
+ * 「库标识」不在这里填——它是应用自己认领远端那一份用的，用户不需要理解它。
+ */
+/**
+ * WebDAV 设置。
+ *
+ * 流程是**连接 → 选择 → 保存**三步，不能跳：
+ * 1. **测试连接**——先证明地址、用户名、密码是对的。错了就不必往下走。
+ * 2. 连上之后**列出远端的目录**，让用户**手动选**要同步哪一个。
+ *    这一步不能省：远端往往不止一个目录，猜错会把笔记同步到别人家的库上。
+ * 3. **保存**——记住配置。保存前必须已经选定了目录。
+ *
+ * ## 布局：两栏 + 固定底栏
+ *
+ * 三张卡竖着堆会变成一长条（实测 837px，要滚到底才按得到保存），
+ * 而且**连接表单被拉到 534px 宽**——服务器地址根本用不了那么宽。
+ * 所以：
+ * - **左窄栏**放连接表单（输入框本来就短）
+ * - **右宽栏**放远端目录（路径长，需要宽度）
+ * - **保存固定在底部**——它是这三步的终点，不该需要滚动才能到达
  *
  * 「库标识」不在这里填——它是应用自己认领远端那一份用的，用户不需要理解它。
  */
@@ -122,163 +152,183 @@ function WebdavSection() {
   const chosen = 目录.find((e) => e.path === picked)
 
   return (
-    <>
-      <Card title="连接">
-        <div className="space-y-3">
-          <Field label="服务器地址" value={server} onChange={dirty(setServer)} />
-          <Field label="用户名" value={username} onChange={dirty(setUsername)} />
-          <Field
-            label="密码"
-            value={password}
-            placeholder="••••••••••••"
-            type="password"
-            onChange={dirty(setPassword)}
-            hint="存系统凭据库，不写进库文件"
-          />
-        </div>
+    <div className="flex min-h-0 flex-1 flex-col">
+      <div className="flex min-h-0 flex-1">
+        {/* ---- 左：连接。窄栏——输入框本来就短，不需要 500px ---- */}
+        <div className="w-56 shrink-0 overflow-auto border-r border-slate-200 bg-white p-4">
+          <div className="mb-3 text-xs font-medium text-slate-700">连接</div>
+          <div className="space-y-3">
+            <Field label="服务器地址" value={server} onChange={dirty(setServer)} />
+            <Field label="用户名" value={username} onChange={dirty(setUsername)} />
+            <Field
+              label="密码"
+              value={password}
+              placeholder="••••••••"
+              type="password"
+              onChange={dirty(setPassword)}
+            />
+          </div>
 
-        <div className="mt-4 flex items-center gap-2">
           <button
             onClick={runTest}
             disabled={test === 'testing'}
-            className={`rounded border px-3 py-1.5 text-xs ${
+            className={`mt-3 w-full rounded px-3 py-1.5 text-xs ${
               test === 'testing'
-                ? 'cursor-wait border-slate-300 bg-slate-100 text-slate-400'
-                : 'border-slate-300 bg-white text-slate-700 hover:bg-slate-100'
+                ? 'cursor-wait bg-slate-100 text-slate-400'
+                : 'bg-slate-800 text-white hover:bg-slate-700'
             }`}
           >
             {test === 'testing' ? '正在连接…' : '测试连接'}
           </button>
 
           {test === 'ok' && (
-            <span className="flex items-center gap-1 text-[11px] text-emerald-700">
+            <div className="mt-2 flex items-center gap-1 text-[11px] text-emerald-700">
               <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
               连接成功
-            </span>
-          )}
-          {test === 'fail' && (
-            <span className="flex items-center gap-1 text-[11px] text-red-700">
-              <span className="h-1.5 w-1.5 rounded-full bg-red-500" />
-              连接失败：401 未授权（用户名或密码不对）
-            </span>
-          )}
-        </div>
-
-        {/* 原型专用：手动切换三种结果，好把样子都看一遍 */}
-        <div className="mt-2 flex items-center gap-1.5 text-[10px] text-slate-400">
-          <span>原型：</span>
-          {(['ok', 'fail'] as const).map((o) => (
-            <button
-              key={o}
-              onClick={() => {
-                setTest(o)
-                setPicked(null)
-                setSaved(false)
-              }}
-              className="rounded border border-slate-200 px-1.5 py-0.5 hover:bg-slate-100"
-            >
-              {o === 'ok' ? '假装成功' : '假装失败'}
-            </button>
-          ))}
-          <span className="ml-1">·</span>
-          <button
-            onClick={() => {
-              setOnlyOne((v) => !v)
-              setTest('idle')
-              setPicked(null)
-              setSaved(false)
-            }}
-            className="rounded border border-slate-200 px-1.5 py-0.5 hover:bg-slate-100"
-          >
-            {onlyOne ? '远端有多个目录' : '远端只有一个目录'}
-          </button>
-        </div>
-      </Card>
-
-      {/* 连上了才出现——没连上时列目录是没有意义的 */}
-      {test === 'ok' && (
-        <Card title="选择远端目录">
-          <p className="mb-3 text-[11px] leading-relaxed text-slate-500">
-            {目录.length === 1 ? (
-              <>
-                服务器上只有一个目录，<b className="text-slate-600">已经替你选好了</b>。
-                换成别的服务器或换个账号，这里会列出全部目录让你挑。
-              </>
-            ) : (
-              <>
-                这是服务器上 {server} 下的目录。选一个作为要同步的位置——
-                <b className="text-slate-600">选错了会把笔记同步到别的库上</b>。
-              </>
-            )}
-          </p>
-
-          <ul className="overflow-hidden rounded border border-slate-200">
-            {目录.map((e) => {
-              const active = picked === e.path
-              return (
-                <li key={e.path}>
-                  <button
-                    onClick={() => {
-                      setPicked(e.path)
-                      setSaved(false)
-                    }}
-                    className={`flex w-full items-center gap-2 border-b border-slate-100 px-3 py-2 text-left last:border-b-0 ${
-                      active ? 'bg-sky-50' : 'bg-white hover:bg-slate-50'
-                    }`}
-                  >
-                    <span
-                      className={`h-3 w-3 shrink-0 rounded-full border ${
-                        active ? 'border-sky-500 bg-sky-500' : 'border-slate-300'
-                      }`}
-                    >
-                      {active && <span className="block h-full w-full scale-[0.4] rounded-full bg-white" />}
-                    </span>
-                    <span className="shrink-0 text-slate-400">📁</span>
-                    <span className="truncate font-mono text-xs text-slate-700">{e.path}</span>
-                    {e.isVault && (
-                      <span className="shrink-0 rounded bg-amber-100 px-1.5 py-0.5 text-[10px] text-amber-800">
-                        已有笔记库
-                      </span>
-                    )}
-                    <span className="ml-auto shrink-0 text-[10px] text-slate-400">
-                      {e.count} 项 · {e.modified}
-                    </span>
-                  </button>
-                </li>
-              )
-            })}
-          </ul>
-
-          {chosen?.isVault && (
-            <div className="mt-3 rounded border border-amber-200 bg-amber-50 px-3 py-2 text-[11px] leading-relaxed text-amber-900">
-              这个目录里已经有 <code className="rounded bg-amber-100 px-1">.confidant/</code>
-              ——它已经是一个知己笔记的库。选它等于**接上那个库**，
-              两边内容不同时首次同步会停下来问你。
             </div>
           )}
-        </Card>
-      )}
+          {test === 'fail' && (
+            <div className="mt-2 rounded border border-red-200 bg-red-50 px-2 py-1.5 text-[11px] leading-relaxed text-red-700">
+              连接失败：401 未授权
+              <div className="text-red-500">用户名或密码不对</div>
+            </div>
+          )}
 
-      {/* 保存 */}
-      <Card title="保存">
-        <div className="mb-3 space-y-1 text-[11px]">
-          <div className="flex gap-2">
-            <span className="w-20 text-slate-400">服务器</span>
-            <span className="font-mono text-slate-700">{server || '（未填）'}</span>
+          <div className="mt-3 border-t border-slate-100 pt-2 text-[10px] leading-relaxed text-slate-400">
+            密码存系统凭据库，不写进库文件——否则它会被同步到<b>它自己要连的那台服务器</b>上。
           </div>
-          <div className="flex gap-2">
-            <span className="w-20 text-slate-400">远端目录</span>
-            <span className={`font-mono ${picked ? 'text-slate-700' : 'text-slate-400'}`}>
-              {picked ?? '（还没选）'}
-            </span>
+
+          {/* 原型专用：手动切换结果，好把样子都看一遍 */}
+          <div className="mt-3 border-t border-dashed border-slate-200 pt-2 text-[10px] text-slate-400">
+            <div className="mb-1">原型开关</div>
+            <div className="flex flex-wrap gap-1">
+              {(['ok', 'fail'] as const).map((o) => (
+                <button
+                  key={o}
+                  onClick={() => {
+                    setTest(o)
+                    setPicked(null)
+                    setSaved(false)
+                  }}
+                  className="rounded border border-slate-200 px-1.5 py-0.5 hover:bg-slate-100"
+                >
+                  {o === 'ok' ? '成功' : '失败'}
+                </button>
+              ))}
+              <button
+                onClick={() => {
+                  setOnlyOne((v) => !v)
+                  setTest('idle')
+                  setPicked(null)
+                  setSaved(false)
+                }}
+                className="rounded border border-slate-200 px-1.5 py-0.5 hover:bg-slate-100"
+              >
+                {onlyOne ? '多目录' : '单目录'}
+              </button>
+            </div>
           </div>
         </div>
 
-        <div className="flex items-center gap-2">
+        {/* ---- 右：远端目录。宽栏，路径长 ---- */}
+        <div className="min-w-0 flex-1 overflow-auto bg-slate-50 p-4">
+          <div className="mb-3 text-xs font-medium text-slate-700">选择远端目录</div>
+
+          {test !== 'ok' ? (
+            <div className="rounded-lg border border-dashed border-slate-300 bg-white py-14 text-center">
+              <div className="text-xs text-slate-400">先测试连接</div>
+              <div className="mt-1 text-[11px] text-slate-400">
+                连上之后这里会列出服务器上的目录，供你挑选要同步哪一个
+              </div>
+            </div>
+          ) : (
+            <>
+              <p className="mb-2.5 text-[11px] leading-relaxed text-slate-500">
+                {目录.length === 1 ? (
+                  <>
+                    服务器上只有一个目录，<b className="text-slate-600">已经替你选好了</b>。
+                  </>
+                ) : (
+                  <>
+                    选一个作为要同步的位置——
+                    <b className="text-slate-600">选错了会把笔记同步到别的库上</b>。
+                  </>
+                )}
+              </p>
+
+              <ul className="overflow-hidden rounded-lg border border-slate-200 bg-white">
+                {目录.map((e) => {
+                  const active = picked === e.path
+                  return (
+                    <li key={e.path}>
+                      <button
+                        onClick={() => {
+                          setPicked(e.path)
+                          setSaved(false)
+                        }}
+                        className={`flex w-full items-center gap-2 border-b border-slate-100 px-3 py-2 text-left last:border-b-0 ${
+                          active ? 'bg-sky-50' : 'hover:bg-slate-50'
+                        }`}
+                      >
+                        <span
+                          className={`flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded-full border ${
+                            active ? 'border-sky-500 bg-sky-500' : 'border-slate-300'
+                          }`}
+                        >
+                          {active && <span className="h-1.5 w-1.5 rounded-full bg-white" />}
+                        </span>
+                        <span className="truncate font-mono text-xs text-slate-700">{e.path}</span>
+                        {e.isVault && (
+                          <span className="shrink-0 rounded bg-amber-100 px-1.5 py-0.5 text-[10px] text-amber-800">
+                            已有库
+                          </span>
+                        )}
+                        <span className="ml-auto shrink-0 text-[10px] text-slate-400">
+                          {e.count} 项 · {e.modified}
+                        </span>
+                      </button>
+                    </li>
+                  )
+                })}
+              </ul>
+
+              {chosen?.isVault && (
+                <div className="mt-2.5 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-[11px] leading-relaxed text-amber-900">
+                  这个目录里已经有 <code className="rounded bg-amber-100 px-1">.confidant/</code>
+                  ——它已经是一个知己笔记的库。选它等于**接上那个库**，
+                  两边内容不同时首次同步会停下来问你。
+                </div>
+              )}
+            </>
+          )}
+        </div>
+      </div>
+
+      {/* ---- 底：保存。固定，不随内容滚走 ---- */}
+      <div className="flex shrink-0 items-center gap-3 border-t border-slate-200 bg-white px-4 py-2.5">
+        <div className="flex min-w-0 items-center gap-3 text-[11px]">
+          <span className="shrink-0 text-slate-400">将保存</span>
+          <span className="truncate font-mono text-slate-700">{server || '（未填服务器）'}</span>
+          <span className="shrink-0 text-slate-300">→</span>
+          <span className={`truncate font-mono ${picked ? 'text-slate-700' : 'text-slate-400'}`}>
+            {picked ?? '（未选目录）'}
+          </span>
+        </div>
+
+        <div className="ml-auto flex shrink-0 items-center gap-2">
+          {saved ? (
+            <span className="text-[11px] text-emerald-700">已保存，下次打开还在</span>
+          ) : (
+            !canSave && (
+              <span className="text-[11px] text-slate-400">
+                {test !== 'ok' ? '先测试连接' : '先选一个远端目录'}
+              </span>
+            )
+          )}
           <button
             onClick={() => canSave && setSaved(true)}
             disabled={!canSave || saved}
-            className={`rounded px-3 py-1.5 text-xs ${
+            className={`rounded px-4 py-1.5 text-xs ${
               saved
                 ? 'cursor-default bg-emerald-50 text-emerald-700'
                 : canSave
@@ -288,20 +338,9 @@ function WebdavSection() {
           >
             {saved ? '已保存' : '保存'}
           </button>
-          {!canSave && !saved && (
-            <span className="text-[11px] text-slate-400">
-              {test !== 'ok' ? '先测试连接' : '先选一个远端目录'}
-            </span>
-          )}
-          {saved && <span className="text-[11px] text-emerald-700">配置已记住，下次打开还在</span>}
         </div>
-
-        <div className="mt-3 rounded border border-slate-200 bg-slate-50 px-2.5 py-2 text-[11px] leading-relaxed text-slate-500">
-          密码存在系统侧而不是库里——否则它会被同步到<b>它自己要连的那台服务器</b>上。
-          代价是换台电脑要重新输一次。
-        </div>
-      </Card>
-    </>
+      </div>
+    </div>
   )
 }
 
