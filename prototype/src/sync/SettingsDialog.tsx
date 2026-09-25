@@ -86,13 +86,15 @@ function Card({ title, children }: { title: string; children: React.ReactNode })
  */
 function WebdavSection() {
   const [server, setServer] = useState(配置.server)
-  const [path, setPath] = useState(配置.path)
   const [username, setUsername] = useState(配置.username)
   const [password, setPassword] = useState('')
 
   const [test, setTest] = useState<TestOutcome>('idle')
   const [picked, setPicked] = useState<string | null>(null)
   const [saved, setSaved] = useState(false)
+  // 原型：用来对比「服务器上只有一个目录」与「有多个目录」两种情况
+  const [onlyOne, setOnlyOne] = useState(false)
+  const 目录 = onlyOne ? 远端目录.slice(0, 1) : 远端目录
 
   // 改了连接信息，之前测出来的目录就不再可信
   const dirty = (fn: (v: string) => void) => (v: string) => {
@@ -107,11 +109,17 @@ function WebdavSection() {
     setPicked(null)
     setSaved(false)
     // 原型：假装连上了。真机上这里是 webdav-client 的一次 PROPFIND。
-    setTimeout(() => setTest('ok'), 700)
+    setTimeout(() => {
+      setTest('ok')
+      // 只有一个目录时自动选中——但**仍然把它显示出来**并注明是自动选的。
+      // 悄悄替用户做决定，和没做这个优化一样糟：下次服务器上多了目录，
+      // 用户不知道自己上次是怎么定的。
+      if (目录.length === 1) setPicked(目录[0].path)
+    }, 700)
   }
 
   const canSave = test === 'ok' && picked !== null
-  const chosen = 远端目录.find((e) => e.path === picked)
+  const chosen = 目录.find((e) => e.path === picked)
 
   return (
     <>
@@ -172,6 +180,18 @@ function WebdavSection() {
               {o === 'ok' ? '假装成功' : '假装失败'}
             </button>
           ))}
+          <span className="ml-1">·</span>
+          <button
+            onClick={() => {
+              setOnlyOne((v) => !v)
+              setTest('idle')
+              setPicked(null)
+              setSaved(false)
+            }}
+            className="rounded border border-slate-200 px-1.5 py-0.5 hover:bg-slate-100"
+          >
+            {onlyOne ? '远端有多个目录' : '远端只有一个目录'}
+          </button>
         </div>
       </Card>
 
@@ -179,12 +199,21 @@ function WebdavSection() {
       {test === 'ok' && (
         <Card title="选择远端目录">
           <p className="mb-3 text-[11px] leading-relaxed text-slate-500">
-            这是服务器上 {server} 下的目录。选一个作为要同步的位置——
-            <b className="text-slate-600">选错了会把笔记同步到别的库上</b>。
+            {目录.length === 1 ? (
+              <>
+                服务器上只有一个目录，<b className="text-slate-600">已经替你选好了</b>。
+                换成别的服务器或换个账号，这里会列出全部目录让你挑。
+              </>
+            ) : (
+              <>
+                这是服务器上 {server} 下的目录。选一个作为要同步的位置——
+                <b className="text-slate-600">选错了会把笔记同步到别的库上</b>。
+              </>
+            )}
           </p>
 
           <ul className="overflow-hidden rounded border border-slate-200">
-            {远端目录.map((e) => {
+            {目录.map((e) => {
               const active = picked === e.path
               return (
                 <li key={e.path}>
