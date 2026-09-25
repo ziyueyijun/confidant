@@ -4,7 +4,7 @@ import { 场景, 场景说明 } from './sync/data'
 
 export interface PrototypeState {
   proto: 'layout' | 'sync'
-  variant: 'A' | 'B' | 'C'
+  variant: 'A' | 'B' | 'C' | 'D'
   reveal: SyntaxReveal
   sourceMode: boolean
   renderTables: boolean
@@ -39,12 +39,17 @@ export function ControlBar({ state, onChange, onCapture }: Props) {
 
         <Divider />
 
-        <Group label="变体">
-          {(['A', 'B', 'C'] as const).map((v) => (
-            <Pill key={v} active={state.variant === v} onClick={() => onChange({ variant: v })}>
-              {v}
-            </Pill>
-          ))}
+        <Group label={state.proto === 'sync' ? '形态' : '变体'}>
+          {(state.proto === 'sync' ? (['D', 'A', 'B', 'C'] as const) : (['A', 'B', 'C'] as const)).map(
+            (v) => (
+              <Pill key={v} active={state.variant === v} onClick={() => onChange({ variant: v })}>
+                {v}
+                {state.proto === 'sync' && v === 'D' && (
+                  <span className="ml-0.5 text-[9px] opacity-70">选定</span>
+                )}
+              </Pill>
+            ),
+          )}
         </Group>
 
         {state.proto === 'sync' ? (

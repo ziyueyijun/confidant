@@ -26,9 +26,12 @@ function readState(): PrototypeState {
   const v = p.get('variant')
   const r = p.get('reveal')
   const c = p.get('capture')
+  const proto = p.get('proto') === 'sync' ? 'sync' : 'layout'
+  const isSyncVariant = v === 'A' || v === 'B' || v === 'C' || v === 'D'
   return {
-    proto: p.get('proto') === 'sync' ? 'sync' : 'layout',
-    variant: v === 'B' || v === 'C' ? v : 'A',
+    proto,
+    // 同步原型的默认形态是 D（拼装后的选定形态）
+    variant: proto === 'sync' ? (isSyncVariant ? v : 'D') : v === 'B' || v === 'C' ? v : 'A',
     reveal: r === 'marker' || r === 'never' ? r : 'line',
     sourceMode: p.get('source') === '1',
     renderTables: p.get('tables') !== '0',
@@ -69,9 +72,13 @@ export default function App() {
 
       if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
         e.preventDefault()
-        const order: Array<'A' | 'B' | 'C'> = ['A', 'B', 'C']
+        const order: Array<'A' | 'B' | 'C' | 'D'> =
+          state.proto === 'sync' ? ['D', 'A', 'B', 'C'] : ['A', 'B', 'C']
         const i = order.indexOf(state.variant)
-        const next = e.key === 'ArrowRight' ? (i + 1) % 3 : (i + 2) % 3
+        const next =
+          e.key === 'ArrowRight'
+            ? (i + 1) % order.length
+            : (i + order.length - 1) % order.length
         update({ variant: order[next] })
       }
       // 全局捕捉快捷键（只在布局原型里有意义）
