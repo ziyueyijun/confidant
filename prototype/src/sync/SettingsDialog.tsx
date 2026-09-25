@@ -97,8 +97,10 @@ function SyncSection() {
   return (
     <>
       <Card title="自动同步">
+        {/* 默认不勾选——这是刻意的：软件装好后不该自己开始动用户的笔记。
+            用户明确打开它，才意味着「我接受它在后台跑」。 */}
         <label className="flex items-center gap-2 text-xs text-slate-600">
-          <input type="checkbox" defaultChecked />
+          <input type="checkbox" />
           启用自动同步
         </label>
         <div className="mt-2 flex items-center gap-2 text-[11px] text-slate-500">
@@ -111,6 +113,11 @@ function SyncSection() {
         </div>
         <div className="mt-2 text-[11px] leading-relaxed text-slate-400">
           另有两次自动同步：应用启动时、本地攒下一批改动之后。
+        </div>
+        <div className="mt-2 rounded border border-slate-200 bg-slate-50 px-2.5 py-2 text-[11px] leading-relaxed text-slate-500">
+          <b className="text-slate-600">默认关闭。</b>
+          不勾选时应用不会在后台动你的笔记——你仍然可以随时手动同步。
+          勾选后左下角会出现同步状态；不勾选时它保持安静。
         </div>
       </Card>
       <Card title="批量删除保护">

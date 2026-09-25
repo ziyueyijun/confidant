@@ -2,7 +2,7 @@
  * 同步界面的假数据。全部在内存里，不落盘。
  *
  * 每个 scenario 对应一种真实会遇到的同步状态——原型要能把这些状态**都看一遍**，
- * 因为「同步失败长什么样」「冲突长什么样」正是这一票要回答的问题。
+ * 因为「什么时候该显示、什么时候该闭嘴」正是这一票要回答的问题。
  *
  * 界面上的每一条约束都来自 #3 / #17 / #19 的决议，不是设计者随手加的。
  */
@@ -28,11 +28,22 @@ export const 配置: SyncConfig = {
 
 // ---- 状态 ----
 
-export type SyncPhase = 'never' | 'idle' | 'syncing' | 'failed' | 'unconfigured'
+export type SyncPhase = 'unconfigured' | 'never' | 'idle' | 'syncing' | 'failed'
 
 export interface SyncStatus {
   phase: SyncPhase
-  /** 「上次同步于 X 分钟前」里的那个 X；null = 从未同步过 */
+  /** 是否已填好 WebDAV 信息 */
+  configured: boolean
+  /** 用户是否勾选了「自动同步」 */
+  autoSync: boolean
+  /**
+   * **本次会话**是否真的同步过。
+   *
+   * 这是状态栏显示逻辑的关键：真实应用里「上次同步时间」是持久化的，
+   * 但**只在本次会话同步过时才显示**——重启后不显示，用户想看就去同步中心。
+   */
+  sessionSynced: boolean
+  /** 上次同步于几分钟前。持久化，但显示与否由 `sessionSynced` 决定 */
   minutesAgo: number | null
   /** 已同步的文件数 */
   syncedFiles: number
@@ -150,14 +161,15 @@ export const 大量冲突: Conflict[] = [
 // ---- 场景 ----
 
 export type ScenarioKey =
-  | 'idle'
+  | 'fresh'
+  | 'ready'
+  | 'synced'
   | 'syncing'
   | 'failed'
   | 'first'
   | 'conflicts'
   | 'manyConflicts'
   | 'danger'
-  | 'unconfigured'
 
 export interface Scenario {
   key: ScenarioKey
@@ -167,20 +179,137 @@ export interface Scenario {
 }
 
 export const 场景: Scenario[] = [
-  { key: 'idle', label: '空闲', note: '已连接、刚同步过——最常见的状态，界面不该在这里占地方' },
-  { key: 'syncing', label: '同步中', note: '进度可见，且要能看出「还要多久」' },
-  { key: 'failed', label: '失败', note: '「悄悄进行」可以，「悄悄失败」不可接受——错误必须具体' },
+  {
+    key: 'fresh',
+    label: '刚装上',
+    note: '未配置 WebDAV——状态栏左下角应当是**空的**，不留任何同步痕迹',
+  },
+  {
+    key: 'ready',
+    label: '已配置',
+    note: '配好了，但**本次会话还没同步过**——状态栏仍然不显示时间（重启后就是这个样子）',
+  },
+  {
+    key: 'synced',
+    label: '本次已同步',
+    note: '本次会话同步过——这时状态栏才显示「上次同步于 X 分钟前」',
+  },
+  { key: 'syncing', label: '同步中', note: '正在进行的操作必须可见' },
+  {
+    key: 'failed',
+    label: '同步失败',
+    note: '开了自动同步时，失败必须可见——「悄悄失败」不可接受',
+  },
   { key: 'first', label: '首次同步', note: '两边都有内容且不同——绝不自动合并，停下来问用户' },
-  { key: 'conflicts', label: '有冲突', note: '待处理的副本列表，每条要能并排看两份' },
-  { key: 'manyConflicts', label: '冲突很多', note: '12 条冲突——检验冲突列表放不下时怎么办' },
+  { key: 'conflicts', label: '有冲突', note: '需要用户处理的待办——它必须自己冒出来' },
+  { key: 'manyConflicts', label: '冲突很多', note: '12 条冲突——检验列表放不下时怎么办' },
   { key: 'danger', label: '批量删除', note: '一次要删 47 篇，超过阈值先停下问用户' },
-  { key: 'unconfigured', label: '未配置', note: '还没填 WebDAV 信息时的样子' },
 ]
 
 /** 场景说明文字——给控制条用。 */
 export function 场景说明(key: string): string {
   const s = 场景.find((x) => x.key === key) ?? 场景[0]
   return `${s.label}：${s.note}`
+}
+
+// ---- 各场景的状态 ----
+
+const 基: Omit<SyncStatus, 'phase' | 'configured' | 'autoSync' | 'sessionSynced'> = {
+  minutesAgo: null,
+  syncedFiles: 0,
+  error: null,
+  progress: null,
+  currentFile: null,
+}
+
+const 状态: Record<ScenarioKey, SyncStatus> = {
+  // 刚装上：什么都没配
+  fresh: { ...基, phase: 'unconfigured', configured: false, autoSync: false, sessionSynced: false },
+
+  // 已配置、开了自动同步，但本次会话还没同步过——**重启后的样子**。
+  // 注意 minutesAgo 有值（真实应用里它是持久化的），但 sessionSynced 为 false，
+  // 所以状态栏不显示它。用户想看就去同步中心。
+  ready: {
+    ...基,
+    phase: 'idle',
+    configured: true,
+    autoSync: true,
+    sessionSynced: false,
+    minutesAgo: 8,
+    syncedFiles: 1284,
+  },
+
+  // 本次会话同步过——状态栏这时才说话
+  synced: {
+    ...基,
+    phase: 'idle',
+    configured: true,
+    autoSync: true,
+    sessionSynced: true,
+    minutesAgo: 8,
+    syncedFiles: 1284,
+  },
+
+  syncing: {
+    ...基,
+    phase: 'syncing',
+    configured: true,
+    autoSync: true,
+    sessionSynced: true,
+    minutesAgo: 8,
+    syncedFiles: 1284,
+    progress: { done: 1207, total: 3000 },
+    currentFile: 'assets/003/20260925-150817-c3d4.png',
+  },
+
+  failed: {
+    ...基,
+    phase: 'failed',
+    configured: true,
+    autoSync: true,
+    sessionSynced: true,
+    minutesAgo: 8,
+    syncedFiles: 1284,
+    error: '连接超时（dav.example.com 30 秒无响应）。下次启动会自动重试。',
+  },
+
+  first: {
+    ...基,
+    phase: 'never',
+    configured: true,
+    autoSync: true,
+    sessionSynced: false,
+  },
+
+  conflicts: {
+    ...基,
+    phase: 'idle',
+    configured: true,
+    autoSync: true,
+    sessionSynced: true,
+    minutesAgo: 8,
+    syncedFiles: 1284,
+  },
+
+  manyConflicts: {
+    ...基,
+    phase: 'idle',
+    configured: true,
+    autoSync: true,
+    sessionSynced: true,
+    minutesAgo: 8,
+    syncedFiles: 1284,
+  },
+
+  danger: {
+    ...基,
+    phase: 'idle',
+    configured: true,
+    autoSync: true,
+    sessionSynced: true,
+    minutesAgo: 8,
+    syncedFiles: 1284,
+  },
 }
 
 export interface SyncMock {
@@ -194,79 +323,12 @@ export interface SyncMock {
   firstSync: { localCount: number; remoteCount: number; remoteAt: string } | null
 }
 
-const 状态: Record<ScenarioKey, SyncStatus> = {
-  idle: {
-    phase: 'idle',
-    minutesAgo: 8,
-    syncedFiles: 1284,
-    error: null,
-    progress: null,
-    currentFile: null,
-  },
-  syncing: {
-    phase: 'syncing',
-    minutesAgo: 8,
-    syncedFiles: 1284,
-    error: null,
-    progress: { done: 1207, total: 3000 },
-    currentFile: 'assets/003/20260925-150817-c3d4.png',
-  },
-  failed: {
-    phase: 'failed',
-    minutesAgo: 8,
-    syncedFiles: 1284,
-    error: '连接超时（dav.example.com 30 秒无响应）。下次启动会自动重试。',
-    progress: null,
-    currentFile: null,
-  },
-  first: {
-    phase: 'never',
-    minutesAgo: null,
-    syncedFiles: 0,
-    error: null,
-    progress: null,
-    currentFile: null,
-  },
-  conflicts: {
-    phase: 'idle',
-    minutesAgo: 8,
-    syncedFiles: 1284,
-    error: null,
-    progress: null,
-    currentFile: null,
-  },
-  manyConflicts: {
-    phase: 'idle',
-    minutesAgo: 8,
-    syncedFiles: 1284,
-    error: null,
-    progress: null,
-    currentFile: null,
-  },
-  danger: {
-    phase: 'idle',
-    minutesAgo: 8,
-    syncedFiles: 1284,
-    error: null,
-    progress: null,
-    currentFile: null,
-  },
-  unconfigured: {
-    phase: 'unconfigured',
-    minutesAgo: null,
-    syncedFiles: 0,
-    error: null,
-    progress: null,
-    currentFile: null,
-  },
-}
-
 export function 取场景(key: ScenarioKey): SyncMock {
   return {
     scenario: key,
     status: 状态[key],
     // 只有相关场景才给出待处理清单，其余留空——免得每个场景都长得一样
-    changes: key === 'idle' || key === 'unconfigured' ? [] : 待处理,
+    changes: key === 'synced' || key === 'ready' || key === 'fresh' ? [] : 待处理,
     conflicts: key === 'conflicts' ? 冲突列表 : key === 'manyConflicts' ? 大量冲突 : [],
     pendingDeletes: key === 'danger' ? 47 : 0,
     firstSync:
@@ -292,6 +354,30 @@ export function 状态文字(s: SyncStatus): string {
     case 'idle':
       return s.minutesAgo === null ? '已连接' : `上次同步于 ${s.minutesAgo} 分钟前`
   }
+}
+
+/**
+ * 状态栏左区该说什么。**返回 null 表示整个左区不该出现任何状态文字。**
+ *
+ * 只在三种情况说话：
+ * 1. **正在进行**（同步中 / 有待确认的删除）—— 活动信号
+ * 2. **需要你处理**（冲突 / 自动同步失败）—— 待办信号
+ * 3. **本次会话刚同步过** —— 会话信号
+ *
+ * 其余时候（未配置、已配置但没同步过、上次会话同步过）**一律闭嘴**。
+ * 「悄悄进行可以，悄悄失败不可接受」里的「失败」只指自动同步的失败——
+ * 手动同步失败时用户正看着同步中心，不需要状态栏再喊一遍。
+ */
+export function 状态栏文字(mock: SyncMock): string | null {
+  const s = mock.status
+  if (s.phase === 'syncing' && s.progress) return `正在同步 ${s.progress.done} / ${s.progress.total}`
+  if (mock.pendingDeletes > 0) return `待删 ${mock.pendingDeletes}`
+  if (mock.conflicts.length > 0) return `冲突 ${mock.conflicts.length}`
+  if (s.phase === 'failed' && s.autoSync) return '自动同步失败'
+  if (s.phase === 'idle' && s.sessionSynced && s.minutesAgo !== null) {
+    return `上次同步于 ${s.minutesAgo} 分钟前`
+  }
+  return null
 }
 
 /** 三个按钮的语义——这是整票最容易做错的地方，文案要顶住 */

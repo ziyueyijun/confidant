@@ -22,6 +22,7 @@ export interface DocStats {
 export function AppShell({
   content,
   overlay,
+  onOpenSyncCenter,
   onOpenSettings,
   statusBar,
 }: {
@@ -29,6 +30,8 @@ export function AppShell({
   content?: React.ReactNode
   /** 浮在界面之上的东西（同步中心弹窗）。 */
   overlay?: React.ReactNode
+  /** 菜单里的「同步中心…」点了做什么。 */
+  onOpenSyncCenter?: () => void
   /** 菜单里的「设置…」点了做什么。 */
   onOpenSettings?: () => void
   /** 状态栏。外壳负责提供**文档信息**（字数），同步信息由调用方给。 */
@@ -48,7 +51,10 @@ export function AppShell({
     <div className="flex h-full bg-white">
       <aside className="flex w-56 shrink-0 flex-col border-r border-slate-200 bg-slate-50/70">
         <div className="flex items-center gap-1 px-2 py-2.5">
-          <AppMenu onOpenSettings={onOpenSettings ?? (() => {})} />
+          <AppMenu
+            onOpenSyncCenter={onOpenSyncCenter ?? (() => {})}
+            onOpenSettings={onOpenSettings ?? (() => {})}
+          />
           <span className="text-xs font-medium tracking-wide text-slate-500">知己笔记</span>
           <button
             className="ml-auto rounded px-1.5 py-0.5 text-xs text-slate-500 hover:bg-slate-200"

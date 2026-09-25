@@ -41,7 +41,6 @@ export function VariantD({
     // 有处境要说的场景直接把同步中心推到眼前
     setSyncOpen(
       scenario === 'failed' ||
-        scenario === 'unconfigured' ||
         scenario === 'first' ||
         scenario === 'conflicts' ||
         scenario === 'manyConflicts' ||
@@ -56,6 +55,7 @@ export function VariantD({
 
   return (
     <AppShell
+      onOpenSyncCenter={() => openSync('overview')}
       onOpenSettings={() => setSettingsOpen(true)}
       overlay={
         <>
@@ -84,12 +84,7 @@ export function VariantD({
         </>
       }
       statusBar={(stats: DocStats) => (
-        <StatusBar
-          mock={mock}
-          stats={stats}
-          onOpenSync={() => openSync('overview')}
-          onOpenConflicts={() => openSync('conflicts')}
-        />
+        <StatusBar mock={mock} stats={stats} onOpenSync={() => openSync('overview')} />
       )}
     />
   )
