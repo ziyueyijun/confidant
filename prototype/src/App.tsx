@@ -37,6 +37,7 @@ function readState(): PrototypeState {
     renderTables: p.get('tables') !== '0',
     captureShape: c === 'card' || c === 'inline' ? c : 'bar',
     scenario: p.get('scenario') ?? 'idle',
+    dialogLayout: p.get('dlg') === 'sections' ? 'sections' : 'tabs',
   }
 }
 
@@ -56,7 +57,10 @@ export default function App() {
       if (merged.sourceMode) p.set('source', '1')
       if (!merged.renderTables) p.set('tables', '0')
       p.set('capture', merged.captureShape)
-      if (merged.proto === 'sync') p.set('scenario', merged.scenario)
+      if (merged.proto === 'sync') {
+        p.set('scenario', merged.scenario)
+        if (merged.dialogLayout === 'sections') p.set('dlg', 'sections')
+      }
       history.replaceState(null, '', '?' + p.toString())
       return merged
     })
@@ -141,7 +145,7 @@ export default function App() {
           )}
         </>
       ) : (
-        <SyncPrototype variant={state.variant} scenario={state.scenario} />
+        <SyncPrototype variant={state.variant} scenario={state.scenario} dialogLayout={state.dialogLayout} />
       )}
 
       <ControlBar state={state} onChange={update} onCapture={() => setCaptureOpen(true)} />

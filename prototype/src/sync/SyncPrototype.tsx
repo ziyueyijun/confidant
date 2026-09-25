@@ -18,9 +18,11 @@ export type SyncVariant = 'A' | 'B' | 'C' | 'D'
 export function SyncPrototype({
   variant,
   scenario,
+  dialogLayout = 'tabs',
 }: {
   variant: SyncVariant
   scenario: string
+  dialogLayout?: 'tabs' | 'sections'
 }) {
   const key = (场景.some((s) => s.key === scenario) ? scenario : 'idle') as ScenarioKey
 
@@ -29,7 +31,7 @@ export function SyncPrototype({
       {variant === 'A' && <VariantA scenario={key} />}
       {variant === 'B' && <VariantB scenario={key} />}
       {variant === 'C' && <VariantC scenario={key} />}
-      {variant === 'D' && <VariantD scenario={key} />}
+      {variant === 'D' && <VariantD scenario={key} layout={dialogLayout} />}
     </>
   )
 }

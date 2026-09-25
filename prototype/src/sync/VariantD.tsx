@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { AppShell, type DocStats } from './AppShell'
 import { StatusBar } from './StatusBar'
-import { SyncCenterDialog } from './SyncCenterDialog'
+import { SyncCenterDialog, type DialogLayout } from './SyncCenterDialog'
 import { SettingsDialog, FirstSyncDialog, DeleteDialog } from './SettingsDialog'
 import { ConflictCompare } from './SyncCenterDialog'
 import { 取场景, type ScenarioKey, type Conflict } from './data'
@@ -17,7 +17,14 @@ import { 取场景, type ScenarioKey, type Conflict } from './data'
  * - **设置**（**从菜单进入**）：**不只服务 WebDAV**——文件关联、自动更新、
  *   库切换都是设置，它们不该挤进同步中心。
  */
-export function VariantD({ scenario }: { scenario: ScenarioKey }) {
+export function VariantD({
+  scenario,
+  layout,
+}: {
+  scenario: ScenarioKey
+  /** 弹窗内部布局：选项卡 vs 单页（冲突只在有冲突时出现）。原型里可对比。 */
+  layout: DialogLayout
+}) {
   const mock = 取场景(scenario)
   const [syncOpen, setSyncOpen] = useState(false)
   const [settingsOpen, setSettingsOpen] = useState(false)
@@ -54,6 +61,7 @@ export function VariantD({ scenario }: { scenario: ScenarioKey }) {
           {syncOpen && (
             <SyncCenterDialog
               mock={mock}
+              layout={layout}
               tab={tab}
               setTab={setTab}
               armed={armed}

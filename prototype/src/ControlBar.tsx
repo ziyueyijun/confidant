@@ -10,6 +10,8 @@ export interface PrototypeState {
   renderTables: boolean
   captureShape: CaptureShape
   scenario: string
+  /** 同步中心弹窗的内部布局——只在变体 D 下有意义 */
+  dialogLayout: 'tabs' | 'sections'
 }
 
 interface Props {
@@ -66,6 +68,26 @@ export function ControlBar({ state, onChange, onCapture }: Props) {
                 </Pill>
               ))}
             </Group>
+
+            {state.variant === 'D' && (
+              <>
+                <Divider />
+                <Group label="内部布局">
+                  <Pill
+                    active={state.dialogLayout === 'tabs'}
+                    onClick={() => onChange({ dialogLayout: 'tabs' })}
+                  >
+                    选项卡
+                  </Pill>
+                  <Pill
+                    active={state.dialogLayout === 'sections'}
+                    onClick={() => onChange({ dialogLayout: 'sections' })}
+                  >
+                    单页
+                  </Pill>
+                </Group>
+              </>
+            )}
           </>
         ) : (
           <>
