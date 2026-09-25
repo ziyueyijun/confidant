@@ -6,7 +6,7 @@
 
 ## 当前状态
 
-**规划阶段：当前工作是定案，不是实现。** 功能范围与技术方案在 [wayfinder map](https://github.com/ziyueyijun/confidant/issues/1)（#1）下逐项定案，终点交付物是**一份可直接开工的 spec**。
+**规划阶段：当前工作是定案，不是实现。** 功能范围与技术方案在 [wayfinder map](https://github.com/ziyueyijun/confidant/issues/20)（#20）下逐项定案，终点交付物是**一份可直接开工的 spec**。
 
 ## 何时读什么
 
