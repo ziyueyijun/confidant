@@ -76,7 +76,12 @@ class EditableTableWidget extends WidgetType {
 
     const wrap = document.createElement('div')
     wrap.className = 'cm-editable-table'
-    wrap.style.cssText = 'padding: 0.35em 0; overflow-x: auto;'
+    // ⚠️ 间距用 **margin 而不是 padding**。
+    // padding 属于元素的命中区——表格上下那几像素的"空白"也会被点中，
+    // 于是点表格上方的空白等于点表格，光标被 CodeMirror 吸附到替换区的
+    // 起点（表格首行），按 ↑ 就跳到表格前面去了。margin 不属于命中区，
+    // 点它等于点真正的空白。
+    wrap.style.cssText = 'margin: 0.35em 0; overflow-x: auto;'
     // 必须是 "false"：cm-content 是可编辑的，contenteditable 会向下继承，
     // 于是 td 不算独立的 editing host——浏览器在原生 mousedown 时把焦点
     // 归一化到最近的 editing host（cm-content），单元格永远拿不到焦点。
@@ -246,8 +251,56 @@ class EditableTableWidget extends WidgetType {
       return
     }
 
-    if (e.key === 'ArrowDown' && visualRow + 1 < totalRows) { e.preventDefault(); this.moveFocus(visualRow + 1, colIdx) }
-    if (e.key === 'ArrowUp' && visualRow > 0) { e.preventDefault(); this.moveFocus(visualRow - 1, colIdx) }
+    if (e.key === 'ArrowDown') {
+      e.preventDefault()
+      if (visualRow + 1 < totalRows) this.moveFocus(visualRow + 1, colIdx)
+      else this.leaveTable('down')
+      return
+    }
+    if (e.key === 'ArrowUp') {
+      e.preventDefault()
+      if (visualRow > 0) this.moveFocus(visualRow - 1, colIdx)
+      else this.leaveTable('up')
+      return
+    }
+  }
+
+  /**
+   * 把光标移出表格。
+   *
+   * **必须有这条出口。** 否则焦点在表头按 ↑（或在最后一行按 ↓）时无处可去，
+   * 用户会觉得"卡在表格里"——而点表格上下的空白想出去又不可靠
+   * （那本来是 widget 的 padding 区，已改为 margin）。
+   *
+   * 出口位置：表格**源码区间之外**的相邻行。表格被整块替换成一个 widget，
+   * 区间是 [tableFrom, tableTo]——光标必须落到区间外的行上，
+   * 否则会被 CodeMirror 吸附回替换区起点。
+   */
+  private leaveTable(dir: 'up' | 'down') {
+    const view = getCurrentView()
+    if (!view) return
+    const doc = view.state.doc
+    const firstLine = doc.lineAt(this.tableFrom).number
+    const lastLine = doc.lineAt(Math.min(this.tableTo, doc.length)).number
+
+    const targetLineNo = dir === 'up' ? firstLine - 1 : lastLine + 1
+    if (targetLineNo < 1 || targetLineNo > doc.lines) {
+      // 表格就在文档首/尾，没有相邻行——在表格外补一行再落上去
+      const insertAt = dir === 'up' ? this.tableFrom : Math.min(this.tableTo, doc.length)
+      view.dispatch({
+        changes: { from: insertAt, insert: dir === 'up' ? '\n' : '\n\n' },
+        selection: { anchor: dir === 'up' ? this.tableFrom : this.tableTo + 2 },
+      })
+      view.focus()
+      return
+    }
+
+    const target = doc.line(targetLineNo)
+    view.dispatch({
+      selection: { anchor: dir === 'up' ? target.to : target.from },
+      effects: EditorView.scrollIntoView(dir === 'up' ? target.from : target.to, { y: 'nearest' }),
+    })
+    view.focus()
   }
 
   private insertRowAfterLast() {
