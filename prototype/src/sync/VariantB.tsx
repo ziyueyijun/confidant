@@ -78,13 +78,13 @@ export function VariantB({ scenario }: { scenario: ScenarioKey }) {
           </div>
         </div>
       }
-      sidebarFooter={
-        <div className="border-t border-slate-200 px-3 py-2">
-          <Badge mock={mock} onClick={() => setTab('overview')} />
-        </div>
-      }
       overlay={
         <>
+          {/* 常驻徽标：B 存在的理由——不进去也知道有没有事 */}
+          <div className="pointer-events-none fixed right-4 top-3 z-20">
+            <Badge mock={mock} onClick={() => setTab('overview')} />
+          </div>
+
           {overlay === 'first' && <FirstSyncDialog mock={mock} onClose={() => setOverlay(null)} />}
           {overlay === 'delete' && (
             <DeleteDialog count={mock.pendingDeletes} onClose={() => setOverlay(null)} />

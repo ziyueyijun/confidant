@@ -32,6 +32,7 @@ export function VariantA({ scenario }: { scenario: ScenarioKey }) {
 
   return (
     <AppShell
+      onOpenSettings={() => setPanel('settings')}
       overlay={
         <>
           {panel === 'conflicts' && (
