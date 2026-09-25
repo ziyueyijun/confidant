@@ -79,8 +79,10 @@ export default function App() {
       renderTables: state.renderTables,
       currentPath,
       onSelect: setCurrentPath,
+      onReveal: (v: SyntaxReveal) => update({ reveal: v }),
+      onSourceMode: (v: boolean) => update({ sourceMode: v }),
     }),
-    [state.reveal, state.sourceMode, state.renderTables, currentPath],
+    [state.reveal, state.sourceMode, state.renderTables, currentPath, update],
   )
 
   return (

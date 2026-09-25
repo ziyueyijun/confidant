@@ -346,11 +346,30 @@ function inlineDecorations(state: EditorState, o: PreviewOptions): Range<Decorat
           break
         case 'Link':
           out.push(MARK('cm-md-link').range(from, to))
+          // 链接的 URL 部分太长会把正文撑乱；不显示语法时把它藏起来，
+          // 只留方括号里的文字（与 Typora 一致）。
+          if (!showSyntax) hideLinkUrl(state, from, to, out)
+          break
+        case 'Image':
+          out.push(MARK('cm-md-image').range(from, to))
+          break
+        case 'URL':
+          // 裸 URL 也标成链接色
+          out.push(MARK('cm-md-link').range(from, to))
           break
       }
     },
   })
   return out
+}
+
+/** 藏掉 `[文字](url)` 里的 `](url)` 部分，只留 `文字`。 */
+function hideLinkUrl(state: EditorState, from: number, to: number, out: Range<Decoration>[]) {
+  const text = state.doc.sliceString(from, to)
+  const close = text.lastIndexOf('](')
+  if (close < 0) return
+  const urlStart = from + close
+  if (urlStart > from) out.push(Decoration.replace({}).range(urlStart, to))
 }
 
 function hideDelimiters(state: EditorState, from: number, to: number, out: Range<Decoration>[], openLen: number, closeLen: number) {
@@ -415,11 +434,56 @@ function blockDecorations(state: EditorState, o: PreviewOptions): Range<Decorati
             const m = /^(\s*)([-*+]|\d+\.)(\s+)/.exec(line.text)
             if (m) {
               const start = line.from + m[1].length
-              out.push(Decoration.replace({ widget: new BulletWidget(m[2]), inclusive: false }).range(start, start + m[2].length + m[3].length))
+              out.push(
+                Decoration.replace({
+                  widget: new BulletWidget(m[2]),
+                  inclusive: false,
+                }).range(start, start + m[2].length + m[3].length),
+              )
+            }
+            // 任务列表：`- [ ]` / `- [x]` 的方括号换成真正的勾选框
+            const task = /^(\s*)([-*+])(\s+)\[([ xX])\]\s+/.exec(line.text)
+            if (task) {
+              const boxStart = line.from + task[1].length + task[2].length + task[3].length
+              out.push(
+                Decoration.replace({
+                  widget: new CheckboxWidget(task[4] !== ' '),
+                  inclusive: false,
+                }).range(boxStart, boxStart + 3),
+              )
             }
           }
           break
         }
+
+        // 代码块：整块加背景，围栏行（```）在光标不在时藏掉
+        case 'FencedCode': {
+          let l = state.doc.lineAt(node.from)
+          const endLine = state.doc.lineAt(node.to).number
+          while (l.number <= endLine) {
+            out.push(MARK('cm-md-codeblock').range(l.from, l.to))
+            if (!showSyntax && (l.number === state.doc.lineAt(node.from).number || l.number === endLine)) {
+              out.push(Decoration.replace({}).range(l.from, l.to))
+            }
+            if (l.number === endLine) break
+            l = state.doc.line(l.number + 1)
+          }
+          break
+        }
+
+        // 分割线：`---` 换成一条真正的横线
+        case 'HorizontalRule': {
+          if (!showSyntax) {
+            out.push(
+              Decoration.replace({ widget: new RuleWidget(), block: true }).range(
+                line.from,
+                line.to,
+              ),
+            )
+          }
+          break
+        }
+
         // 表格：始终渲染可编辑 widget，用户直接在表格内编辑
         case 'Table': {
           if (!o.renderTables) break
@@ -453,6 +517,38 @@ class BulletWidget extends WidgetType {
     span.className = 'cm-md-bullet'
     span.textContent = /\d/.test(this.marker) ? this.marker + ' ' : '•'
     return span
+  }
+  ignoreEvent() { return true }
+}
+
+/**
+ * 任务列表的勾选框。
+ *
+ * 原型里**点得动**（只是切换自己的勾选状态，不改 markdown）——
+ * 真机上点它要改文档里的 `[ ]` / `[x]`，但那属于「写回」，
+ * 不是这次要验证的东西。这里只验证它长得对不对、占位对不对。
+ */
+class CheckboxWidget extends WidgetType {
+  constructor(readonly checked: boolean) { super() }
+  eq(other: CheckboxWidget) { return other.checked === this.checked }
+  toDOM() {
+    const box = document.createElement('span')
+    box.className = `cm-md-checkbox${this.checked ? ' is-checked' : ''}`
+    box.setAttribute('role', 'checkbox')
+    box.setAttribute('aria-checked', String(this.checked))
+    box.textContent = this.checked ? '✓' : ''
+    return box
+  }
+  ignoreEvent() { return true }
+}
+
+/** 分割线：一条横线，替换掉 `---` 那一行。 */
+class RuleWidget extends WidgetType {
+  eq() { return true }
+  toDOM() {
+    const hr = document.createElement('div')
+    hr.className = 'cm-md-rule'
+    return hr
   }
   ignoreEvent() { return true }
 }

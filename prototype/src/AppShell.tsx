@@ -1,6 +1,7 @@
 import { useRef, useState } from 'react'
 import { 文件树, type FileTreeNode } from './data'
 import { MarkdownEditor, type EditorApi } from './editor/MarkdownEditor'
+import { EditorToolbar } from './editor/EditorToolbar'
 import { TabBar, type TabItem } from './editor/TabBar'
 import { SavePrompt } from './editor/SavePrompt'
 import { useWorkspace } from './editor/useWorkspace'
@@ -13,6 +14,8 @@ interface Props {
   renderTables: boolean
   currentPath: string
   onSelect: (path: string) => void
+  onReveal: (v: SyntaxReveal) => void
+  onSourceMode: (v: boolean) => void
   /** 侧栏顶部「☰」点了做什么。不传则不显示菜单按钮。 */
   menu?: React.ReactNode
   /** 浮在界面之上的东西（同步中心弹窗等） */
@@ -86,6 +89,8 @@ export function AppShell({
   menu,
   overlay,
   statusBar,
+  onReveal,
+  onSourceMode,
 }: Props) {
   const ws = useWorkspace()
   const editorRefs = useRef<Record<string, EditorApi | null>>({})
@@ -156,6 +161,18 @@ export function AppShell({
                   onRefresh={(_paneId, path) => ws.revert(path)}
                   onSave={ws.save}
                 />
+
+                {/* 工具栏只在有笔记时出现——没有内容时那些按钮没有作用对象 */}
+                {doc && (
+                  <EditorToolbar
+                    // 按需读取：ref 回调晚于首次渲染，直接传值会拿到 null
+                    getApi={() => editorRefs.current[pane.id] ?? null}
+                    sourceMode={sourceMode}
+                    onSourceMode={onSourceMode}
+                    reveal={reveal}
+                    onReveal={onReveal}
+                  />
+                )}
 
                 {doc ? (
                   <div className="min-h-0 flex-1 overflow-auto">

@@ -26,6 +26,8 @@ export function SyncFeature({
   renderTables,
   currentPath,
   onSelect,
+  onReveal,
+  onSourceMode,
 }: {
   scenario: ScenarioKey
   reveal: SyntaxReveal
@@ -33,6 +35,8 @@ export function SyncFeature({
   renderTables: boolean
   currentPath: string
   onSelect: (path: string) => void
+  onReveal: (v: SyntaxReveal) => void
+  onSourceMode: (v: boolean) => void
 }) {
   const mock = 取场景(scenario)
   const [syncOpen, setSyncOpen] = useState(false)
@@ -66,6 +70,8 @@ export function SyncFeature({
       renderTables={renderTables}
       currentPath={currentPath}
       onSelect={onSelect}
+      onReveal={onReveal}
+      onSourceMode={onSourceMode}
       menu={
         <AppMenu
           onOpenSettings={() => setSettingsOpen(true)}
