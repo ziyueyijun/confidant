@@ -5,44 +5,29 @@ import { 状态文字, 配置, type SyncMock, type Conflict } from './data'
  * 同步中心——**弹窗**。
  *
  * 它是一个「专门处理一件事」的界面：处理完就关掉，不该长期占着内容区。
+ * 内部两个页签：概览（状态 + 待处理 + 操作）、冲突（待处理的副本列表）。
  *
- * ## 两种内部布局（原型里可直接对比）
- *
- * - **选项卡**：标题「同步中心」，内容区顶部一条页签（概览 / 冲突）。
- * - **单页**：没有页签。**冲突只在有冲突时才出现**，作为页内一个区块。
- *
- * 单页的依据：「冲突」不是一个**视图**，是一个**待办**——没冲突时那个页签
- * 永远是空的（多数时候如此），有冲突时它是你打开弹窗的唯一理由。
- * 一个多数时候为空的常驻页签，是在为一个不常发生的事付常驻成本。
+ * 页签放在**内容区顶部**而不是标题栏——「同步中心」是标题，
+ * 页签是导航，两者不是一回事。把标题做成页签会让人以为点它有反应。
  */
-export type DialogLayout = 'tabs' | 'sections'
-
 export function SyncCenterDialog({
   mock,
-  layout,
-  tab,
-  setTab,
-  armed,
-  setArmed,
   onClose,
   onOverlay,
 }: {
   mock: SyncMock
-  layout: DialogLayout
-  tab: 'overview' | 'conflicts'
-  setTab: (t: 'overview' | 'conflicts') => void
-  armed: null | '上传' | '下载'
-  setArmed: (a: null | '上传' | '下载') => void
   onClose: () => void
   onOverlay: (o: 'first' | 'delete' | { conflict: Conflict }) => void
 }) {
   const hasConflicts = mock.conflicts.length > 0
+  const [tab, setTab] = useState<'overview' | 'conflicts'>(
+    hasConflicts ? 'conflicts' : 'overview',
+  )
+  const [armed, setArmed] = useState<null | '上传' | '下载'>(null)
 
   return (
     <div className="fixed inset-0 z-40 flex items-center justify-center bg-slate-900/30 p-6">
       <div className="flex max-h-[85vh] w-full max-w-3xl flex-col overflow-hidden rounded-lg bg-white shadow-2xl">
-        {/* 标题栏：只是标题 + 关闭。**不放页签**——那是导航，不属于标题，
-            而且原先那个「同步」长得像页签却不是，会让人以为点它有反应。 */}
         <div className="flex shrink-0 items-center border-b border-slate-200 px-4 py-2.5">
           <span className="text-sm font-medium text-slate-700">同步中心</span>
           <button
@@ -54,69 +39,46 @@ export function SyncCenterDialog({
         </div>
 
         <div className="flex min-h-0 flex-1 flex-col">
-          {/* 选项卡布局：页签在**内容区顶部**，不随内容滚走 */}
-          {layout === 'tabs' && (
-            <div className="flex shrink-0 items-center gap-1 border-b border-slate-200 bg-white px-4">
-              {(['overview', 'conflicts'] as const).map((t) => (
-                <button
-                  key={t}
-                  onClick={() => setTab(t)}
-                  className={`-mb-px border-b-2 px-3 py-2 text-xs transition ${
-                    tab === t
-                      ? 'border-slate-800 font-medium text-slate-900'
-                      : 'border-transparent text-slate-500 hover:text-slate-800'
-                  }`}
-                >
-                  {{ overview: '概览', conflicts: '冲突' }[t]}
-                  {t === 'conflicts' && hasConflicts && (
-                    <span className="ml-1.5 rounded bg-amber-400 px-1 text-[10px] text-slate-900">
-                      {mock.conflicts.length}
-                    </span>
-                  )}
-                </button>
-              ))}
-            </div>
-          )}
+          <div className="flex shrink-0 items-center gap-1 border-b border-slate-200 bg-white px-4">
+            {(['overview', 'conflicts'] as const).map((t) => (
+              <button
+                key={t}
+                onClick={() => setTab(t)}
+                className={`-mb-px border-b-2 px-3 py-2 text-xs transition ${
+                  tab === t
+                    ? 'border-slate-800 font-medium text-slate-900'
+                    : 'border-transparent text-slate-500 hover:text-slate-800'
+                }`}
+              >
+                {{ overview: '概览', conflicts: '冲突' }[t]}
+                {t === 'conflicts' && hasConflicts && (
+                  <span className="ml-1.5 rounded bg-amber-400 px-1 text-[10px] text-slate-900">
+                    {mock.conflicts.length}
+                  </span>
+                )}
+              </button>
+            ))}
+          </div>
 
           <div className="min-h-0 flex-1 overflow-auto bg-slate-50">
             <div className="p-5">
-              {layout === 'tabs' ? (
-                tab === 'overview' ? (
-                  <div className="space-y-4">
-                    <StatusCard mock={mock} onOverlay={onOverlay} />
-                    {mock.pendingDeletes > 0 && (
-                      <DeleteWarning count={mock.pendingDeletes} onOverlay={onOverlay} />
-                    )}
-                    <PendingSection
-                      mock={mock}
-                      onJumpToConflicts={hasConflicts ? () => setTab('conflicts') : undefined}
-                    />
-                    <Operations mock={mock} armed={armed} setArmed={setArmed} />
-                  </div>
-                ) : (
-                  <ConflictList
-                    conflicts={mock.conflicts}
-                    onOpen={(c) => onOverlay({ conflict: c })}
-                  />
-                )
-              ) : (
+              {tab === 'overview' ? (
                 <div className="space-y-4">
                   <StatusCard mock={mock} onOverlay={onOverlay} />
                   {mock.pendingDeletes > 0 && (
                     <DeleteWarning count={mock.pendingDeletes} onOverlay={onOverlay} />
                   )}
-                  {/* 单页布局的核心：冲突只在有冲突时出现。
-                      用可滚动列表——冲突多时不能把下面的操作区顶出屏幕。 */}
-                  {hasConflicts && (
-                    <ConflictList
-                      conflicts={mock.conflicts}
-                      onOpen={(c) => onOverlay({ conflict: c })}
-                      scrollable
-                    />
-                  )}
-                  <PendingSection mock={mock} />
+                  <PendingSection
+                    mock={mock}
+                    onJumpToConflicts={hasConflicts ? () => setTab('conflicts') : undefined}
+                  />
                   <Operations mock={mock} armed={armed} setArmed={setArmed} />
                 </div>
+              ) : (
+                <ConflictList
+                  conflicts={mock.conflicts}
+                  onOpen={(c) => onOverlay({ conflict: c })}
+                />
               )}
             </div>
           </div>
@@ -434,12 +396,9 @@ function ConfirmInline({
 function ConflictList({
   conflicts,
   onOpen,
-  /** 折叠成有上限的滚动区——冲突多时不能把下面的操作区顶出屏幕 */
-  scrollable,
 }: {
   conflicts: Conflict[]
   onOpen: (c: Conflict) => void
-  scrollable?: boolean
 }) {
   if (conflicts.length === 0) {
     return (
@@ -457,9 +416,6 @@ function ConflictList({
       <div className="flex items-baseline gap-2">
         <span className="text-xs font-medium text-slate-700">待处理的冲突</span>
         <span className="text-[11px] text-amber-700">{conflicts.length} 条</span>
-        {scrollable && conflicts.length > 3 && (
-          <span className="text-[10px] text-slate-400">· 列表可滚动</span>
-        )}
       </div>
       <p className="mt-1 text-[11px] leading-relaxed text-slate-500">
         两处都改了同一篇、且无法自动合并。副本存在{' '}
@@ -468,8 +424,7 @@ function ConflictList({
         用记事本也能打开。处理完就从这里消失。
       </p>
 
-      {/* 有上限的滚动区：冲突再多也占这么高，操作区始终留在屏幕内 */}
-      <div className={`mt-3 space-y-2 ${scrollable ? 'max-h-72 overflow-auto pr-1' : ''}`}>
+      <div className="mt-3 space-y-2">
         {conflicts.map((c) => (
           <div key={c.id} className="rounded border border-amber-200 bg-amber-50/50 p-3">
             <div className="flex items-baseline gap-2">

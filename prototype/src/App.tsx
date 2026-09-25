@@ -1,72 +1,50 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { NOTES } from './data'
-import { VariantA } from './variants/VariantA'
-import { VariantB } from './variants/VariantB'
-import { VariantC } from './variants/VariantC'
-import { CaptureWindow, type CaptureShape } from './capture/CaptureWindow'
+import { SyncFeature } from './sync/SyncFeature'
 import { ControlBar, type PrototypeState } from './ControlBar'
-import { SyncPrototype } from './sync/SyncPrototype'
+import { 场景, type ScenarioKey } from './sync/data'
 import type { SyntaxReveal } from './editor/markdownLivePreview'
 
 /**
  * 原型入口。
  *
- * 两组原型共用这一个壳：
- * 1. **布局原型**（#8）：编辑器 / 捕捉窗口 / 三种布局
- * 2. **同步原型**（#19）：三种同步界面形态
+ * **只有一个界面。** 编辑器、文件树、标签页、大纲、同步都是它的部件，
+ * 不是可以切换的几种形态——之前把它们做成「变体 A/B/C」是错的。
  *
- * 用 `?proto=sync` 切到第二组。两组不混着看——它们回答的是不同的问题。
- *
- * URL 参数：?proto=layout|sync&variant=A|B|C&reveal=line|marker|never&source=1
- *          &capture=bar|card|inline&scenario=idle|syncing|failed|first|conflicts|danger|unconfigured
- * 键盘：← → 切换变体（输入框聚焦时不拦截）
+ * URL 参数：?reveal=line|marker|never&source=1&scenario=ready|...
+ * 键盘：← → 切换场景
  */
 function readState(): PrototypeState {
   const p = new URLSearchParams(location.search)
-  const v = p.get('variant')
   const r = p.get('reveal')
-  const c = p.get('capture')
-  const proto = p.get('proto') === 'sync' ? 'sync' : 'layout'
-  const isSyncVariant = v === 'A' || v === 'B' || v === 'C' || v === 'D'
+  const s = p.get('scenario')
+  const 已知 = 场景.some((x) => x.key === s)
   return {
-    proto,
-    // 同步原型的默认形态是 D（拼装后的选定形态）
-    variant: proto === 'sync' ? (isSyncVariant ? v : 'D') : v === 'B' || v === 'C' ? v : 'A',
     reveal: r === 'marker' || r === 'never' ? r : 'line',
     sourceMode: p.get('source') === '1',
     renderTables: p.get('tables') !== '0',
-    captureShape: c === 'card' || c === 'inline' ? c : 'bar',
-    scenario: p.get('scenario') ?? 'idle',
-    dialogLayout: p.get('dlg') === 'sections' ? 'sections' : 'tabs',
+    scenario: (已知 ? s : 'ready') as ScenarioKey,
   }
 }
 
 export default function App() {
   const [state, setState] = useState<PrototypeState>(readState)
-  const [captureOpen, setCaptureOpen] = useState(false)
   const [currentPath, setCurrentPath] = useState(NOTES[0].path)
-  const [inbox, setInbox] = useState<string[]>([])
 
   const update = useCallback((next: Partial<PrototypeState>) => {
     setState((s) => {
       const merged = { ...s, ...next }
       const p = new URLSearchParams()
-      p.set('proto', merged.proto)
-      p.set('variant', merged.variant)
       p.set('reveal', merged.reveal)
       if (merged.sourceMode) p.set('source', '1')
       if (!merged.renderTables) p.set('tables', '0')
-      p.set('capture', merged.captureShape)
-      if (merged.proto === 'sync') {
-        p.set('scenario', merged.scenario)
-        if (merged.dialogLayout === 'sections') p.set('dlg', 'sections')
-      }
+      p.set('scenario', merged.scenario)
       history.replaceState(null, '', '?' + p.toString())
       return merged
     })
   }, [])
 
-  // 左右方向键切换变体；输入框聚焦时不拦截
+  // 左右方向键切换场景；输入框聚焦时不拦截
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       const t = e.target as HTMLElement | null
@@ -76,36 +54,29 @@ export default function App() {
 
       if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
         e.preventDefault()
-        const order: Array<'A' | 'B' | 'C' | 'D'> =
-          state.proto === 'sync' ? ['D', 'A', 'B', 'C'] : ['A', 'B', 'C']
-        const i = order.indexOf(state.variant)
+        const order = 场景.map((s) => s.key)
+        const i = order.indexOf(state.scenario)
         const next =
           e.key === 'ArrowRight'
             ? (i + 1) % order.length
             : (i + order.length - 1) % order.length
-        update({ variant: order[next] })
-      }
-      // 全局捕捉快捷键（只在布局原型里有意义）
-      if (state.proto === 'layout' && e.ctrlKey && e.shiftKey && e.code === 'Space') {
-        e.preventDefault()
-        setCaptureOpen(true)
+        update({ scenario: order[next] })
       }
       // 源码视图开关
-      if (state.proto === 'layout' && e.ctrlKey && e.key === '/') {
+      if (e.ctrlKey && e.key === '/') {
         e.preventDefault()
         update({ sourceMode: !state.sourceMode })
       }
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [state.variant, state.sourceMode, state.proto, update])
+  }, [state.scenario, state.sourceMode, update])
 
   const shared = useMemo(
     () => ({
       reveal: state.reveal as SyntaxReveal,
       sourceMode: state.sourceMode,
       renderTables: state.renderTables,
-      onCapture: () => setCaptureOpen(true),
       currentPath,
       onSelect: setCurrentPath,
     }),
@@ -113,52 +84,9 @@ export default function App() {
   )
 
   return (
-    <div className="h-full w-full overflow-hidden pb-0">
-      {state.proto === 'layout' ? (
-        <>
-          {state.variant === 'A' && <VariantA {...shared} />}
-          {state.variant === 'B' && <VariantB {...shared} />}
-          {state.variant === 'C' && <VariantC {...shared} />}
-
-          {captureOpen && (
-            <CaptureWindow
-              shape={state.captureShape as CaptureShape}
-              onClose={() => setCaptureOpen(false)}
-              onSave={(t) => setInbox((prev) => [...prev, t])}
-            />
-          )}
-
-          {/* 捕捉到的内容在下角累积，证明"落进收件箱"这件事真的发生了 */}
-          {inbox.length > 0 && (
-            <div className="fixed bottom-4 left-4 z-40 max-w-xs rounded-lg border border-slate-200 bg-white/95 p-3 text-xs shadow-lg">
-              <div className="mb-1.5 font-medium text-slate-500">
-                inbox.md（本次会话追加 {inbox.length} 条）
-              </div>
-              <ul className="space-y-0.5 text-slate-600">
-                {inbox.slice(-4).map((t, i) => (
-                  <li key={i} className="truncate">
-                    · {t}
-                  </li>
-                ))}
-              </ul>
-            </div>
-          )}
-        </>
-      ) : (
-        <SyncPrototype
-          variant={state.variant}
-          scenario={state.scenario}
-          dialogLayout={state.dialogLayout}
-          reveal={shared.reveal}
-          sourceMode={shared.sourceMode}
-          renderTables={shared.renderTables}
-          onCapture={shared.onCapture}
-          currentPath={shared.currentPath}
-          onSelect={shared.onSelect}
-        />
-      )}
-
-      <ControlBar state={state} onChange={update} onCapture={() => setCaptureOpen(true)} />
+    <div className="h-full w-full overflow-hidden">
+      <SyncFeature scenario={state.scenario} {...shared} />
+      <ControlBar state={state} onChange={update} />
     </div>
   )
 }

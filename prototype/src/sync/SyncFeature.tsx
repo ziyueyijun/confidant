@@ -1,50 +1,40 @@
 import { useEffect, useState } from 'react'
-import { VariantA } from '../variants/VariantA'
+import { AppShell } from '../AppShell'
 import { AppMenu } from './AppMenu'
 import { StatusBar } from './StatusBar'
-import { SyncCenterDialog, type DialogLayout } from './SyncCenterDialog'
+import { SyncCenterDialog } from './SyncCenterDialog'
 import { SettingsDialog, FirstSyncDialog, DeleteDialog } from './SettingsDialog'
 import { ConflictCompare } from './SyncCenterDialog'
 import { 取场景, type ScenarioKey, type Conflict } from './data'
+import type { SyntaxReveal } from '../editor/markdownLivePreview'
 
 /**
- * 拼装版 —— **状态栏 + 同步中心弹窗 + 菜单里的设置**。
+ * 同步界面 —— **它是应用的一部分，不是一层可切换的皮**。
  *
- * ## 外壳复用布局原型
- *
- * 它直接跑在 `VariantA` 上（文件树 / 标签页 / 编辑器 / 大纲），
- * 不另做一套简化外壳——同步界面必须在**真实密度**里被评判，
- * 而一个只有文件树和静态正文的空壳会让每个方案都显得成立。
- *
- * 三个部件各答一个问题，不重叠：
- * - **状态栏**（常驻底部）：同步是**环境**。左同步、右字数，且默认闭嘴。
- * - **同步中心**（**弹窗**）：专门处理一件事的界面，处理完就关掉。
- * - **设置**（**从菜单进入**）：**不只服务 WebDAV**。
+ * 状态栏常驻底部、同步中心是弹窗、设置从菜单进。三者各答一个问题：
+ * - **状态栏**：同步是**环境**。默认闭嘴，只在「正在进行 / 需要处理 /
+ *   本次会话同步过」时说话。
+ * - **同步中心**（弹窗）：专门处理一件事的界面，处理完就关掉。
+ * - **设置**（菜单进入）：**不只服务 WebDAV**。
  */
-export function VariantD({
+export function SyncFeature({
   scenario,
-  layout,
   reveal,
   sourceMode,
   renderTables,
-  onCapture,
   currentPath,
   onSelect,
 }: {
   scenario: ScenarioKey
-  /** 弹窗内部布局：选项卡 vs 单页（冲突只在有冲突时出现）。原型里可对比。 */
-  layout: DialogLayout
-  reveal: Parameters<typeof VariantA>[0]['reveal']
+  reveal: SyntaxReveal
   sourceMode: boolean
   renderTables: boolean
-  onCapture: () => void
   currentPath: string
   onSelect: (path: string) => void
 }) {
   const mock = 取场景(scenario)
   const [syncOpen, setSyncOpen] = useState(false)
   const [settingsOpen, setSettingsOpen] = useState(false)
-  const [tab, setTab] = useState<'overview' | 'conflicts'>('overview')
   const [overlay, setOverlay] = useState<null | 'first' | 'delete' | { conflict: Conflict }>(null)
   const [armed, setArmed] = useState<null | '上传' | '下载'>(null)
 
@@ -53,7 +43,6 @@ export function VariantD({
     setSettingsOpen(false)
     setOverlay(null)
     setArmed(null)
-    setTab(scenario === 'conflicts' || scenario === 'manyConflicts' ? 'conflicts' : 'overview')
     // 有处境要说的场景直接把同步中心推到眼前
     setSyncOpen(
       scenario === 'failed' ||
@@ -64,23 +53,19 @@ export function VariantD({
     )
   }, [scenario])
 
-  const openSync = (t: 'overview' | 'conflicts' = 'overview') => {
-    setTab(t)
-    setSyncOpen(true)
-  }
+  const openSync = () => setSyncOpen(true)
 
   return (
-    <VariantA
+    <AppShell
       reveal={reveal}
       sourceMode={sourceMode}
       renderTables={renderTables}
-      onCapture={onCapture}
       currentPath={currentPath}
       onSelect={onSelect}
       menu={
         <AppMenu
           onOpenSettings={() => setSettingsOpen(true)}
-          onOpenSyncCenter={() => openSync('overview')}
+          onOpenSyncCenter={openSync}
         />
       }
       overlay={
@@ -88,11 +73,6 @@ export function VariantD({
           {syncOpen && (
             <SyncCenterDialog
               mock={mock}
-              layout={layout}
-              tab={tab}
-              setTab={setTab}
-              armed={armed}
-              setArmed={setArmed}
               onClose={() => setSyncOpen(false)}
               onOverlay={setOverlay}
             />
@@ -110,7 +90,7 @@ export function VariantD({
         </>
       }
       statusBar={(stats) => (
-        <StatusBar mock={mock} stats={stats} onOpenSync={() => openSync('overview')} />
+        <StatusBar mock={mock} stats={stats} onOpenSync={openSync} />
       )}
     />
   )

@@ -1,17 +1,16 @@
 import { useRef, useState } from 'react'
-import { 文件树, type FileTreeNode } from '../data'
-import { MarkdownEditor, type EditorApi } from '../editor/MarkdownEditor'
-import { TabBar, type TabItem } from '../editor/TabBar'
-import { SavePrompt } from '../editor/SavePrompt'
-import { useWorkspace } from '../editor/useWorkspace'
-import { Outline } from '../Outline'
-import type { SyntaxReveal } from '../editor/markdownLivePreview'
+import { 文件树, type FileTreeNode } from './data'
+import { MarkdownEditor, type EditorApi } from './editor/MarkdownEditor'
+import { TabBar, type TabItem } from './editor/TabBar'
+import { SavePrompt } from './editor/SavePrompt'
+import { useWorkspace } from './editor/useWorkspace'
+import { Outline } from './Outline'
+import type { SyntaxReveal } from './editor/markdownLivePreview'
 
 interface Props {
   reveal: SyntaxReveal
   sourceMode: boolean
   renderTables: boolean
-  onCapture: () => void
   currentPath: string
   onSelect: (path: string) => void
   /** 侧栏顶部「☰」点了做什么。不传则不显示菜单按钮。 */
@@ -76,15 +75,14 @@ function FileTreeNodeView({ node, depth, activePath, onEnter }: {
 }
 
 /**
- * 变体 A：左文件树 / 中标签页 + 编辑器（可向右分屏）/ 右大纲。
+ * 应用外壳：左文件树 / 中标签页 + 编辑器（可向右分屏）/ 右大纲。
  *
  * 默认不预选笔记——内容区留白，等用户从左侧文件树点进来。
  */
-export function VariantA({
+export function AppShell({
   reveal,
   sourceMode,
   renderTables,
-  onCapture,
   menu,
   overlay,
   statusBar,
@@ -117,13 +115,6 @@ export function VariantA({
           <div className="flex items-center gap-1 px-2 py-2.5">
             {menu}
             <span className="text-xs font-medium tracking-wide text-slate-500">知己笔记</span>
-            <button
-              onClick={onCapture}
-              className="ml-auto rounded px-1.5 py-0.5 text-xs text-slate-500 hover:bg-slate-200"
-              title="捕捉（Ctrl+Shift+Space）"
-            >
-              ＋
-            </button>
           </div>
           <nav className="flex-1 overflow-auto px-1 pb-2">
             {文件树.map((node, i) => (
