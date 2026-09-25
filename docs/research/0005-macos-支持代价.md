@@ -1186,7 +1186,7 @@ if (platform === Platform.MAC && process.platform === Platform.WINDOWS.nodeName)
 
 **现在做（成本 0，避免将来的痛）：**
 
-1. `appId` 定死（如 `com.<你>.zhijibiji`），写进 `package.json` 的 `build` 块。
+1. `appId` 定死（如 `com.<你>.confidant`），写进 `package.json` 的 `build` 块。
 2. 默认库位置改为 `app.getPath('home')` 下的自建目录，或首次运行让用户选。**不要用 `getPath('documents')`。**
 3. 冲突副本命名规范定为小写 ASCII。
 4. `package.json` 里 `electron: "^44"`。
