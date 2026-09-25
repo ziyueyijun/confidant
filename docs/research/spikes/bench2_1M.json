@@ -1,0 +1,2250 @@
+{
+  "tag": "1M",
+  "target": 1000000,
+  "notes": 2519,
+  "chars": 1000212,
+  "origBytes": 2830574,
+  "indexes": {
+    "preseg": {
+      "buildMs": 184,
+      "dbBytes": 7045120,
+      "totalRatio": 2.49,
+      "contentBytes": 3042439,
+      "contentRatio": 1.075
+    },
+    "perchar": {
+      "buildMs": 209,
+      "dbBytes": 9531392,
+      "totalRatio": 3.37,
+      "contentBytes": 3746248,
+      "contentRatio": 1.323
+    },
+    "trigram": {
+      "buildMs": 602,
+      "dbBytes": 16441344,
+      "totalRatio": 5.81,
+      "contentBytes": 2830574,
+      "contentRatio": 1
+    },
+    "simple": {
+      "buildMs": 508,
+      "dbBytes": 13594624,
+      "totalRatio": 4.8,
+      "contentBytes": 2830574,
+      "contentRatio": 1
+    }
+  },
+  "queries": {
+    "char1": [
+      {
+        "q": "识",
+        "presegTokens": "识",
+        "percharTokens": "识",
+        "gt": 196,
+        "lat": {
+          "preseg": 0.054,
+          "perchar": 0.095,
+          "trigram": null,
+          "simple_and": 0.082,
+          "simple_jieba": 0.093,
+          "simple_phrase": 0.07
+        },
+        "m": {
+          "preseg": {
+            "recall": 0.0102,
+            "precision": 1,
+            "hits": 2,
+            "gt": 196,
+            "tp": 2,
+            "missed": 194,
+            "extra": 0
+          },
+          "perchar": {
+            "recall": 1,
+            "precision": 1,
+            "hits": 196,
+            "gt": 196,
+            "tp": 196,
+            "missed": 0,
+            "extra": 0
+          },
+          "trigram": {
+            "unsupported": true,
+            "recall": 0,
+            "precision": 0,
+            "hits": 0,
+            "gt": 196,
+            "tp": 0,
+            "missed": 196,
+            "extra": 0
+          },
+          "simple_and": {
+            "recall": 1,
+            "precision": 1,
+            "hits": 196,
+            "gt": 196,
+            "tp": 196,
+            "missed": 0,
+            "extra": 0
+          },
+          "simple_jieba": {
+            "recall": 1,
+            "precision": 1,
+            "hits": 196,
+            "gt": 196,
+            "tp": 196,
+            "missed": 0,
+            "extra": 0
+          },
+          "simple_phrase": {
+            "recall": 1,
+            "precision": 1,
+            "hits": 196,
+            "gt": 196,
+            "tp": 196,
+            "missed": 0,
+            "extra": 0
+          }
+        }
+      },
+      {
+        "q": "史",
+        "presegTokens": "史",
+        "percharTokens": "史",
+        "gt": 881,
+        "lat": {
+          "preseg": 0.099,
+          "perchar": 0.2,
+          "trigram": null,
+          "simple_and": 0.189,
+          "simple_jieba": 0.385,
+          "simple_phrase": 0.197
+        },
+        "m": {
+          "preseg": {
+            "recall": 0.3314,
+            "precision": 1,
+            "hits": 292,
+            "gt": 881,
+            "tp": 292,
+            "missed": 589,
+            "extra": 0
+          },
+          "perchar": {
+            "recall": 1,
+            "precision": 1,
+            "hits": 881,
+            "gt": 881,
+            "tp": 881,
+            "missed": 0,
+            "extra": 0
+          },
+          "trigram": {
+            "unsupported": true,
+            "recall": 0,
+            "precision": 0,
+            "hits": 0,
+            "gt": 881,
+            "tp": 0,
+            "missed": 881,
+            "extra": 0
+          },
+          "simple_and": {
+            "recall": 1,
+            "precision": 1,
+            "hits": 881,
+            "gt": 881,
+            "tp": 881,
+            "missed": 0,
+            "extra": 0
+          },
+          "simple_jieba": {
+            "recall": 1,
+            "precision": 1,
+            "hits": 881,
+            "gt": 881,
+            "tp": 881,
+            "missed": 0,
+            "extra": 0
+          },
+          "simple_phrase": {
+            "recall": 1,
+            "precision": 1,
+            "hits": 881,
+            "gt": 881,
+            "tp": 881,
+            "missed": 0,
+            "extra": 0
+          }
+        }
+      },
+      {
+        "q": "学",
+        "presegTokens": "学",
+        "percharTokens": "学",
+        "gt": 783,
+        "lat": {
+          "preseg": 0.073,
+          "perchar": 0.198,
+          "trigram": null,
+          "simple_and": 0.229,
+          "simple_jieba": 0.255,
+          "simple_phrase": 0.232
+        },
+        "m": {
+          "preseg": {
+            "recall": 0.2708,
+            "precision": 1,
+            "hits": 212,
+            "gt": 783,
+            "tp": 212,
+            "missed": 571,
+            "extra": 0
+          },
+          "perchar": {
+            "recall": 1,
+            "precision": 1,
+            "hits": 783,
+            "gt": 783,
+            "tp": 783,
+            "missed": 0,
+            "extra": 0
+          },
+          "trigram": {
+            "unsupported": true,
+            "recall": 0,
+            "precision": 0,
+            "hits": 0,
+            "gt": 783,
+            "tp": 0,
+            "missed": 783,
+            "extra": 0
+          },
+          "simple_and": {
+            "recall": 1,
+            "precision": 1,
+            "hits": 783,
+            "gt": 783,
+            "tp": 783,
+            "missed": 0,
+            "extra": 0
+          },
+          "simple_jieba": {
+            "recall": 1,
+            "precision": 1,
+            "hits": 783,
+            "gt": 783,
+            "tp": 783,
+            "missed": 0,
+            "extra": 0
+          },
+          "simple_phrase": {
+            "recall": 1,
+            "precision": 1,
+            "hits": 783,
+            "gt": 783,
+            "tp": 783,
+            "missed": 0,
+            "extra": 0
+          }
+        }
+      },
+      {
+        "q": "国",
+        "presegTokens": "国",
+        "percharTokens": "国",
+        "gt": 1681,
+        "lat": {
+          "preseg": 0.132,
+          "perchar": 0.55,
+          "trigram": null,
+          "simple_and": 0.509,
+          "simple_jieba": 0.479,
+          "simple_phrase": 0.506
+        },
+        "m": {
+          "preseg": {
+            "recall": 0.2005,
+            "precision": 1,
+            "hits": 337,
+            "gt": 1681,
+            "tp": 337,
+            "missed": 1344,
+            "extra": 0
+          },
+          "perchar": {
+            "recall": 1,
+            "precision": 1,
+            "hits": 1681,
+            "gt": 1681,
+            "tp": 1681,
+            "missed": 0,
+            "extra": 0
+          },
+          "trigram": {
+            "unsupported": true,
+            "recall": 0,
+            "precision": 0,
+            "hits": 0,
+            "gt": 1681,
+            "tp": 0,
+            "missed": 1681,
+            "extra": 0
+          },
+          "simple_and": {
+            "recall": 1,
+            "precision": 1,
+            "hits": 1681,
+            "gt": 1681,
+            "tp": 1681,
+            "missed": 0,
+            "extra": 0
+          },
+          "simple_jieba": {
+            "recall": 1,
+            "precision": 1,
+            "hits": 1681,
+            "gt": 1681,
+            "tp": 1681,
+            "missed": 0,
+            "extra": 0
+          },
+          "simple_phrase": {
+            "recall": 1,
+            "precision": 1,
+            "hits": 1681,
+            "gt": 1681,
+            "tp": 1681,
+            "missed": 0,
+            "extra": 0
+          }
+        }
+      },
+      {
+        "q": "人",
+        "presegTokens": "人",
+        "percharTokens": "人",
+        "gt": 1972,
+        "lat": {
+          "preseg": 0.331,
+          "perchar": 0.594,
+          "trigram": null,
+          "simple_and": 0.426,
+          "simple_jieba": 0.432,
+          "simple_phrase": 0.685
+        },
+        "m": {
+          "preseg": {
+            "recall": 0.5583,
+            "precision": 1,
+            "hits": 1101,
+            "gt": 1972,
+            "tp": 1101,
+            "missed": 871,
+            "extra": 0
+          },
+          "perchar": {
+            "recall": 1,
+            "precision": 1,
+            "hits": 1972,
+            "gt": 1972,
+            "tp": 1972,
+            "missed": 0,
+            "extra": 0
+          },
+          "trigram": {
+            "unsupported": true,
+            "recall": 0,
+            "precision": 0,
+            "hits": 0,
+            "gt": 1972,
+            "tp": 0,
+            "missed": 1972,
+            "extra": 0
+          },
+          "simple_and": {
+            "recall": 1,
+            "precision": 1,
+            "hits": 1972,
+            "gt": 1972,
+            "tp": 1972,
+            "missed": 0,
+            "extra": 0
+          },
+          "simple_jieba": {
+            "recall": 1,
+            "precision": 1,
+            "hits": 1972,
+            "gt": 1972,
+            "tp": 1972,
+            "missed": 0,
+            "extra": 0
+          },
+          "simple_phrase": {
+            "recall": 1,
+            "precision": 1,
+            "hits": 1972,
+            "gt": 1972,
+            "tp": 1972,
+            "missed": 0,
+            "extra": 0
+          }
+        }
+      }
+    ],
+    "word2": [
+      {
+        "q": "知识",
+        "presegTokens": "知识",
+        "percharTokens": "知 识",
+        "gt": 79,
+        "lat": {
+          "preseg": 0.049,
+          "perchar": 0.085,
+          "trigram": null,
+          "simple_and": 0.101,
+          "simple_jieba": 0.05,
+          "simple_phrase": 0.049
+        },
+        "m": {
+          "preseg": {
+            "recall": 1,
+            "precision": 1,
+            "hits": 79,
+            "gt": 79,
+            "tp": 79,
+            "missed": 0,
+            "extra": 0
+          },
+          "perchar": {
+            "recall": 1,
+            "precision": 1,
+            "hits": 79,
+            "gt": 79,
+            "tp": 79,
+            "missed": 0,
+            "extra": 0
+          },
+          "trigram": {
+            "unsupported": true,
+            "recall": 0,
+            "precision": 0,
+            "hits": 0,
+            "gt": 79,
+            "tp": 0,
+            "missed": 79,
+            "extra": 0
+          },
+          "simple_and": {
+            "recall": 1,
+            "precision": 0.8316,
+            "hits": 95,
+            "gt": 79,
+            "tp": 79,
+            "missed": 0,
+            "extra": 16
+          },
+          "simple_jieba": {
+            "recall": 1,
+            "precision": 1,
+            "hits": 79,
+            "gt": 79,
+            "tp": 79,
+            "missed": 0,
+            "extra": 0
+          },
+          "simple_phrase": {
+            "recall": 1,
+            "precision": 1,
+            "hits": 79,
+            "gt": 79,
+            "tp": 79,
+            "missed": 0,
+            "extra": 0
+          }
+        }
+      },
+      {
+        "q": "历史",
+        "presegTokens": "历史",
+        "percharTokens": "历 史",
+        "gt": 416,
+        "lat": {
+          "preseg": 0.163,
+          "perchar": 0.164,
+          "trigram": null,
+          "simple_and": 0.156,
+          "simple_jieba": 0.168,
+          "simple_phrase": 0.169
+        },
+        "m": {
+          "preseg": {
+            "recall": 1,
+            "precision": 1,
+            "hits": 416,
+            "gt": 416,
+            "tp": 416,
+            "missed": 0,
+            "extra": 0
+          },
+          "perchar": {
+            "recall": 1,
+            "precision": 0.9976,
+            "hits": 417,
+            "gt": 416,
+            "tp": 416,
+            "missed": 0,
+            "extra": 1
+          },
+          "trigram": {
+            "unsupported": true,
+            "recall": 0,
+            "precision": 0,
+            "hits": 0,
+            "gt": 416,
+            "tp": 0,
+            "missed": 416,
+            "extra": 0
+          },
+          "simple_and": {
+            "recall": 1,
+            "precision": 0.9369,
+            "hits": 444,
+            "gt": 416,
+            "tp": 416,
+            "missed": 0,
+            "extra": 28
+          },
+          "simple_jieba": {
+            "recall": 1,
+            "precision": 1,
+            "hits": 416,
+            "gt": 416,
+            "tp": 416,
+            "missed": 0,
+            "extra": 0
+          },
+          "simple_phrase": {
+            "recall": 1,
+            "precision": 1,
+            "hits": 416,
+            "gt": 416,
+            "tp": 416,
+            "missed": 0,
+            "extra": 0
+          }
+        }
+      },
+      {
+        "q": "科学",
+        "presegTokens": "科学",
+        "percharTokens": "科 学",
+        "gt": 171,
+        "lat": {
+          "preseg": 0.066,
+          "perchar": 0.116,
+          "trigram": null,
+          "simple_and": 0.114,
+          "simple_jieba": 0.116,
+          "simple_phrase": 0.133
+        },
+        "m": {
+          "preseg": {
+            "recall": 0.8713,
+            "precision": 1,
+            "hits": 149,
+            "gt": 171,
+            "tp": 149,
+            "missed": 22,
+            "extra": 0
+          },
+          "perchar": {
+            "recall": 1,
+            "precision": 1,
+            "hits": 171,
+            "gt": 171,
+            "tp": 171,
+            "missed": 0,
+            "extra": 0
+          },
+          "trigram": {
+            "unsupported": true,
+            "recall": 0,
+            "precision": 0,
+            "hits": 0,
+            "gt": 171,
+            "tp": 0,
+            "missed": 171,
+            "extra": 0
+          },
+          "simple_and": {
+            "recall": 1,
+            "precision": 0.6129,
+            "hits": 279,
+            "gt": 171,
+            "tp": 171,
+            "missed": 0,
+            "extra": 108
+          },
+          "simple_jieba": {
+            "recall": 1,
+            "precision": 1,
+            "hits": 171,
+            "gt": 171,
+            "tp": 171,
+            "missed": 0,
+            "extra": 0
+          },
+          "simple_phrase": {
+            "recall": 1,
+            "precision": 1,
+            "hits": 171,
+            "gt": 171,
+            "tp": 171,
+            "missed": 0,
+            "extra": 0
+          }
+        }
+      },
+      {
+        "q": "经济",
+        "presegTokens": "经济",
+        "percharTokens": "经 济",
+        "gt": 383,
+        "lat": {
+          "preseg": 0.116,
+          "perchar": 0.172,
+          "trigram": null,
+          "simple_and": 0.146,
+          "simple_jieba": 0.165,
+          "simple_phrase": 0.161
+        },
+        "m": {
+          "preseg": {
+            "recall": 0.9948,
+            "precision": 1,
+            "hits": 381,
+            "gt": 383,
+            "tp": 381,
+            "missed": 2,
+            "extra": 0
+          },
+          "perchar": {
+            "recall": 1,
+            "precision": 1,
+            "hits": 383,
+            "gt": 383,
+            "tp": 383,
+            "missed": 0,
+            "extra": 0
+          },
+          "trigram": {
+            "unsupported": true,
+            "recall": 0,
+            "precision": 0,
+            "hits": 0,
+            "gt": 383,
+            "tp": 0,
+            "missed": 383,
+            "extra": 0
+          },
+          "simple_and": {
+            "recall": 1,
+            "precision": 0.9504,
+            "hits": 403,
+            "gt": 383,
+            "tp": 383,
+            "missed": 0,
+            "extra": 20
+          },
+          "simple_jieba": {
+            "recall": 1,
+            "precision": 1,
+            "hits": 383,
+            "gt": 383,
+            "tp": 383,
+            "missed": 0,
+            "extra": 0
+          },
+          "simple_phrase": {
+            "recall": 1,
+            "precision": 1,
+            "hits": 383,
+            "gt": 383,
+            "tp": 383,
+            "missed": 0,
+            "extra": 0
+          }
+        }
+      },
+      {
+        "q": "规模",
+        "presegTokens": "规模",
+        "percharTokens": "规 模",
+        "gt": 210,
+        "lat": {
+          "preseg": 0.058,
+          "perchar": 0.109,
+          "trigram": null,
+          "simple_and": 0.073,
+          "simple_jieba": 0.076,
+          "simple_phrase": 0.073
+        },
+        "m": {
+          "preseg": {
+            "recall": 0.4619,
+            "precision": 1,
+            "hits": 97,
+            "gt": 210,
+            "tp": 97,
+            "missed": 113,
+            "extra": 0
+          },
+          "perchar": {
+            "recall": 1,
+            "precision": 1,
+            "hits": 210,
+            "gt": 210,
+            "tp": 210,
+            "missed": 0,
+            "extra": 0
+          },
+          "trigram": {
+            "unsupported": true,
+            "recall": 0,
+            "precision": 0,
+            "hits": 0,
+            "gt": 210,
+            "tp": 0,
+            "missed": 210,
+            "extra": 0
+          },
+          "simple_and": {
+            "recall": 1,
+            "precision": 0.9251,
+            "hits": 227,
+            "gt": 210,
+            "tp": 210,
+            "missed": 0,
+            "extra": 17
+          },
+          "simple_jieba": {
+            "recall": 1,
+            "precision": 1,
+            "hits": 210,
+            "gt": 210,
+            "tp": 210,
+            "missed": 0,
+            "extra": 0
+          },
+          "simple_phrase": {
+            "recall": 1,
+            "precision": 1,
+            "hits": 210,
+            "gt": 210,
+            "tp": 210,
+            "missed": 0,
+            "extra": 0
+          }
+        }
+      },
+      {
+        "q": "革命",
+        "presegTokens": "革命",
+        "percharTokens": "革 命",
+        "gt": 331,
+        "lat": {
+          "preseg": 0.077,
+          "perchar": 0.133,
+          "trigram": null,
+          "simple_and": 0.109,
+          "simple_jieba": 0.126,
+          "simple_phrase": 0.128
+        },
+        "m": {
+          "preseg": {
+            "recall": 0.6375,
+            "precision": 1,
+            "hits": 211,
+            "gt": 331,
+            "tp": 211,
+            "missed": 120,
+            "extra": 0
+          },
+          "perchar": {
+            "recall": 1,
+            "precision": 1,
+            "hits": 331,
+            "gt": 331,
+            "tp": 331,
+            "missed": 0,
+            "extra": 0
+          },
+          "trigram": {
+            "unsupported": true,
+            "recall": 0,
+            "precision": 0,
+            "hits": 0,
+            "gt": 331,
+            "tp": 0,
+            "missed": 331,
+            "extra": 0
+          },
+          "simple_and": {
+            "recall": 1,
+            "precision": 0.9377,
+            "hits": 353,
+            "gt": 331,
+            "tp": 331,
+            "missed": 0,
+            "extra": 22
+          },
+          "simple_jieba": {
+            "recall": 1,
+            "precision": 1,
+            "hits": 331,
+            "gt": 331,
+            "tp": 331,
+            "missed": 0,
+            "extra": 0
+          },
+          "simple_phrase": {
+            "recall": 1,
+            "precision": 1,
+            "hits": 331,
+            "gt": 331,
+            "tp": 331,
+            "missed": 0,
+            "extra": 0
+          }
+        }
+      }
+    ],
+    "word4": [
+      {
+        "q": "人工智能",
+        "presegTokens": "人工 智能",
+        "percharTokens": "人 工 智 能",
+        "gt": 45,
+        "lat": {
+          "preseg": 0.053,
+          "perchar": 0.084,
+          "trigram": 0.09,
+          "simple_and": 0.152,
+          "simple_jieba": 0.129,
+          "simple_phrase": 0.127
+        },
+        "m": {
+          "preseg": {
+            "recall": 1,
+            "precision": 0.9574,
+            "hits": 47,
+            "gt": 45,
+            "tp": 45,
+            "missed": 0,
+            "extra": 2
+          },
+          "perchar": {
+            "recall": 1,
+            "precision": 1,
+            "hits": 45,
+            "gt": 45,
+            "tp": 45,
+            "missed": 0,
+            "extra": 0
+          },
+          "trigram": {
+            "recall": 1,
+            "precision": 1,
+            "hits": 45,
+            "gt": 45,
+            "tp": 45,
+            "missed": 0,
+            "extra": 0
+          },
+          "simple_and": {
+            "recall": 1,
+            "precision": 0.8654,
+            "hits": 52,
+            "gt": 45,
+            "tp": 45,
+            "missed": 0,
+            "extra": 7
+          },
+          "simple_jieba": {
+            "recall": 1,
+            "precision": 1,
+            "hits": 45,
+            "gt": 45,
+            "tp": 45,
+            "missed": 0,
+            "extra": 0
+          },
+          "simple_phrase": {
+            "recall": 1,
+            "precision": 1,
+            "hits": 45,
+            "gt": 45,
+            "tp": 45,
+            "missed": 0,
+            "extra": 0
+          }
+        }
+      },
+      {
+        "q": "世界大战",
+        "presegTokens": "世界 大战",
+        "percharTokens": "世 界 大 战",
+        "gt": 21,
+        "lat": {
+          "preseg": 0.067,
+          "perchar": 0.16,
+          "trigram": 0.049,
+          "simple_and": 0.185,
+          "simple_jieba": 0.162,
+          "simple_phrase": 0.155
+        },
+        "m": {
+          "preseg": {
+            "recall": 1,
+            "precision": 1,
+            "hits": 21,
+            "gt": 21,
+            "tp": 21,
+            "missed": 0,
+            "extra": 0
+          },
+          "perchar": {
+            "recall": 1,
+            "precision": 1,
+            "hits": 21,
+            "gt": 21,
+            "tp": 21,
+            "missed": 0,
+            "extra": 0
+          },
+          "trigram": {
+            "recall": 1,
+            "precision": 1,
+            "hits": 21,
+            "gt": 21,
+            "tp": 21,
+            "missed": 0,
+            "extra": 0
+          },
+          "simple_and": {
+            "recall": 1,
+            "precision": 0.1892,
+            "hits": 111,
+            "gt": 21,
+            "tp": 21,
+            "missed": 0,
+            "extra": 90
+          },
+          "simple_jieba": {
+            "recall": 1,
+            "precision": 1,
+            "hits": 21,
+            "gt": 21,
+            "tp": 21,
+            "missed": 0,
+            "extra": 0
+          },
+          "simple_phrase": {
+            "recall": 1,
+            "precision": 1,
+            "hits": 21,
+            "gt": 21,
+            "tp": 21,
+            "missed": 0,
+            "extra": 0
+          }
+        }
+      },
+      {
+        "q": "中华人民共和国",
+        "presegTokens": "中华 人民 共和国",
+        "percharTokens": "中 华 人 民 共 和 国",
+        "gt": 209,
+        "lat": {
+          "preseg": 0.144,
+          "perchar": 0.487,
+          "trigram": 0.196,
+          "simple_and": 0.405,
+          "simple_jieba": 0.52,
+          "simple_phrase": 0.566
+        },
+        "m": {
+          "preseg": {
+            "recall": 1,
+            "precision": 0.9858,
+            "hits": 212,
+            "gt": 209,
+            "tp": 209,
+            "missed": 0,
+            "extra": 3
+          },
+          "perchar": {
+            "recall": 1,
+            "precision": 1,
+            "hits": 209,
+            "gt": 209,
+            "tp": 209,
+            "missed": 0,
+            "extra": 0
+          },
+          "trigram": {
+            "recall": 1,
+            "precision": 1,
+            "hits": 209,
+            "gt": 209,
+            "tp": 209,
+            "missed": 0,
+            "extra": 0
+          },
+          "simple_and": {
+            "recall": 1,
+            "precision": 0.777,
+            "hits": 269,
+            "gt": 209,
+            "tp": 209,
+            "missed": 0,
+            "extra": 60
+          },
+          "simple_jieba": {
+            "recall": 1,
+            "precision": 1,
+            "hits": 209,
+            "gt": 209,
+            "tp": 209,
+            "missed": 0,
+            "extra": 0
+          },
+          "simple_phrase": {
+            "recall": 1,
+            "precision": 1,
+            "hits": 209,
+            "gt": 209,
+            "tp": 209,
+            "missed": 0,
+            "extra": 0
+          }
+        }
+      },
+      {
+        "q": "中国人民银行",
+        "presegTokens": "中国 人民 银行",
+        "percharTokens": "中 国 人 民 银 行",
+        "gt": 4,
+        "lat": {
+          "preseg": 0.118,
+          "perchar": 0.308,
+          "trigram": 0.062,
+          "simple_and": 0.261,
+          "simple_jieba": 0.395,
+          "simple_phrase": 0.112
+        },
+        "m": {
+          "preseg": {
+            "recall": 1,
+            "precision": 0.25,
+            "hits": 16,
+            "gt": 4,
+            "tp": 4,
+            "missed": 0,
+            "extra": 12
+          },
+          "perchar": {
+            "recall": 1,
+            "precision": 1,
+            "hits": 4,
+            "gt": 4,
+            "tp": 4,
+            "missed": 0,
+            "extra": 0
+          },
+          "trigram": {
+            "recall": 1,
+            "precision": 1,
+            "hits": 4,
+            "gt": 4,
+            "tp": 4,
+            "missed": 0,
+            "extra": 0
+          },
+          "simple_and": {
+            "recall": 1,
+            "precision": 0.1111,
+            "hits": 36,
+            "gt": 4,
+            "tp": 4,
+            "missed": 0,
+            "extra": 32
+          },
+          "simple_jieba": {
+            "recall": 1,
+            "precision": 1,
+            "hits": 4,
+            "gt": 4,
+            "tp": 4,
+            "missed": 0,
+            "extra": 0
+          },
+          "simple_phrase": {
+            "recall": 1,
+            "precision": 1,
+            "hits": 4,
+            "gt": 4,
+            "tp": 4,
+            "missed": 0,
+            "extra": 0
+          }
+        }
+      }
+    ],
+    "cross": [
+      {
+        "q": "克思",
+        "presegTokens": "克 思",
+        "percharTokens": "克 思",
+        "gt": 112,
+        "lat": {
+          "preseg": 0.049,
+          "perchar": 0.087,
+          "trigram": null,
+          "simple_and": 0.098,
+          "simple_jieba": 0.092,
+          "simple_phrase": 0.066
+        },
+        "m": {
+          "preseg": {
+            "recall": 0.0536,
+            "precision": 0.6,
+            "hits": 10,
+            "gt": 112,
+            "tp": 6,
+            "missed": 106,
+            "extra": 4
+          },
+          "perchar": {
+            "recall": 1,
+            "precision": 1,
+            "hits": 112,
+            "gt": 112,
+            "tp": 112,
+            "missed": 0,
+            "extra": 0
+          },
+          "trigram": {
+            "unsupported": true,
+            "recall": 0,
+            "precision": 0,
+            "hits": 0,
+            "gt": 112,
+            "tp": 0,
+            "missed": 112,
+            "extra": 0
+          },
+          "simple_and": {
+            "recall": 1,
+            "precision": 0.7,
+            "hits": 160,
+            "gt": 112,
+            "tp": 112,
+            "missed": 0,
+            "extra": 48
+          },
+          "simple_jieba": {
+            "recall": 1,
+            "precision": 1,
+            "hits": 112,
+            "gt": 112,
+            "tp": 112,
+            "missed": 0,
+            "extra": 0
+          },
+          "simple_phrase": {
+            "recall": 1,
+            "precision": 1,
+            "hits": 112,
+            "gt": 112,
+            "tp": 112,
+            "missed": 0,
+            "extra": 0
+          }
+        }
+      },
+      {
+        "q": "共和",
+        "presegTokens": "共和",
+        "percharTokens": "共 和",
+        "gt": 335,
+        "lat": {
+          "preseg": 0.035,
+          "perchar": 0.194,
+          "trigram": null,
+          "simple_and": 0.446,
+          "simple_jieba": 0.378,
+          "simple_phrase": 0.372
+        },
+        "m": {
+          "preseg": {
+            "recall": 0.0597,
+            "precision": 1,
+            "hits": 20,
+            "gt": 335,
+            "tp": 20,
+            "missed": 315,
+            "extra": 0
+          },
+          "perchar": {
+            "recall": 1,
+            "precision": 1,
+            "hits": 335,
+            "gt": 335,
+            "tp": 335,
+            "missed": 0,
+            "extra": 0
+          },
+          "trigram": {
+            "unsupported": true,
+            "recall": 0,
+            "precision": 0,
+            "hits": 0,
+            "gt": 335,
+            "tp": 0,
+            "missed": 335,
+            "extra": 0
+          },
+          "simple_and": {
+            "recall": 1,
+            "precision": 0.4056,
+            "hits": 826,
+            "gt": 335,
+            "tp": 335,
+            "missed": 0,
+            "extra": 491
+          },
+          "simple_jieba": {
+            "recall": 1,
+            "precision": 1,
+            "hits": 335,
+            "gt": 335,
+            "tp": 335,
+            "missed": 0,
+            "extra": 0
+          },
+          "simple_phrase": {
+            "recall": 1,
+            "precision": 1,
+            "hits": 335,
+            "gt": 335,
+            "tp": 335,
+            "missed": 0,
+            "extra": 0
+          }
+        }
+      },
+      {
+        "q": "第一",
+        "presegTokens": "第一",
+        "percharTokens": "第 一",
+        "gt": 502,
+        "lat": {
+          "preseg": 0.101,
+          "perchar": 0.213,
+          "trigram": null,
+          "simple_and": 0.227,
+          "simple_jieba": 0.255,
+          "simple_phrase": 0.254
+        },
+        "m": {
+          "preseg": {
+            "recall": 0.4582,
+            "precision": 1,
+            "hits": 230,
+            "gt": 502,
+            "tp": 230,
+            "missed": 272,
+            "extra": 0
+          },
+          "perchar": {
+            "recall": 1,
+            "precision": 0.998,
+            "hits": 503,
+            "gt": 502,
+            "tp": 502,
+            "missed": 0,
+            "extra": 1
+          },
+          "trigram": {
+            "unsupported": true,
+            "recall": 0,
+            "precision": 0,
+            "hits": 0,
+            "gt": 502,
+            "tp": 0,
+            "missed": 502,
+            "extra": 0
+          },
+          "simple_and": {
+            "recall": 1,
+            "precision": 0.616,
+            "hits": 815,
+            "gt": 502,
+            "tp": 502,
+            "missed": 0,
+            "extra": 313
+          },
+          "simple_jieba": {
+            "recall": 1,
+            "precision": 1,
+            "hits": 502,
+            "gt": 502,
+            "tp": 502,
+            "missed": 0,
+            "extra": 0
+          },
+          "simple_phrase": {
+            "recall": 1,
+            "precision": 1,
+            "hits": 502,
+            "gt": 502,
+            "tp": 502,
+            "missed": 0,
+            "extra": 0
+          }
+        }
+      },
+      {
+        "q": "部分",
+        "presegTokens": "部分",
+        "percharTokens": "部 分",
+        "gt": 453,
+        "lat": {
+          "preseg": 0.101,
+          "perchar": 0.263,
+          "trigram": null,
+          "simple_and": 0.259,
+          "simple_jieba": 0.231,
+          "simple_phrase": 0.43
+        },
+        "m": {
+          "preseg": {
+            "recall": 0.6623,
+            "precision": 1,
+            "hits": 300,
+            "gt": 453,
+            "tp": 300,
+            "missed": 153,
+            "extra": 0
+          },
+          "perchar": {
+            "recall": 1,
+            "precision": 0.9912,
+            "hits": 457,
+            "gt": 453,
+            "tp": 453,
+            "missed": 0,
+            "extra": 4
+          },
+          "trigram": {
+            "unsupported": true,
+            "recall": 0,
+            "precision": 0,
+            "hits": 0,
+            "gt": 453,
+            "tp": 0,
+            "missed": 453,
+            "extra": 0
+          },
+          "simple_and": {
+            "recall": 1,
+            "precision": 0.5953,
+            "hits": 761,
+            "gt": 453,
+            "tp": 453,
+            "missed": 0,
+            "extra": 308
+          },
+          "simple_jieba": {
+            "recall": 1,
+            "precision": 1,
+            "hits": 453,
+            "gt": 453,
+            "tp": 453,
+            "missed": 0,
+            "extra": 0
+          },
+          "simple_phrase": {
+            "recall": 1,
+            "precision": 1,
+            "hits": 453,
+            "gt": 453,
+            "tp": 453,
+            "missed": 0,
+            "extra": 0
+          }
+        }
+      },
+      {
+        "q": "中共",
+        "presegTokens": "中共",
+        "percharTokens": "中 共",
+        "gt": 265,
+        "lat": {
+          "preseg": 0.097,
+          "perchar": 0.269,
+          "trigram": null,
+          "simple_and": 0.315,
+          "simple_jieba": 0.256,
+          "simple_phrase": 0.311
+        },
+        "m": {
+          "preseg": {
+            "recall": 0.6415,
+            "precision": 1,
+            "hits": 170,
+            "gt": 265,
+            "tp": 170,
+            "missed": 95,
+            "extra": 0
+          },
+          "perchar": {
+            "recall": 1,
+            "precision": 0.9888,
+            "hits": 268,
+            "gt": 265,
+            "tp": 265,
+            "missed": 0,
+            "extra": 3
+          },
+          "trigram": {
+            "unsupported": true,
+            "recall": 0,
+            "precision": 0,
+            "hits": 0,
+            "gt": 265,
+            "tp": 0,
+            "missed": 265,
+            "extra": 0
+          },
+          "simple_and": {
+            "recall": 1,
+            "precision": 0.2991,
+            "hits": 886,
+            "gt": 265,
+            "tp": 265,
+            "missed": 0,
+            "extra": 621
+          },
+          "simple_jieba": {
+            "recall": 1,
+            "precision": 1,
+            "hits": 265,
+            "gt": 265,
+            "tp": 265,
+            "missed": 0,
+            "extra": 0
+          },
+          "simple_phrase": {
+            "recall": 1,
+            "precision": 1,
+            "hits": 265,
+            "gt": 265,
+            "tp": 265,
+            "missed": 0,
+            "extra": 0
+          }
+        }
+      },
+      {
+        "q": "人民共和",
+        "presegTokens": "人民 共和",
+        "percharTokens": "人 民 共 和",
+        "gt": 252,
+        "lat": {
+          "preseg": 0.048,
+          "perchar": 0.311,
+          "trigram": 0.171,
+          "simple_and": 0.256,
+          "simple_jieba": 0.618,
+          "simple_phrase": 0.532
+        },
+        "m": {
+          "preseg": {
+            "recall": 0.0079,
+            "precision": 0.6667,
+            "hits": 3,
+            "gt": 252,
+            "tp": 2,
+            "missed": 250,
+            "extra": 1
+          },
+          "perchar": {
+            "recall": 1,
+            "precision": 1,
+            "hits": 252,
+            "gt": 252,
+            "tp": 252,
+            "missed": 0,
+            "extra": 0
+          },
+          "trigram": {
+            "recall": 1,
+            "precision": 1,
+            "hits": 252,
+            "gt": 252,
+            "tp": 252,
+            "missed": 0,
+            "extra": 0
+          },
+          "simple_and": {
+            "recall": 1,
+            "precision": 0.471,
+            "hits": 535,
+            "gt": 252,
+            "tp": 252,
+            "missed": 0,
+            "extra": 283
+          },
+          "simple_jieba": {
+            "recall": 1,
+            "precision": 0.9065,
+            "hits": 278,
+            "gt": 252,
+            "tp": 252,
+            "missed": 0,
+            "extra": 26
+          },
+          "simple_phrase": {
+            "recall": 1,
+            "precision": 1,
+            "hits": 252,
+            "gt": 252,
+            "tp": 252,
+            "missed": 0,
+            "extra": 0
+          }
+        }
+      }
+    ],
+    "phrase": [
+      {
+        "q": "中国历史",
+        "presegTokens": "中国 历史",
+        "percharTokens": "中 国 历 史",
+        "gt": 35,
+        "lat": {
+          "preseg": 0.222,
+          "perchar": 0.341,
+          "trigram": 0.08,
+          "simple_and": 0.398,
+          "simple_jieba": 0.274,
+          "simple_phrase": 0.175
+        },
+        "m": {
+          "preseg": {
+            "recall": 1,
+            "precision": 0.1913,
+            "hits": 183,
+            "gt": 35,
+            "tp": 35,
+            "missed": 0,
+            "extra": 148
+          },
+          "perchar": {
+            "recall": 1,
+            "precision": 1,
+            "hits": 35,
+            "gt": 35,
+            "tp": 35,
+            "missed": 0,
+            "extra": 0
+          },
+          "trigram": {
+            "recall": 1,
+            "precision": 1,
+            "hits": 35,
+            "gt": 35,
+            "tp": 35,
+            "missed": 0,
+            "extra": 0
+          },
+          "simple_and": {
+            "recall": 1,
+            "precision": 0.1061,
+            "hits": 330,
+            "gt": 35,
+            "tp": 35,
+            "missed": 0,
+            "extra": 295
+          },
+          "simple_jieba": {
+            "recall": 1,
+            "precision": 0.1892,
+            "hits": 185,
+            "gt": 35,
+            "tp": 35,
+            "missed": 0,
+            "extra": 150
+          },
+          "simple_phrase": {
+            "recall": 1,
+            "precision": 1,
+            "hits": 35,
+            "gt": 35,
+            "tp": 35,
+            "missed": 0,
+            "extra": 0
+          }
+        }
+      },
+      {
+        "q": "大规模",
+        "presegTokens": "大规模",
+        "percharTokens": "大 规 模",
+        "gt": 123,
+        "lat": {
+          "preseg": 0.066,
+          "perchar": 0.132,
+          "trigram": 0.059,
+          "simple_and": 0.134,
+          "simple_jieba": 0.125,
+          "simple_phrase": 0.124
+        },
+        "m": {
+          "preseg": {
+            "recall": 0.9675,
+            "precision": 1,
+            "hits": 119,
+            "gt": 123,
+            "tp": 119,
+            "missed": 4,
+            "extra": 0
+          },
+          "perchar": {
+            "recall": 1,
+            "precision": 1,
+            "hits": 123,
+            "gt": 123,
+            "tp": 123,
+            "missed": 0,
+            "extra": 0
+          },
+          "trigram": {
+            "recall": 1,
+            "precision": 1,
+            "hits": 123,
+            "gt": 123,
+            "tp": 123,
+            "missed": 0,
+            "extra": 0
+          },
+          "simple_and": {
+            "recall": 1,
+            "precision": 0.5668,
+            "hits": 217,
+            "gt": 123,
+            "tp": 123,
+            "missed": 0,
+            "extra": 94
+          },
+          "simple_jieba": {
+            "recall": 1,
+            "precision": 1,
+            "hits": 123,
+            "gt": 123,
+            "tp": 123,
+            "missed": 0,
+            "extra": 0
+          },
+          "simple_phrase": {
+            "recall": 1,
+            "precision": 1,
+            "hits": 123,
+            "gt": 123,
+            "tp": 123,
+            "missed": 0,
+            "extra": 0
+          }
+        }
+      },
+      {
+        "q": "知识管理",
+        "presegTokens": "知识 管理",
+        "percharTokens": "知 识 管 理",
+        "gt": 0,
+        "lat": {
+          "preseg": 0.048,
+          "perchar": 0.068,
+          "trigram": 0.017,
+          "simple_and": 0.056,
+          "simple_jieba": 0.059,
+          "simple_phrase": 0.042
+        },
+        "m": {
+          "preseg": {
+            "recall": 1,
+            "precision": 0,
+            "hits": 3,
+            "gt": 0,
+            "tp": 0,
+            "missed": 0,
+            "extra": 3
+          },
+          "perchar": {
+            "recall": 1,
+            "precision": 1,
+            "hits": 0,
+            "gt": 0,
+            "tp": 0,
+            "missed": 0,
+            "extra": 0
+          },
+          "trigram": {
+            "recall": 1,
+            "precision": 1,
+            "hits": 0,
+            "gt": 0,
+            "tp": 0,
+            "missed": 0,
+            "extra": 0
+          },
+          "simple_and": {
+            "recall": 1,
+            "precision": 0,
+            "hits": 12,
+            "gt": 0,
+            "tp": 0,
+            "missed": 0,
+            "extra": 12
+          },
+          "simple_jieba": {
+            "recall": 1,
+            "precision": 0,
+            "hits": 4,
+            "gt": 0,
+            "tp": 0,
+            "missed": 0,
+            "extra": 4
+          },
+          "simple_phrase": {
+            "recall": 1,
+            "precision": 1,
+            "hits": 0,
+            "gt": 0,
+            "tp": 0,
+            "missed": 0,
+            "extra": 0
+          }
+        }
+      }
+    ],
+    "oov": [
+      {
+        "q": "知识管理",
+        "presegTokens": "知识 管理",
+        "percharTokens": "知 识 管 理",
+        "gt": 0,
+        "lat": {
+          "preseg": 0.041,
+          "perchar": 0.052,
+          "trigram": 0.018,
+          "simple_and": 0.058,
+          "simple_jieba": 0.065,
+          "simple_phrase": 0.041
+        },
+        "m": {
+          "preseg": {
+            "recall": 1,
+            "precision": 0,
+            "hits": 3,
+            "gt": 0,
+            "tp": 0,
+            "missed": 0,
+            "extra": 3
+          },
+          "perchar": {
+            "recall": 1,
+            "precision": 1,
+            "hits": 0,
+            "gt": 0,
+            "tp": 0,
+            "missed": 0,
+            "extra": 0
+          },
+          "trigram": {
+            "recall": 1,
+            "precision": 1,
+            "hits": 0,
+            "gt": 0,
+            "tp": 0,
+            "missed": 0,
+            "extra": 0
+          },
+          "simple_and": {
+            "recall": 1,
+            "precision": 0,
+            "hits": 12,
+            "gt": 0,
+            "tp": 0,
+            "missed": 0,
+            "extra": 12
+          },
+          "simple_jieba": {
+            "recall": 1,
+            "precision": 0,
+            "hits": 4,
+            "gt": 0,
+            "tp": 0,
+            "missed": 0,
+            "extra": 4
+          },
+          "simple_phrase": {
+            "recall": 1,
+            "precision": 1,
+            "hits": 0,
+            "gt": 0,
+            "tp": 0,
+            "missed": 0,
+            "extra": 0
+          }
+        }
+      },
+      {
+        "q": "量子纠缠笔记",
+        "presegTokens": "量子 纠缠 笔记",
+        "percharTokens": "量 子 纠 缠 笔 记",
+        "gt": 0,
+        "lat": {
+          "preseg": 0.027,
+          "perchar": 0.039,
+          "trigram": 0.017,
+          "simple_and": 0.038,
+          "simple_jieba": 0.032,
+          "simple_phrase": 0.037
+        },
+        "m": {
+          "preseg": {
+            "recall": 1,
+            "precision": 1,
+            "hits": 0,
+            "gt": 0,
+            "tp": 0,
+            "missed": 0,
+            "extra": 0
+          },
+          "perchar": {
+            "recall": 1,
+            "precision": 1,
+            "hits": 0,
+            "gt": 0,
+            "tp": 0,
+            "missed": 0,
+            "extra": 0
+          },
+          "trigram": {
+            "recall": 1,
+            "precision": 1,
+            "hits": 0,
+            "gt": 0,
+            "tp": 0,
+            "missed": 0,
+            "extra": 0
+          },
+          "simple_and": {
+            "recall": 1,
+            "precision": 1,
+            "hits": 0,
+            "gt": 0,
+            "tp": 0,
+            "missed": 0,
+            "extra": 0
+          },
+          "simple_jieba": {
+            "recall": 1,
+            "precision": 1,
+            "hits": 0,
+            "gt": 0,
+            "tp": 0,
+            "missed": 0,
+            "extra": 0
+          },
+          "simple_phrase": {
+            "recall": 1,
+            "precision": 1,
+            "hits": 0,
+            "gt": 0,
+            "tp": 0,
+            "missed": 0,
+            "extra": 0
+          }
+        }
+      }
+    ]
+  },
+  "agg": {
+    "char1": {
+      "n": 5,
+      "schemes": {
+        "preseg": {
+          "recall": 0.2742,
+          "precision": 1,
+          "latMs": 0.099,
+          "unsupported": 0
+        },
+        "perchar": {
+          "recall": 1,
+          "precision": 1,
+          "latMs": 0.2,
+          "unsupported": 0
+        },
+        "trigram": {
+          "recall": 0,
+          "precision": 0,
+          "latMs": null,
+          "unsupported": 5
+        },
+        "simple_and": {
+          "recall": 1,
+          "precision": 1,
+          "latMs": 0.229,
+          "unsupported": 0
+        },
+        "simple_jieba": {
+          "recall": 1,
+          "precision": 1,
+          "latMs": 0.385,
+          "unsupported": 0
+        },
+        "simple_phrase": {
+          "recall": 1,
+          "precision": 1,
+          "latMs": 0.232,
+          "unsupported": 0
+        }
+      }
+    },
+    "word2": {
+      "n": 6,
+      "schemes": {
+        "preseg": {
+          "recall": 0.8276,
+          "precision": 1,
+          "latMs": 0.077,
+          "unsupported": 0
+        },
+        "perchar": {
+          "recall": 1,
+          "precision": 0.9996,
+          "latMs": 0.133,
+          "unsupported": 0
+        },
+        "trigram": {
+          "recall": 0,
+          "precision": 0,
+          "latMs": null,
+          "unsupported": 6
+        },
+        "simple_and": {
+          "recall": 1,
+          "precision": 0.8658,
+          "latMs": 0.114,
+          "unsupported": 0
+        },
+        "simple_jieba": {
+          "recall": 1,
+          "precision": 1,
+          "latMs": 0.126,
+          "unsupported": 0
+        },
+        "simple_phrase": {
+          "recall": 1,
+          "precision": 1,
+          "latMs": 0.133,
+          "unsupported": 0
+        }
+      }
+    },
+    "word4": {
+      "n": 4,
+      "schemes": {
+        "preseg": {
+          "recall": 1,
+          "precision": 0.7983,
+          "latMs": 0.118,
+          "unsupported": 0
+        },
+        "perchar": {
+          "recall": 1,
+          "precision": 1,
+          "latMs": 0.308,
+          "unsupported": 0
+        },
+        "trigram": {
+          "recall": 1,
+          "precision": 1,
+          "latMs": 0.09,
+          "unsupported": 0
+        },
+        "simple_and": {
+          "recall": 1,
+          "precision": 0.4857,
+          "latMs": 0.261,
+          "unsupported": 0
+        },
+        "simple_jieba": {
+          "recall": 1,
+          "precision": 1,
+          "latMs": 0.395,
+          "unsupported": 0
+        },
+        "simple_phrase": {
+          "recall": 1,
+          "precision": 1,
+          "latMs": 0.155,
+          "unsupported": 0
+        }
+      }
+    },
+    "cross": {
+      "n": 6,
+      "schemes": {
+        "preseg": {
+          "recall": 0.3139,
+          "precision": 0.8778,
+          "latMs": 0.097,
+          "unsupported": 0
+        },
+        "perchar": {
+          "recall": 1,
+          "precision": 0.9963,
+          "latMs": 0.263,
+          "unsupported": 0
+        },
+        "trigram": {
+          "recall": 0.1667,
+          "precision": 0.1667,
+          "latMs": 0.171,
+          "unsupported": 5
+        },
+        "simple_and": {
+          "recall": 1,
+          "precision": 0.5145,
+          "latMs": 0.259,
+          "unsupported": 0
+        },
+        "simple_jieba": {
+          "recall": 1,
+          "precision": 0.9844,
+          "latMs": 0.256,
+          "unsupported": 0
+        },
+        "simple_phrase": {
+          "recall": 1,
+          "precision": 1,
+          "latMs": 0.372,
+          "unsupported": 0
+        }
+      }
+    },
+    "phrase": {
+      "n": 3,
+      "schemes": {
+        "preseg": {
+          "recall": 0.9892,
+          "precision": 0.3971,
+          "latMs": 0.066,
+          "unsupported": 0
+        },
+        "perchar": {
+          "recall": 1,
+          "precision": 1,
+          "latMs": 0.132,
+          "unsupported": 0
+        },
+        "trigram": {
+          "recall": 1,
+          "precision": 1,
+          "latMs": 0.059,
+          "unsupported": 0
+        },
+        "simple_and": {
+          "recall": 1,
+          "precision": 0.2243,
+          "latMs": 0.134,
+          "unsupported": 0
+        },
+        "simple_jieba": {
+          "recall": 1,
+          "precision": 0.3964,
+          "latMs": 0.125,
+          "unsupported": 0
+        },
+        "simple_phrase": {
+          "recall": 1,
+          "precision": 1,
+          "latMs": 0.124,
+          "unsupported": 0
+        }
+      }
+    },
+    "oov": {
+      "n": 2,
+      "schemes": {
+        "preseg": {
+          "recall": 1,
+          "precision": 0.5,
+          "latMs": 0.041,
+          "unsupported": 0
+        },
+        "perchar": {
+          "recall": 1,
+          "precision": 1,
+          "latMs": 0.052,
+          "unsupported": 0
+        },
+        "trigram": {
+          "recall": 1,
+          "precision": 1,
+          "latMs": 0.018,
+          "unsupported": 0
+        },
+        "simple_and": {
+          "recall": 1,
+          "precision": 0.5,
+          "latMs": 0.058,
+          "unsupported": 0
+        },
+        "simple_jieba": {
+          "recall": 1,
+          "precision": 0.5,
+          "latMs": 0.065,
+          "unsupported": 0
+        },
+        "simple_phrase": {
+          "recall": 1,
+          "precision": 1,
+          "latMs": 0.041,
+          "unsupported": 0
+        }
+      }
+    }
+  },
+  "fallback": [
+    {
+      "q": "识",
+      "likeOnPreseg": {
+        "ms": 5.359,
+        "hit": 196
+      },
+      "likeOnPerchar": {
+        "ms": 3.233,
+        "hit": 196
+      },
+      "likeOnTrigram": {
+        "ms": 2.937,
+        "hit": 196
+      }
+    },
+    {
+      "q": "史",
+      "likeOnPreseg": {
+        "ms": 5.348,
+        "hit": 881
+      },
+      "likeOnPerchar": {
+        "ms": 2.729,
+        "hit": 881
+      },
+      "likeOnTrigram": {
+        "ms": 2.684,
+        "hit": 881
+      }
+    },
+    {
+      "q": "克思",
+      "likeOnPreseg": {
+        "ms": 5.189,
+        "hit": 39
+      },
+      "likeOnPerchar": {
+        "ms": 3.197,
+        "hit": 0
+      },
+      "likeOnTrigram": {
+        "ms": 2.735,
+        "hit": 112
+      }
+    },
+    {
+      "q": "共和",
+      "likeOnPreseg": {
+        "ms": 5.055,
+        "hit": 334
+      },
+      "likeOnPerchar": {
+        "ms": 3.947,
+        "hit": 0
+      },
+      "likeOnTrigram": {
+        "ms": 3.426,
+        "hit": 335
+      }
+    },
+    {
+      "q": "大规模",
+      "likeOnPreseg": {
+        "ms": 5.587,
+        "hit": 119
+      },
+      "likeOnPerchar": {
+        "ms": 3.448,
+        "hit": 0
+      },
+      "likeOnTrigram": {
+        "ms": 3.386,
+        "hit": 123
+      }
+    },
+    {
+      "q": "知识管理",
+      "likeOnPreseg": {
+        "ms": 5.297,
+        "hit": 0
+      },
+      "likeOnPerchar": {
+        "ms": 4.422,
+        "hit": 0
+      },
+      "likeOnTrigram": {
+        "ms": 3.544,
+        "hit": 0
+      }
+    }
+  ],
+  "incremental": {
+    "preseg": {
+      "oneNoteEditMs": 0.231,
+      "fullRebuildMs": 136.9,
+      "notes": 2519
+    },
+    "perchar": {
+      "oneNoteEditMs": 0.202,
+      "fullRebuildMs": 102.1,
+      "notes": 2519
+    }
+  },
+  "simpleExt": {
+    "jiebaQueryAfterWarmMs": 0.41,
+    "pinyin": {
+      "full_pinyin": 1082,
+      "initials": 2219
+    }
+  },
+  "host": {
+    "sqliteVersion": "3.53.4",
+    "node": "v24.18.0"
+  }
+}

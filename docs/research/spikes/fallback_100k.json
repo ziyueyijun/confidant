@@ -1,0 +1,178 @@
+{
+  "tag": "100k",
+  "docs": 251,
+  "chars": 100085,
+  "origBytes": 288284,
+  "sizes": {
+    "plain": {
+      "bytes": 352256,
+      "ratio": 1.22
+    },
+    "trigram": {
+      "bytes": 1433600,
+      "ratio": 4.97
+    },
+    "perchar": {
+      "bytes": 778240,
+      "ratio": 2.7
+    }
+  },
+  "queries": [
+    {
+      "q": "识",
+      "gt": 28,
+      "like_plain": {
+        "ms": 0.224,
+        "hit": 28
+      },
+      "trigram_match": {
+        "unsupported": true
+      },
+      "trigram_like": {
+        "ms": 0.217,
+        "hit": 28
+      },
+      "perchar_match": {
+        "ms": 0.029,
+        "hit": 28
+      }
+    },
+    {
+      "q": "史",
+      "gt": 129,
+      "like_plain": {
+        "ms": 0.172,
+        "hit": 129
+      },
+      "trigram_match": {
+        "unsupported": true
+      },
+      "trigram_like": {
+        "ms": 0.176,
+        "hit": 129
+      },
+      "perchar_match": {
+        "ms": 0.03,
+        "hit": 129
+      }
+    },
+    {
+      "q": "克思",
+      "gt": 10,
+      "like_plain": {
+        "ms": 0.245,
+        "hit": 10
+      },
+      "trigram_match": {
+        "unsupported": true
+      },
+      "trigram_like": {
+        "ms": 0.243,
+        "hit": 10
+      },
+      "perchar_match": {
+        "ms": 0.032,
+        "hit": 10
+      }
+    },
+    {
+      "q": "共和",
+      "gt": 47,
+      "like_plain": {
+        "ms": 0.229,
+        "hit": 47
+      },
+      "trigram_match": {
+        "unsupported": true
+      },
+      "trigram_like": {
+        "ms": 0.229,
+        "hit": 47
+      },
+      "perchar_match": {
+        "ms": 0.083,
+        "hit": 47
+      }
+    },
+    {
+      "q": "大规模",
+      "gt": 26,
+      "like_plain": {
+        "ms": 0.218,
+        "hit": 26
+      },
+      "trigram_match": {
+        "ms": 0.028,
+        "hit": 26
+      },
+      "trigram_like": {
+        "ms": 0.236,
+        "hit": 26
+      },
+      "perchar_match": {
+        "ms": 0.035,
+        "hit": 26
+      }
+    },
+    {
+      "q": "知识管理",
+      "gt": 0,
+      "like_plain": {
+        "ms": 0.25,
+        "hit": 0
+      },
+      "trigram_match": {
+        "ms": 0.029,
+        "hit": 0
+      },
+      "trigram_like": {
+        "ms": 0.25,
+        "hit": 0
+      },
+      "perchar_match": {
+        "ms": 0.033,
+        "hit": 0
+      }
+    },
+    {
+      "q": "人工智能",
+      "gt": 2,
+      "like_plain": {
+        "ms": 0.249,
+        "hit": 2
+      },
+      "trigram_match": {
+        "ms": 0.037,
+        "hit": 2
+      },
+      "trigram_like": {
+        "ms": 0.246,
+        "hit": 2
+      },
+      "perchar_match": {
+        "ms": 0.083,
+        "hit": 2
+      }
+    },
+    {
+      "q": "量子纠缠笔记",
+      "gt": 0,
+      "like_plain": {
+        "ms": 0.227,
+        "hit": 0
+      },
+      "trigram_match": {
+        "ms": 0.027,
+        "hit": 0
+      },
+      "trigram_like": {
+        "ms": 0.24,
+        "hit": 0
+      },
+      "perchar_match": {
+        "ms": 0.032,
+        "hit": 0
+      }
+    }
+  ]
+}

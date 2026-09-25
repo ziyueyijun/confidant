@@ -1,0 +1,1706 @@
+{
+  "tag": "500k",
+  "docs": 1255,
+  "chars": 500117,
+  "sizeReport": {
+    "origBytes": 1415853,
+    "preseg": {
+      "bytes": 4848200,
+      "ratio": 3.42
+    },
+    "perchar": {
+      "bytes": 6110416,
+      "ratio": 4.32
+    },
+    "trigram": {
+      "bytes": 10252288,
+      "ratio": 7.24
+    },
+    "preseg_union_perchar": {
+      "bytes": 10958616,
+      "ratio": 7.74
+    },
+    "preseg_union_trigram": {
+      "bytes": 15100488,
+      "ratio": 10.67
+    }
+  },
+  "results": {
+    "char1": [
+      {
+        "q": "识",
+        "gt": 86,
+        "schemes": {
+          "preseg": {
+            "recall": 0.0116,
+            "precision": 1,
+            "hits": 1,
+            "gt": 86,
+            "missed": 85,
+            "extra": 0,
+            "ms": 0.049
+          },
+          "perchar": {
+            "recall": 1,
+            "precision": 1,
+            "hits": 86,
+            "gt": 86,
+            "missed": 0,
+            "extra": 0,
+            "ms": 0.105
+          },
+          "trigram": {
+            "unsupported": true,
+            "recall": 0,
+            "precision": 0,
+            "hits": 0,
+            "gt": 86
+          },
+          "preseg∪perchar": {
+            "recall": 1,
+            "precision": 1,
+            "hits": 86,
+            "gt": 86,
+            "missed": 0,
+            "extra": 0,
+            "ms": 0.092
+          },
+          "preseg∪trigram": {
+            "unsupported": true,
+            "recall": 0,
+            "precision": 0,
+            "hits": 0,
+            "gt": 86
+          }
+        }
+      },
+      {
+        "q": "史",
+        "gt": 460,
+        "schemes": {
+          "preseg": {
+            "recall": 0.3826,
+            "precision": 1,
+            "hits": 176,
+            "gt": 460,
+            "missed": 284,
+            "extra": 0,
+            "ms": 0.084
+          },
+          "perchar": {
+            "recall": 1,
+            "precision": 1,
+            "hits": 460,
+            "gt": 460,
+            "missed": 0,
+            "extra": 0,
+            "ms": 0.319
+          },
+          "trigram": {
+            "unsupported": true,
+            "recall": 0,
+            "precision": 0,
+            "hits": 0,
+            "gt": 460
+          },
+          "preseg∪perchar": {
+            "recall": 1,
+            "precision": 1,
+            "hits": 460,
+            "gt": 460,
+            "missed": 0,
+            "extra": 0,
+            "ms": 0.244
+          },
+          "preseg∪trigram": {
+            "unsupported": true,
+            "recall": 0,
+            "precision": 0,
+            "hits": 0,
+            "gt": 460
+          }
+        }
+      },
+      {
+        "q": "学",
+        "gt": 365,
+        "schemes": {
+          "preseg": {
+            "recall": 0.1863,
+            "precision": 1,
+            "hits": 68,
+            "gt": 365,
+            "missed": 297,
+            "extra": 0,
+            "ms": 0.05
+          },
+          "perchar": {
+            "recall": 1,
+            "precision": 1,
+            "hits": 365,
+            "gt": 365,
+            "missed": 0,
+            "extra": 0,
+            "ms": 0.133
+          },
+          "trigram": {
+            "unsupported": true,
+            "recall": 0,
+            "precision": 0,
+            "hits": 0,
+            "gt": 365
+          },
+          "preseg∪perchar": {
+            "recall": 1,
+            "precision": 1,
+            "hits": 365,
+            "gt": 365,
+            "missed": 0,
+            "extra": 0,
+            "ms": 0.141
+          },
+          "preseg∪trigram": {
+            "unsupported": true,
+            "recall": 0,
+            "precision": 0,
+            "hits": 0,
+            "gt": 365
+          }
+        }
+      },
+      {
+        "q": "国",
+        "gt": 956,
+        "schemes": {
+          "preseg": {
+            "recall": 0.2123,
+            "precision": 1,
+            "hits": 203,
+            "gt": 956,
+            "missed": 753,
+            "extra": 0,
+            "ms": 0.064
+          },
+          "perchar": {
+            "recall": 1,
+            "precision": 1,
+            "hits": 956,
+            "gt": 956,
+            "missed": 0,
+            "extra": 0,
+            "ms": 0.183
+          },
+          "trigram": {
+            "unsupported": true,
+            "recall": 0,
+            "precision": 0,
+            "hits": 0,
+            "gt": 956
+          },
+          "preseg∪perchar": {
+            "recall": 1,
+            "precision": 1,
+            "hits": 956,
+            "gt": 956,
+            "missed": 0,
+            "extra": 0,
+            "ms": 0.289
+          },
+          "preseg∪trigram": {
+            "unsupported": true,
+            "recall": 0,
+            "precision": 0,
+            "hits": 0,
+            "gt": 956
+          }
+        }
+      },
+      {
+        "q": "人",
+        "gt": 982,
+        "schemes": {
+          "preseg": {
+            "recall": 0.5662,
+            "precision": 1,
+            "hits": 556,
+            "gt": 982,
+            "missed": 426,
+            "extra": 0,
+            "ms": 0.158
+          },
+          "perchar": {
+            "recall": 1,
+            "precision": 1,
+            "hits": 982,
+            "gt": 982,
+            "missed": 0,
+            "extra": 0,
+            "ms": 0.249
+          },
+          "trigram": {
+            "unsupported": true,
+            "recall": 0,
+            "precision": 0,
+            "hits": 0,
+            "gt": 982
+          },
+          "preseg∪perchar": {
+            "recall": 1,
+            "precision": 1,
+            "hits": 982,
+            "gt": 982,
+            "missed": 0,
+            "extra": 0,
+            "ms": 0.468
+          },
+          "preseg∪trigram": {
+            "unsupported": true,
+            "recall": 0,
+            "precision": 0,
+            "hits": 0,
+            "gt": 982
+          }
+        }
+      }
+    ],
+    "word2": [
+      {
+        "q": "知识",
+        "gt": 36,
+        "schemes": {
+          "preseg": {
+            "recall": 1,
+            "precision": 1,
+            "hits": 36,
+            "gt": 36,
+            "missed": 0,
+            "extra": 0,
+            "ms": 0.052
+          },
+          "perchar": {
+            "recall": 1,
+            "precision": 1,
+            "hits": 36,
+            "gt": 36,
+            "missed": 0,
+            "extra": 0,
+            "ms": 0.048
+          },
+          "trigram": {
+            "unsupported": true,
+            "recall": 0,
+            "precision": 0,
+            "hits": 0,
+            "gt": 36
+          },
+          "preseg∪perchar": {
+            "recall": 1,
+            "precision": 1,
+            "hits": 36,
+            "gt": 36,
+            "missed": 0,
+            "extra": 0,
+            "ms": 0.113
+          },
+          "preseg∪trigram": {
+            "unsupported": true,
+            "recall": 0,
+            "precision": 0,
+            "hits": 0,
+            "gt": 36
+          }
+        }
+      },
+      {
+        "q": "历史",
+        "gt": 217,
+        "schemes": {
+          "preseg": {
+            "recall": 1,
+            "precision": 1,
+            "hits": 217,
+            "gt": 217,
+            "missed": 0,
+            "extra": 0,
+            "ms": 0.096
+          },
+          "perchar": {
+            "recall": 1,
+            "precision": 0.9954,
+            "hits": 218,
+            "gt": 217,
+            "missed": 0,
+            "extra": 1,
+            "ms": 0.121
+          },
+          "trigram": {
+            "unsupported": true,
+            "recall": 0,
+            "precision": 0,
+            "hits": 0,
+            "gt": 217
+          },
+          "preseg∪perchar": {
+            "recall": 1,
+            "precision": 0.9954,
+            "hits": 218,
+            "gt": 217,
+            "missed": 0,
+            "extra": 1,
+            "ms": 0.21
+          },
+          "preseg∪trigram": {
+            "unsupported": true,
+            "recall": 0,
+            "precision": 0,
+            "hits": 0,
+            "gt": 217
+          }
+        }
+      },
+      {
+        "q": "科学",
+        "gt": 73,
+        "schemes": {
+          "preseg": {
+            "recall": 0.7808,
+            "precision": 1,
+            "hits": 57,
+            "gt": 73,
+            "missed": 16,
+            "extra": 0,
+            "ms": 0.05
+          },
+          "perchar": {
+            "recall": 1,
+            "precision": 1,
+            "hits": 73,
+            "gt": 73,
+            "missed": 0,
+            "extra": 0,
+            "ms": 0.078
+          },
+          "trigram": {
+            "unsupported": true,
+            "recall": 0,
+            "precision": 0,
+            "hits": 0,
+            "gt": 73
+          },
+          "preseg∪perchar": {
+            "recall": 1,
+            "precision": 1,
+            "hits": 73,
+            "gt": 73,
+            "missed": 0,
+            "extra": 0,
+            "ms": 0.199
+          },
+          "preseg∪trigram": {
+            "unsupported": true,
+            "recall": 0,
+            "precision": 0,
+            "hits": 0,
+            "gt": 73
+          }
+        }
+      },
+      {
+        "q": "经济",
+        "gt": 259,
+        "schemes": {
+          "preseg": {
+            "recall": 0.9923,
+            "precision": 1,
+            "hits": 257,
+            "gt": 259,
+            "missed": 2,
+            "extra": 0,
+            "ms": 0.111
+          },
+          "perchar": {
+            "recall": 1,
+            "precision": 1,
+            "hits": 259,
+            "gt": 259,
+            "missed": 0,
+            "extra": 0,
+            "ms": 0.105
+          },
+          "trigram": {
+            "unsupported": true,
+            "recall": 0,
+            "precision": 0,
+            "hits": 0,
+            "gt": 259
+          },
+          "preseg∪perchar": {
+            "recall": 1,
+            "precision": 1,
+            "hits": 259,
+            "gt": 259,
+            "missed": 0,
+            "extra": 0,
+            "ms": 0.173
+          },
+          "preseg∪trigram": {
+            "unsupported": true,
+            "recall": 0,
+            "precision": 0,
+            "hits": 0,
+            "gt": 259
+          }
+        }
+      },
+      {
+        "q": "规模",
+        "gt": 133,
+        "schemes": {
+          "preseg": {
+            "recall": 0.3985,
+            "precision": 1,
+            "hits": 53,
+            "gt": 133,
+            "missed": 80,
+            "extra": 0,
+            "ms": 0.047
+          },
+          "perchar": {
+            "recall": 1,
+            "precision": 1,
+            "hits": 133,
+            "gt": 133,
+            "missed": 0,
+            "extra": 0,
+            "ms": 0.058
+          },
+          "trigram": {
+            "unsupported": true,
+            "recall": 0,
+            "precision": 0,
+            "hits": 0,
+            "gt": 133
+          },
+          "preseg∪perchar": {
+            "recall": 1,
+            "precision": 1,
+            "hits": 133,
+            "gt": 133,
+            "missed": 0,
+            "extra": 0,
+            "ms": 0.116
+          },
+          "preseg∪trigram": {
+            "unsupported": true,
+            "recall": 0,
+            "precision": 0,
+            "hits": 0,
+            "gt": 133
+          }
+        }
+      },
+      {
+        "q": "革命",
+        "gt": 200,
+        "schemes": {
+          "preseg": {
+            "recall": 0.56,
+            "precision": 1,
+            "hits": 112,
+            "gt": 200,
+            "missed": 88,
+            "extra": 0,
+            "ms": 0.062
+          },
+          "perchar": {
+            "recall": 1,
+            "precision": 1,
+            "hits": 200,
+            "gt": 200,
+            "missed": 0,
+            "extra": 0,
+            "ms": 0.098
+          },
+          "trigram": {
+            "unsupported": true,
+            "recall": 0,
+            "precision": 0,
+            "hits": 0,
+            "gt": 200
+          },
+          "preseg∪perchar": {
+            "recall": 1,
+            "precision": 1,
+            "hits": 200,
+            "gt": 200,
+            "missed": 0,
+            "extra": 0,
+            "ms": 0.165
+          },
+          "preseg∪trigram": {
+            "unsupported": true,
+            "recall": 0,
+            "precision": 0,
+            "hits": 0,
+            "gt": 200
+          }
+        }
+      }
+    ],
+    "word4": [
+      {
+        "q": "人工智能",
+        "gt": 6,
+        "schemes": {
+          "preseg": {
+            "recall": 1,
+            "precision": 1,
+            "hits": 6,
+            "gt": 6,
+            "missed": 0,
+            "extra": 0,
+            "ms": 0.047
+          },
+          "perchar": {
+            "recall": 1,
+            "precision": 1,
+            "hits": 6,
+            "gt": 6,
+            "missed": 0,
+            "extra": 0,
+            "ms": 0.056
+          },
+          "trigram": {
+            "recall": 1,
+            "precision": 1,
+            "hits": 6,
+            "gt": 6,
+            "missed": 0,
+            "extra": 0,
+            "ms": 0.037
+          },
+          "preseg∪perchar": {
+            "recall": 1,
+            "precision": 1,
+            "hits": 6,
+            "gt": 6,
+            "missed": 0,
+            "extra": 0,
+            "ms": 0.113
+          },
+          "preseg∪trigram": {
+            "recall": 1,
+            "precision": 1,
+            "hits": 6,
+            "gt": 6,
+            "missed": 0,
+            "extra": 0,
+            "ms": 0.064
+          }
+        }
+      },
+      {
+        "q": "世界大战",
+        "gt": 6,
+        "schemes": {
+          "preseg": {
+            "recall": 1,
+            "precision": 1,
+            "hits": 6,
+            "gt": 6,
+            "missed": 0,
+            "extra": 0,
+            "ms": 0.057
+          },
+          "perchar": {
+            "recall": 1,
+            "precision": 1,
+            "hits": 6,
+            "gt": 6,
+            "missed": 0,
+            "extra": 0,
+            "ms": 0.064
+          },
+          "trigram": {
+            "recall": 1,
+            "precision": 1,
+            "hits": 6,
+            "gt": 6,
+            "missed": 0,
+            "extra": 0,
+            "ms": 0.025
+          },
+          "preseg∪perchar": {
+            "recall": 1,
+            "precision": 1,
+            "hits": 6,
+            "gt": 6,
+            "missed": 0,
+            "extra": 0,
+            "ms": 0.102
+          },
+          "preseg∪trigram": {
+            "recall": 1,
+            "precision": 1,
+            "hits": 6,
+            "gt": 6,
+            "missed": 0,
+            "extra": 0,
+            "ms": 0.062
+          }
+        }
+      },
+      {
+        "q": "中华人民共和国",
+        "gt": 154,
+        "schemes": {
+          "preseg": {
+            "recall": 1,
+            "precision": 0.9935,
+            "hits": 155,
+            "gt": 154,
+            "missed": 0,
+            "extra": 1,
+            "ms": 0.077
+          },
+          "perchar": {
+            "recall": 1,
+            "precision": 1,
+            "hits": 154,
+            "gt": 154,
+            "missed": 0,
+            "extra": 0,
+            "ms": 0.217
+          },
+          "trigram": {
+            "recall": 1,
+            "precision": 1,
+            "hits": 154,
+            "gt": 154,
+            "missed": 0,
+            "extra": 0,
+            "ms": 0.117
+          },
+          "preseg∪perchar": {
+            "recall": 1,
+            "precision": 0.9935,
+            "hits": 155,
+            "gt": 154,
+            "missed": 0,
+            "extra": 1,
+            "ms": 0.365
+          },
+          "preseg∪trigram": {
+            "recall": 1,
+            "precision": 0.9935,
+            "hits": 155,
+            "gt": 154,
+            "missed": 0,
+            "extra": 1,
+            "ms": 0.236
+          }
+        }
+      },
+      {
+        "q": "中国人民银行",
+        "gt": 4,
+        "schemes": {
+          "preseg": {
+            "recall": 1,
+            "precision": 0.2667,
+            "hits": 15,
+            "gt": 4,
+            "missed": 0,
+            "extra": 11,
+            "ms": 0.065
+          },
+          "perchar": {
+            "recall": 1,
+            "precision": 1,
+            "hits": 4,
+            "gt": 4,
+            "missed": 0,
+            "extra": 0,
+            "ms": 0.109
+          },
+          "trigram": {
+            "recall": 1,
+            "precision": 1,
+            "hits": 4,
+            "gt": 4,
+            "missed": 0,
+            "extra": 0,
+            "ms": 0.035
+          },
+          "preseg∪perchar": {
+            "recall": 1,
+            "precision": 0.2667,
+            "hits": 15,
+            "gt": 4,
+            "missed": 0,
+            "extra": 11,
+            "ms": 0.18
+          },
+          "preseg∪trigram": {
+            "recall": 1,
+            "precision": 0.2667,
+            "hits": 15,
+            "gt": 4,
+            "missed": 0,
+            "extra": 11,
+            "ms": 0.097
+          }
+        }
+      }
+    ],
+    "cross": [
+      {
+        "q": "克思",
+        "gt": 46,
+        "schemes": {
+          "preseg": {
+            "recall": 0.0217,
+            "precision": 0.25,
+            "hits": 4,
+            "gt": 46,
+            "missed": 45,
+            "extra": 3,
+            "ms": 0.046
+          },
+          "perchar": {
+            "recall": 1,
+            "precision": 1,
+            "hits": 46,
+            "gt": 46,
+            "missed": 0,
+            "extra": 0,
+            "ms": 0.054
+          },
+          "trigram": {
+            "unsupported": true,
+            "recall": 0,
+            "precision": 0,
+            "hits": 0,
+            "gt": 46
+          },
+          "preseg∪perchar": {
+            "recall": 1,
+            "precision": 0.9388,
+            "hits": 49,
+            "gt": 46,
+            "missed": 0,
+            "extra": 3,
+            "ms": 0.11
+          },
+          "preseg∪trigram": {
+            "unsupported": true,
+            "recall": 0,
+            "precision": 0,
+            "hits": 0,
+            "gt": 46
+          }
+        }
+      },
+      {
+        "q": "共和",
+        "gt": 196,
+        "schemes": {
+          "preseg": {
+            "recall": 0.0561,
+            "precision": 1,
+            "hits": 11,
+            "gt": 196,
+            "missed": 185,
+            "extra": 0,
+            "ms": 0.036
+          },
+          "perchar": {
+            "recall": 1,
+            "precision": 1,
+            "hits": 196,
+            "gt": 196,
+            "missed": 0,
+            "extra": 0,
+            "ms": 0.14
+          },
+          "trigram": {
+            "unsupported": true,
+            "recall": 0,
+            "precision": 0,
+            "hits": 0,
+            "gt": 196
+          },
+          "preseg∪perchar": {
+            "recall": 1,
+            "precision": 1,
+            "hits": 196,
+            "gt": 196,
+            "missed": 0,
+            "extra": 0,
+            "ms": 0.184
+          },
+          "preseg∪trigram": {
+            "unsupported": true,
+            "recall": 0,
+            "precision": 0,
+            "hits": 0,
+            "gt": 196
+          }
+        }
+      },
+      {
+        "q": "第一",
+        "gt": 263,
+        "schemes": {
+          "preseg": {
+            "recall": 0.4867,
+            "precision": 1,
+            "hits": 128,
+            "gt": 263,
+            "missed": 135,
+            "extra": 0,
+            "ms": 0.064
+          },
+          "perchar": {
+            "recall": 1,
+            "precision": 1,
+            "hits": 263,
+            "gt": 263,
+            "missed": 0,
+            "extra": 0,
+            "ms": 0.149
+          },
+          "trigram": {
+            "unsupported": true,
+            "recall": 0,
+            "precision": 0,
+            "hits": 0,
+            "gt": 263
+          },
+          "preseg∪perchar": {
+            "recall": 1,
+            "precision": 1,
+            "hits": 263,
+            "gt": 263,
+            "missed": 0,
+            "extra": 0,
+            "ms": 0.25
+          },
+          "preseg∪trigram": {
+            "unsupported": true,
+            "recall": 0,
+            "precision": 0,
+            "hits": 0,
+            "gt": 263
+          }
+        }
+      },
+      {
+        "q": "部分",
+        "gt": 238,
+        "schemes": {
+          "preseg": {
+            "recall": 0.7395,
+            "precision": 1,
+            "hits": 176,
+            "gt": 238,
+            "missed": 62,
+            "extra": 0,
+            "ms": 0.073
+          },
+          "perchar": {
+            "recall": 1,
+            "precision": 1,
+            "hits": 238,
+            "gt": 238,
+            "missed": 0,
+            "extra": 0,
+            "ms": 0.134
+          },
+          "trigram": {
+            "unsupported": true,
+            "recall": 0,
+            "precision": 0,
+            "hits": 0,
+            "gt": 238
+          },
+          "preseg∪perchar": {
+            "recall": 1,
+            "precision": 1,
+            "hits": 238,
+            "gt": 238,
+            "missed": 0,
+            "extra": 0,
+            "ms": 0.193
+          },
+          "preseg∪trigram": {
+            "unsupported": true,
+            "recall": 0,
+            "precision": 0,
+            "hits": 0,
+            "gt": 238
+          }
+        }
+      },
+      {
+        "q": "中共",
+        "gt": 228,
+        "schemes": {
+          "preseg": {
+            "recall": 0.6009,
+            "precision": 1,
+            "hits": 137,
+            "gt": 228,
+            "missed": 91,
+            "extra": 0,
+            "ms": 0.054
+          },
+          "perchar": {
+            "recall": 1,
+            "precision": 0.9956,
+            "hits": 229,
+            "gt": 228,
+            "missed": 0,
+            "extra": 1,
+            "ms": 0.141
+          },
+          "trigram": {
+            "unsupported": true,
+            "recall": 0,
+            "precision": 0,
+            "hits": 0,
+            "gt": 228
+          },
+          "preseg∪perchar": {
+            "recall": 1,
+            "precision": 0.9956,
+            "hits": 229,
+            "gt": 228,
+            "missed": 0,
+            "extra": 1,
+            "ms": 0.224
+          },
+          "preseg∪trigram": {
+            "unsupported": true,
+            "recall": 0,
+            "precision": 0,
+            "hits": 0,
+            "gt": 228
+          }
+        }
+      },
+      {
+        "q": "人民共和",
+        "gt": 177,
+        "schemes": {
+          "preseg": {
+            "recall": 0.0056,
+            "precision": 0.5,
+            "hits": 2,
+            "gt": 177,
+            "missed": 176,
+            "extra": 1,
+            "ms": 0.041
+          },
+          "perchar": {
+            "recall": 1,
+            "precision": 1,
+            "hits": 177,
+            "gt": 177,
+            "missed": 0,
+            "extra": 0,
+            "ms": 0.165
+          },
+          "trigram": {
+            "recall": 1,
+            "precision": 1,
+            "hits": 177,
+            "gt": 177,
+            "missed": 0,
+            "extra": 0,
+            "ms": 0.084
+          },
+          "preseg∪perchar": {
+            "recall": 1,
+            "precision": 0.9944,
+            "hits": 178,
+            "gt": 177,
+            "missed": 0,
+            "extra": 1,
+            "ms": 0.225
+          },
+          "preseg∪trigram": {
+            "recall": 1,
+            "precision": 0.9944,
+            "hits": 178,
+            "gt": 177,
+            "missed": 0,
+            "extra": 1,
+            "ms": 0.133
+          }
+        }
+      }
+    ],
+    "phrase": [
+      {
+        "q": "中国历史",
+        "gt": 27,
+        "schemes": {
+          "preseg": {
+            "recall": 1,
+            "precision": 0.2177,
+            "hits": 124,
+            "gt": 27,
+            "missed": 0,
+            "extra": 97,
+            "ms": 0.068
+          },
+          "perchar": {
+            "recall": 1,
+            "precision": 1,
+            "hits": 27,
+            "gt": 27,
+            "missed": 0,
+            "extra": 0,
+            "ms": 0.088
+          },
+          "trigram": {
+            "recall": 1,
+            "precision": 1,
+            "hits": 27,
+            "gt": 27,
+            "missed": 0,
+            "extra": 0,
+            "ms": 0.029
+          },
+          "preseg∪perchar": {
+            "recall": 1,
+            "precision": 0.2177,
+            "hits": 124,
+            "gt": 27,
+            "missed": 0,
+            "extra": 97,
+            "ms": 0.158
+          },
+          "preseg∪trigram": {
+            "recall": 1,
+            "precision": 0.2177,
+            "hits": 124,
+            "gt": 27,
+            "missed": 0,
+            "extra": 97,
+            "ms": 0.101
+          }
+        }
+      },
+      {
+        "q": "大规模",
+        "gt": 86,
+        "schemes": {
+          "preseg": {
+            "recall": 0.9767,
+            "precision": 1,
+            "hits": 84,
+            "gt": 86,
+            "missed": 2,
+            "extra": 0,
+            "ms": 0.056
+          },
+          "perchar": {
+            "recall": 1,
+            "precision": 1,
+            "hits": 86,
+            "gt": 86,
+            "missed": 0,
+            "extra": 0,
+            "ms": 0.074
+          },
+          "trigram": {
+            "recall": 1,
+            "precision": 1,
+            "hits": 86,
+            "gt": 86,
+            "missed": 0,
+            "extra": 0,
+            "ms": 0.041
+          },
+          "preseg∪perchar": {
+            "recall": 1,
+            "precision": 1,
+            "hits": 86,
+            "gt": 86,
+            "missed": 0,
+            "extra": 0,
+            "ms": 0.141
+          },
+          "preseg∪trigram": {
+            "recall": 1,
+            "precision": 1,
+            "hits": 86,
+            "gt": 86,
+            "missed": 0,
+            "extra": 0,
+            "ms": 0.11
+          }
+        }
+      },
+      {
+        "q": "知识管理",
+        "gt": 0,
+        "schemes": {
+          "preseg": {
+            "recall": 1,
+            "precision": 0,
+            "hits": 2,
+            "gt": 0,
+            "missed": 0,
+            "extra": 2,
+            "ms": 0.076
+          },
+          "perchar": {
+            "recall": 1,
+            "precision": 1,
+            "hits": 0,
+            "gt": 0,
+            "missed": 0,
+            "extra": 0,
+            "ms": 0.054
+          },
+          "trigram": {
+            "recall": 1,
+            "precision": 1,
+            "hits": 0,
+            "gt": 0,
+            "missed": 0,
+            "extra": 0,
+            "ms": 0.025
+          },
+          "preseg∪perchar": {
+            "recall": 1,
+            "precision": 0,
+            "hits": 2,
+            "gt": 0,
+            "missed": 0,
+            "extra": 2,
+            "ms": 0.087
+          },
+          "preseg∪trigram": {
+            "recall": 1,
+            "precision": 0,
+            "hits": 2,
+            "gt": 0,
+            "missed": 0,
+            "extra": 2,
+            "ms": 0.061
+          }
+        }
+      }
+    ],
+    "oov": [
+      {
+        "q": "知识管理",
+        "gt": 0,
+        "schemes": {
+          "preseg": {
+            "recall": 1,
+            "precision": 0,
+            "hits": 2,
+            "gt": 0,
+            "missed": 0,
+            "extra": 2,
+            "ms": 0.034
+          },
+          "perchar": {
+            "recall": 1,
+            "precision": 1,
+            "hits": 0,
+            "gt": 0,
+            "missed": 0,
+            "extra": 0,
+            "ms": 0.041
+          },
+          "trigram": {
+            "recall": 1,
+            "precision": 1,
+            "hits": 0,
+            "gt": 0,
+            "missed": 0,
+            "extra": 0,
+            "ms": 0.015
+          },
+          "preseg∪perchar": {
+            "recall": 1,
+            "precision": 0,
+            "hits": 2,
+            "gt": 0,
+            "missed": 0,
+            "extra": 2,
+            "ms": 0.064
+          },
+          "preseg∪trigram": {
+            "recall": 1,
+            "precision": 0,
+            "hits": 2,
+            "gt": 0,
+            "missed": 0,
+            "extra": 2,
+            "ms": 0.05
+          }
+        }
+      },
+      {
+        "q": "量子纠缠笔记",
+        "gt": 0,
+        "schemes": {
+          "preseg": {
+            "recall": 1,
+            "precision": 1,
+            "hits": 0,
+            "gt": 0,
+            "missed": 0,
+            "extra": 0,
+            "ms": 0.029
+          },
+          "perchar": {
+            "recall": 1,
+            "precision": 1,
+            "hits": 0,
+            "gt": 0,
+            "missed": 0,
+            "extra": 0,
+            "ms": 0.031
+          },
+          "trigram": {
+            "recall": 1,
+            "precision": 1,
+            "hits": 0,
+            "gt": 0,
+            "missed": 0,
+            "extra": 0,
+            "ms": 0.018
+          },
+          "preseg∪perchar": {
+            "recall": 1,
+            "precision": 1,
+            "hits": 0,
+            "gt": 0,
+            "missed": 0,
+            "extra": 0,
+            "ms": 0.066
+          },
+          "preseg∪trigram": {
+            "recall": 1,
+            "precision": 1,
+            "hits": 0,
+            "gt": 0,
+            "missed": 0,
+            "extra": 0,
+            "ms": 0.043
+          }
+        }
+      }
+    ],
+    "multiterm": [
+      {
+        "q": "中国 历史",
+        "gt": 125,
+        "schemes": {
+          "preseg": {
+            "recall": 0.992,
+            "precision": 1,
+            "hits": 124,
+            "gt": 125,
+            "missed": 1,
+            "extra": 0,
+            "ms": 0.069
+          },
+          "perchar": {
+            "recall": 1,
+            "precision": 0.9921,
+            "hits": 126,
+            "gt": 125,
+            "missed": 0,
+            "extra": 1,
+            "ms": 0.176
+          },
+          "trigram": {
+            "unsupported": true,
+            "recall": 0,
+            "precision": 0,
+            "hits": 0,
+            "gt": 125
+          },
+          "preseg∪perchar": {
+            "recall": 1,
+            "precision": 0.9921,
+            "hits": 126,
+            "gt": 125,
+            "missed": 0,
+            "extra": 1,
+            "ms": 0.212
+          },
+          "preseg∪trigram": {
+            "unsupported": true,
+            "recall": 0,
+            "precision": 0,
+            "hits": 0,
+            "gt": 125
+          }
+        }
+      },
+      {
+        "q": "经济 政策",
+        "gt": 47,
+        "schemes": {
+          "preseg": {
+            "recall": 1,
+            "precision": 1,
+            "hits": 47,
+            "gt": 47,
+            "missed": 0,
+            "extra": 0,
+            "ms": 0.124
+          },
+          "perchar": {
+            "recall": 1,
+            "precision": 1,
+            "hits": 47,
+            "gt": 47,
+            "missed": 0,
+            "extra": 0,
+            "ms": 0.174
+          },
+          "trigram": {
+            "unsupported": true,
+            "recall": 0,
+            "precision": 0,
+            "hits": 0,
+            "gt": 47
+          },
+          "preseg∪perchar": {
+            "recall": 1,
+            "precision": 1,
+            "hits": 47,
+            "gt": 47,
+            "missed": 0,
+            "extra": 0,
+            "ms": 0.286
+          },
+          "preseg∪trigram": {
+            "unsupported": true,
+            "recall": 0,
+            "precision": 0,
+            "hits": 0,
+            "gt": 47
+          }
+        }
+      },
+      {
+        "q": "人工智能 发展",
+        "gt": 4,
+        "schemes": {
+          "preseg": {
+            "recall": 1,
+            "precision": 1,
+            "hits": 4,
+            "gt": 4,
+            "missed": 0,
+            "extra": 0,
+            "ms": 0.047
+          },
+          "perchar": {
+            "recall": 1,
+            "precision": 1,
+            "hits": 4,
+            "gt": 4,
+            "missed": 0,
+            "extra": 0,
+            "ms": 0.068
+          },
+          "trigram": {
+            "unsupported": true,
+            "recall": 0,
+            "precision": 0,
+            "hits": 0,
+            "gt": 4
+          },
+          "preseg∪perchar": {
+            "recall": 1,
+            "precision": 1,
+            "hits": 4,
+            "gt": 4,
+            "missed": 0,
+            "extra": 0,
+            "ms": 0.104
+          },
+          "preseg∪trigram": {
+            "unsupported": true,
+            "recall": 0,
+            "precision": 0,
+            "hits": 0,
+            "gt": 4
+          }
+        }
+      },
+      {
+        "q": "北京 大学",
+        "gt": 33,
+        "schemes": {
+          "preseg": {
+            "recall": 0.5758,
+            "precision": 1,
+            "hits": 19,
+            "gt": 33,
+            "missed": 14,
+            "extra": 0,
+            "ms": 0.044
+          },
+          "perchar": {
+            "recall": 1,
+            "precision": 1,
+            "hits": 33,
+            "gt": 33,
+            "missed": 0,
+            "extra": 0,
+            "ms": 0.101
+          },
+          "trigram": {
+            "unsupported": true,
+            "recall": 0,
+            "precision": 0,
+            "hits": 0,
+            "gt": 33
+          },
+          "preseg∪perchar": {
+            "recall": 1,
+            "precision": 1,
+            "hits": 33,
+            "gt": 33,
+            "missed": 0,
+            "extra": 0,
+            "ms": 0.156
+          },
+          "preseg∪trigram": {
+            "unsupported": true,
+            "recall": 0,
+            "precision": 0,
+            "hits": 0,
+            "gt": 33
+          }
+        }
+      }
+    ]
+  },
+  "agg": {
+    "char1": {
+      "n": 5,
+      "schemes": {
+        "preseg": {
+          "recall": 0.2718,
+          "precision": 1,
+          "unsupported": 0
+        },
+        "perchar": {
+          "recall": 1,
+          "precision": 1,
+          "unsupported": 0
+        },
+        "trigram": {
+          "recall": 0,
+          "precision": 0,
+          "unsupported": 5
+        },
+        "preseg∪perchar": {
+          "recall": 1,
+          "precision": 1,
+          "unsupported": 0
+        },
+        "preseg∪trigram": {
+          "recall": 0,
+          "precision": 0,
+          "unsupported": 5
+        }
+      }
+    },
+    "word2": {
+      "n": 6,
+      "schemes": {
+        "preseg": {
+          "recall": 0.7886,
+          "precision": 1,
+          "unsupported": 0
+        },
+        "perchar": {
+          "recall": 1,
+          "precision": 0.9992,
+          "unsupported": 0
+        },
+        "trigram": {
+          "recall": 0,
+          "precision": 0,
+          "unsupported": 6
+        },
+        "preseg∪perchar": {
+          "recall": 1,
+          "precision": 0.9992,
+          "unsupported": 0
+        },
+        "preseg∪trigram": {
+          "recall": 0,
+          "precision": 0,
+          "unsupported": 6
+        }
+      }
+    },
+    "word4": {
+      "n": 4,
+      "schemes": {
+        "preseg": {
+          "recall": 1,
+          "precision": 0.8151,
+          "unsupported": 0
+        },
+        "perchar": {
+          "recall": 1,
+          "precision": 1,
+          "unsupported": 0
+        },
+        "trigram": {
+          "recall": 1,
+          "precision": 1,
+          "unsupported": 0
+        },
+        "preseg∪perchar": {
+          "recall": 1,
+          "precision": 0.8151,
+          "unsupported": 0
+        },
+        "preseg∪trigram": {
+          "recall": 1,
+          "precision": 0.8151,
+          "unsupported": 0
+        }
+      }
+    },
+    "cross": {
+      "n": 6,
+      "schemes": {
+        "preseg": {
+          "recall": 0.3184,
+          "precision": 0.7917,
+          "unsupported": 0
+        },
+        "perchar": {
+          "recall": 1,
+          "precision": 0.9993,
+          "unsupported": 0
+        },
+        "trigram": {
+          "recall": 0.1667,
+          "precision": 0.1667,
+          "unsupported": 5
+        },
+        "preseg∪perchar": {
+          "recall": 1,
+          "precision": 0.9881,
+          "unsupported": 0
+        },
+        "preseg∪trigram": {
+          "recall": 0.1667,
+          "precision": 0.1657,
+          "unsupported": 5
+        }
+      }
+    },
+    "phrase": {
+      "n": 3,
+      "schemes": {
+        "preseg": {
+          "recall": 0.9922,
+          "precision": 0.4059,
+          "unsupported": 0
+        },
+        "perchar": {
+          "recall": 1,
+          "precision": 1,
+          "unsupported": 0
+        },
+        "trigram": {
+          "recall": 1,
+          "precision": 1,
+          "unsupported": 0
+        },
+        "preseg∪perchar": {
+          "recall": 1,
+          "precision": 0.4059,
+          "unsupported": 0
+        },
+        "preseg∪trigram": {
+          "recall": 1,
+          "precision": 0.4059,
+          "unsupported": 0
+        }
+      }
+    },
+    "oov": {
+      "n": 2,
+      "schemes": {
+        "preseg": {
+          "recall": 1,
+          "precision": 0.5,
+          "unsupported": 0
+        },
+        "perchar": {
+          "recall": 1,
+          "precision": 1,
+          "unsupported": 0
+        },
+        "trigram": {
+          "recall": 1,
+          "precision": 1,
+          "unsupported": 0
+        },
+        "preseg∪perchar": {
+          "recall": 1,
+          "precision": 0.5,
+          "unsupported": 0
+        },
+        "preseg∪trigram": {
+          "recall": 1,
+          "precision": 0.5,
+          "unsupported": 0
+        }
+      }
+    },
+    "multiterm": {
+      "n": 4,
+      "schemes": {
+        "preseg": {
+          "recall": 0.892,
+          "precision": 1,
+          "unsupported": 0
+        },
+        "perchar": {
+          "recall": 1,
+          "precision": 0.998,
+          "unsupported": 0
+        },
+        "trigram": {
+          "recall": 0,
+          "precision": 0,
+          "unsupported": 4
+        },
+        "preseg∪perchar": {
+          "recall": 1,
+          "precision": 0.998,
+          "unsupported": 0
+        },
+        "preseg∪trigram": {
+          "recall": 0,
+          "precision": 0,
+          "unsupported": 4
+        }
+      }
+    }
+  }
+}

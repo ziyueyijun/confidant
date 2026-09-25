@@ -1,0 +1,67 @@
+{
+  "segmenter": {
+    "chars": 1002730,
+    "segments": 650181,
+    "ms": 292.4,
+    "kCharsPerSec": 3429.5
+  },
+  "contentlessDelete": {
+    "origBytes": 2830574,
+    "preseg": {
+      "bytes": 2453504,
+      "ratio": 0.87
+    },
+    "perchar": {
+      "bytes": 2285568,
+      "ratio": 0.81
+    },
+    "rebuildCmd": "ERR: 'rebuild' may not be used with a contentless fts5 table",
+    "matchWorks": 417
+  },
+  "mixed": {
+    "indexed": [
+      "人 工 智 能 Artificial Intelligence 正 在 改 变 世 界",
+      "机 器 学 习 machine learning 是 AI 的 子 领 域",
+      "OpenAI 发 布 了 GPT 模 型"
+    ],
+    "queries": {
+      "Artificial": 1,
+      "machine": 1,
+      "Intelligence": 1,
+      "GPT": 1,
+      "子领域": 1,
+      "机器学习": 1
+    }
+  },
+  "mismatchSamples": [
+    {
+      "sub": "模夺权",
+      "ftsSize": 3,
+      "truthSize": 2
+    },
+    {
+      "sub": "在政治",
+      "ftsSize": 23,
+      "truthSize": 22
+    },
+    {
+      "sub": "总书记胡",
+      "ftsSize": 5,
+      "truthSize": 4
+    },
+    {
+      "sub": "年蒙",
+      "ftsSize": 17,
+      "truthSize": 9
+    },
+    {
+      "sub": "合派",
+      "ftsSize": 8,
+      "truthSize": 7
+    }
+  ],
+  "percharExactness": {
+    "checked": 162,
+    "mismatch": 12
+  }
+}

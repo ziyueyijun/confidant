@@ -1,0 +1,50 @@
+# 依赖
+node_modules/
+
+# 构建产物
+dist/
+out/
+build/Release/
+*.tsbuildinfo
+
+# Vite 依赖预打包缓存（可自动重建）
+.vite/
+
+# 应用打包产物
+release/
+*.exe
+*.msi
+*.blockmap
+
+# 日志与临时文件
+*.log
+npm-debug.log*
+.tmp/
+*.tmp
+
+# 编辑器与系统
+.vscode/*
+!.vscode/extensions.json
+.idea/
+Thumbs.db
+desktop.ini
+$RECYCLE.BIN/
+
+# 环境变量（可能含密钥）
+.env
+.env.local
+.env.*.local
+
+# 测试与实验产物
+coverage/
+*.lcov
+
+# 调研用的语料与依赖（体积大、含第三方版权内容；脚本保留以便重抓）
+docs/research/spikes/*.jsonl
+docs/research/spikes/node_modules/
+
+# 第三方技能包（可重建，不属本项目内容）
+# .agents/skills/ 是 40 个第三方 skill（来源与哈希记录在 skills-lock.json，可据此重装）
+# .claude/skills/ 全是符号链接，且链接的绝对路径含本机用户名
+.agents/
+.claude/
