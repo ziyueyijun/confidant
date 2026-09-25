@@ -484,6 +484,27 @@ function blockDecorations(state: EditorState, o: PreviewOptions): Range<Decorati
         }
         case 'ListItem': {
           if (!showSyntax) {
+            // 任务列表先判：`- [ ]` / `- [x]`。
+            // **任务项不该同时画项目符号**——`- ` 和 `[ ]` 一起被勾选框替换掉，
+            // 否则会看到 `•□ 文字` 两个标记叠着。
+            const task = /^(\s*)([-*+])(\s+)\[([ xX])\]\s+/.exec(line.text)
+            if (task) {
+              const start = line.from + task[1].length
+              const end = start + task[2].length + task[3].length + 3 + 1
+              // 要改的是方括号**中间**那个字符（空格 / x），不是 `[` 本身——
+              // 所以是 `[` 的位置再 +1。少了这个 +1 会读到 "["，
+              // 于是点击静默失败（char 既不是空格也不是 x）。
+              const bracketPos =
+                line.from + task[1].length + task[2].length + task[3].length + 1
+              out.push(
+                Decoration.replace({
+                  widget: new CheckboxWidget(task[4] !== ' ', bracketPos),
+                  inclusive: false,
+                }).range(start, end),
+              )
+              break
+            }
+
             const m = /^(\s*)([-*+]|\d+\.)(\s+)/.exec(line.text)
             if (m) {
               const start = line.from + m[1].length
@@ -492,17 +513,6 @@ function blockDecorations(state: EditorState, o: PreviewOptions): Range<Decorati
                   widget: new BulletWidget(m[2]),
                   inclusive: false,
                 }).range(start, start + m[2].length + m[3].length),
-              )
-            }
-            // 任务列表：`- [ ]` / `- [x]` 的方括号换成真正的勾选框
-            const task = /^(\s*)([-*+])(\s+)\[([ xX])\]\s+/.exec(line.text)
-            if (task) {
-              const boxStart = line.from + task[1].length + task[2].length + task[3].length
-              out.push(
-                Decoration.replace({
-                  widget: new CheckboxWidget(task[4] !== ' '),
-                  inclusive: false,
-                }).range(boxStart, boxStart + 3),
               )
             }
           }
@@ -577,22 +587,59 @@ class BulletWidget extends WidgetType {
 /**
  * 任务列表的勾选框。
  *
- * 原型里**点得动**（只是切换自己的勾选状态，不改 markdown）——
- * 真机上点它要改文档里的 `[ ]` / `[x]`，但那属于「写回」，
- * 不是这次要验证的东西。这里只验证它长得对不对、占位对不对。
+ * **点得动**——点击把文档里的 `[ ]` 改成 `[x]`（或反过来）。
+ * 这是「文件是唯一真相」的直接体现：勾选状态不活在应用里，
+ * 它就是文件里的那一个字符。
+ *
+ * `bracketPos` 是 `[ ]` 里那个**空格/x 字符**在文档中的位置
+ * （方括号本身不动，只换中间那一个字符）。
  */
 class CheckboxWidget extends WidgetType {
-  constructor(readonly checked: boolean) { super() }
-  eq(other: CheckboxWidget) { return other.checked === this.checked }
+  constructor(
+    readonly checked: boolean,
+    readonly bracketPos: number,
+  ) {
+    super()
+  }
+
+  eq(other: CheckboxWidget) {
+    return other.checked === this.checked && other.bracketPos === this.bracketPos
+  }
+
   toDOM() {
     const box = document.createElement('span')
     box.className = `cm-md-checkbox${this.checked ? ' is-checked' : ''}`
     box.setAttribute('role', 'checkbox')
     box.setAttribute('aria-checked', String(this.checked))
+    box.setAttribute('title', this.checked ? '点击取消勾选' : '点击勾选')
     box.textContent = this.checked ? '✓' : ''
+
+    box.addEventListener('mousedown', (e) => {
+      // 阻止 CodeMirror 把这次点击当成「把光标放到 widget 处」
+      e.preventDefault()
+      e.stopPropagation()
+    })
+    box.addEventListener('click', (e) => {
+      e.preventDefault()
+      e.stopPropagation()
+      const view = getCurrentView()
+      if (!view) return
+      // 只换方括号中间那一个字符，括号与其余内容原样不动
+      const ch = view.state.doc.sliceString(this.bracketPos, this.bracketPos + 1)
+      if (ch !== ' ' && ch !== 'x' && ch !== 'X') return
+      const next = ch === ' ' ? 'x' : ' '
+      view.dispatch({
+        changes: { from: this.bracketPos, to: this.bracketPos + 1, insert: next },
+      })
+    })
+
     return box
   }
-  ignoreEvent() { return true }
+
+  ignoreEvent() {
+    // 交给自己的 click 处理器；不让 CodeMirror 插手
+    return true
+  }
 }
 
 /** 分割线：一条横线，替换掉 `---` 那一行。 */

@@ -82,13 +82,19 @@ span.cm-md-checkbox {
   justify-content: center;
   width: 0.95em;
   height: 0.95em;
-  margin-right: 0.25em;
+  /* 它同时承担了项目符号的位置，所以左右都要有间距 */
+  margin-right: 0.4em;
   border: 1.5px solid #94a3b8;
   border-radius: 3px;
   font-size: 0.75em;
   line-height: 1;
   color: #fff;
   vertical-align: -0.08em;
+  cursor: pointer;
+  transition: background 0.12s, border-color 0.12s;
+}
+span.cm-md-checkbox:hover {
+  border-color: #2563eb;
 }
 span.cm-md-checkbox.is-checked {
   background: #2563eb;
