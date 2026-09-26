@@ -34,8 +34,6 @@ export interface SyncStatus {
   phase: SyncPhase
   /** 是否已填好 WebDAV 信息 */
   configured: boolean
-  /** 用户是否勾选了「自动同步」 */
-  autoSync: boolean
   /**
    * **本次会话**是否真的同步过。
    *
@@ -198,7 +196,7 @@ export const 场景: Scenario[] = [
   {
     key: 'failed',
     label: '同步失败',
-    note: '开了自动同步时，失败必须可见——「悄悄失败」不可接受',
+    note: '同步失败必须可见——「悄悄失败」不可接受',
   },
   { key: 'first', label: '首次同步', note: '两边都有内容且不同——绝不自动合并，停下来问用户' },
   { key: 'conflicts', label: '有冲突', note: '需要用户处理的待办——它必须自己冒出来' },
@@ -214,7 +212,7 @@ export function 场景说明(key: string): string {
 
 // ---- 各场景的状态 ----
 
-const 基: Omit<SyncStatus, 'phase' | 'configured' | 'autoSync' | 'sessionSynced'> = {
+const 基: Omit<SyncStatus, 'phase' | 'configured' | 'sessionSynced'> = {
   minutesAgo: null,
   syncedFiles: 0,
   error: null,
@@ -224,16 +222,15 @@ const 基: Omit<SyncStatus, 'phase' | 'configured' | 'autoSync' | 'sessionSynced
 
 const 状态: Record<ScenarioKey, SyncStatus> = {
   // 刚装上：什么都没配
-  fresh: { ...基, phase: 'unconfigured', configured: false, autoSync: false, sessionSynced: false },
+  fresh: { ...基, phase: 'unconfigured', configured: false, sessionSynced: false },
 
-  // 已配置、开了自动同步，但本次会话还没同步过——**重启后的样子**。
+  // 已配置，但本次会话还没同步过——**重启后的样子**。
   // 注意 minutesAgo 有值（真实应用里它是持久化的），但 sessionSynced 为 false，
   // 所以状态栏不显示它。用户想看就去同步中心。
   ready: {
     ...基,
     phase: 'idle',
     configured: true,
-    autoSync: true,
     sessionSynced: false,
     minutesAgo: 8,
     syncedFiles: 1284,
@@ -244,7 +241,6 @@ const 状态: Record<ScenarioKey, SyncStatus> = {
     ...基,
     phase: 'idle',
     configured: true,
-    autoSync: true,
     sessionSynced: true,
     minutesAgo: 8,
     syncedFiles: 1284,
@@ -254,7 +250,6 @@ const 状态: Record<ScenarioKey, SyncStatus> = {
     ...基,
     phase: 'syncing',
     configured: true,
-    autoSync: true,
     sessionSynced: true,
     minutesAgo: 8,
     syncedFiles: 1284,
@@ -266,18 +261,16 @@ const 状态: Record<ScenarioKey, SyncStatus> = {
     ...基,
     phase: 'failed',
     configured: true,
-    autoSync: true,
     sessionSynced: true,
     minutesAgo: 8,
     syncedFiles: 1284,
-    error: '连接超时（dav.example.com 30 秒无响应）。下次启动会自动重试。',
+    error: '连接超时（dav.example.com 30 秒无响应）。',
   },
 
   first: {
     ...基,
     phase: 'never',
     configured: true,
-    autoSync: true,
     sessionSynced: false,
   },
 
@@ -285,7 +278,6 @@ const 状态: Record<ScenarioKey, SyncStatus> = {
     ...基,
     phase: 'idle',
     configured: true,
-    autoSync: true,
     sessionSynced: true,
     minutesAgo: 8,
     syncedFiles: 1284,
@@ -295,7 +287,6 @@ const 状态: Record<ScenarioKey, SyncStatus> = {
     ...基,
     phase: 'idle',
     configured: true,
-    autoSync: true,
     sessionSynced: true,
     minutesAgo: 8,
     syncedFiles: 1284,
@@ -305,7 +296,6 @@ const 状态: Record<ScenarioKey, SyncStatus> = {
     ...基,
     phase: 'idle',
     configured: true,
-    autoSync: true,
     sessionSynced: true,
     minutesAgo: 8,
     syncedFiles: 1284,
@@ -361,19 +351,21 @@ export function 状态文字(s: SyncStatus): string {
  *
  * 只在三种情况说话：
  * 1. **正在进行**（同步中 / 有待确认的删除）—— 活动信号
- * 2. **需要你处理**（冲突 / 自动同步失败）—— 待办信号
+ * 2. **需要你处理**（冲突 / 同步失败）—— 待办信号
  * 3. **本次会话刚同步过** —— 会话信号
  *
  * 其余时候（未配置、已配置但没同步过、上次会话同步过）**一律闭嘴**。
- * 「悄悄进行可以，悄悄失败不可接受」里的「失败」只指自动同步的失败——
- * 手动同步失败时用户正看着同步中心，不需要状态栏再喊一遍。
+ *
+ * **失败为什么还要说**：同步是手动的，失败那一刻用户正看着同步中心——
+ * 但他会把它关掉，而「库和远端现在不一致」这件事在关掉之后仍然成立。
+ * 状态栏是唯一一个不需要打开任何东西就能看见它的地方。
  */
 export function 状态栏文字(mock: SyncMock): string | null {
   const s = mock.status
   if (s.phase === 'syncing' && s.progress) return `正在同步 ${s.progress.done} / ${s.progress.total}`
   if (mock.pendingDeletes > 0) return `待删 ${mock.pendingDeletes}`
   if (mock.conflicts.length > 0) return `冲突 ${mock.conflicts.length}`
-  if (s.phase === 'failed' && s.autoSync) return '自动同步失败'
+  if (s.phase === 'failed') return '上次同步失败'
   if (s.phase === 'idle' && s.sessionSynced && s.minutesAgo !== null) {
     return `上次同步于 ${s.minutesAgo} 分钟前`
   }

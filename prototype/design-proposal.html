@@ -1,0 +1,876 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>知己笔记 · 视觉提案</title>
+<style>
+/* ============================================================
+   本页自己就用提案里的 token —— 提案是什么样，它就长什么样。
+   ============================================================ */
+
+:root {
+  /* 面：三层，不再有五层近似米色 */
+  --sunk:  #F1EEE7;   /* 框：两条侧栏 / 标签栏 / 工具栏 / 底部栏 */
+  --paper: #FBFAF7;   /* 纸：正文那一块，读的地方 */
+  --float: #FFFFFF;   /* 浮：弹窗 / 菜单 / 卡片 */
+
+  /* 墨：文字与图标的三个阶 */
+  --ink:   #1F1C18;
+  --ink-2: #6A6259;
+  --ink-3: #A49C92;
+
+  /* 朱砂：只在"活着的东西"上出现 */
+  --seal:      #B23A2E;
+  --seal-soft: #F6EBE8;
+
+  /* 线：两档，不再是一档通吃 */
+  --rule-strong: #DFD9CD;
+  --rule-soft:   #ECE8E0;
+
+  /* 圆角：按"东西有多大"分三档，差距是 ×2 */
+  --r-sm: 4px;
+  --r-md: 8px;
+  --r-lg: 12px;
+
+  --sans: 'SF Pro Text', 'PingFang SC', -apple-system, 'Segoe UI', 'Noto Sans SC', 'Microsoft YaHei', sans-serif;
+  --mono: 'Cascadia Code', Consolas, 'SF Mono', Menlo, monospace;
+
+  color-scheme: light;
+}
+
+.page-dark {
+  --sunk:  #141210;
+  --paper: #1B1815;
+  --float: #262220;
+  --ink:   #E9E5DE;
+  --ink-2: #A69E94;
+  --ink-3: #6B655D;
+  --seal:      #E0705C;
+  --seal-soft: #35211D;
+  --rule-strong: #2C2823;
+  --rule-soft:   #241F1C;
+  color-scheme: dark;
+  /* 必须显式给 color：body 上的 color 已经算成了浅色那个值，
+     变量在这里重定义不会让继承下来的计算值跟着变——不给的话
+     深色模拟里的正文是深色字压深色底，整块看不见。 */
+  color: var(--ink);
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  padding: 0 0 80px;
+  font-family: var(--sans);
+  font-size: 14px;
+  line-height: 1.7;
+  background: var(--paper);
+  color: var(--ink);
+  -webkit-font-smoothing: antialiased;
+}
+
+.wrap { max-width: 940px; margin: 0 auto; padding: 0 32px; }
+
+/* ---- 页头 ---- */
+.head { padding: 64px 0 8px; }
+.head h1 {
+  font-size: 30px;
+  font-weight: 650;
+  letter-spacing: -0.01em;
+  margin: 0 0 10px;
+  line-height: 1.3;
+}
+.head p { margin: 0; color: var(--ink-2); max-width: 62ch; }
+
+/* ---- 章节 ---- */
+.sec { margin-top: 64px; }
+.sec > h2 {
+  font-size: 19px;
+  font-weight: 620;
+  margin: 0 0 6px;
+  letter-spacing: -0.005em;
+}
+.sec > .lede {
+  margin: 0 0 26px;
+  color: var(--ink-2);
+  max-width: 66ch;
+}
+
+/* ---- 通用小件 ---- */
+.note {
+  margin: 20px 0 0;
+  padding: 14px 18px;
+  background: var(--sunk);
+  border-radius: var(--r-md);
+  color: var(--ink-2);
+  font-size: 13px;
+  line-height: 1.75;
+}
+.note b { color: var(--ink); font-weight: 600; }
+.note code, .mono {
+  font-family: var(--mono);
+  font-size: 0.9em;
+  background: var(--paper);
+  padding: 1px 5px;
+  border-radius: var(--r-sm);
+  color: var(--ink);
+}
+.page-dark .note code { background: #2E2926; }
+
+/* ============================================================
+   1. 三个面
+   ============================================================ */
+
+.planes { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+.plane {
+  border-radius: var(--r-lg);
+  padding: 20px 20px 18px;
+  min-height: 168px;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+}
+.plane--sunk  { background: var(--sunk);  box-shadow: inset 0 0 0 1px var(--rule-strong); }
+.plane--paper { background: var(--paper); box-shadow: inset 0 0 0 1px var(--rule-strong); }
+.plane--float { background: var(--float); box-shadow: 0 4px 16px -4px rgba(31,28,24,.16), 0 1px 3px rgba(31,28,24,.07); }
+.plane .name { font-size: 15px; font-weight: 600; }
+.plane .hex  { font-family: var(--mono); font-size: 12px; color: var(--ink-2); margin-top: 2px; }
+.plane .use  { font-size: 12.5px; color: var(--ink-2); margin-top: 8px; line-height: 1.6; }
+
+/* 三个面的关系示意条 */
+.ladder {
+  display: flex;
+  height: 92px;
+  margin-top: 20px;
+  border-radius: var(--r-lg);
+  overflow: hidden;
+  box-shadow: inset 0 0 0 1px var(--rule-strong);
+}
+.ladder > div {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  color: var(--ink-2);
+}
+.ladder .l-sunk  { background: var(--sunk); flex: 0 0 20%; }
+.ladder .l-paper { background: var(--paper); flex: 0 0 60%; }
+.ladder .l-float { background: var(--float); flex: 0 0 20%; }
+
+/* ============================================================
+   2. 墨阶与朱砂
+   ============================================================ */
+
+.inks { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+.ink-card {
+  background: var(--paper);
+  border-radius: var(--r-md);
+  padding: 16px 18px;
+  box-shadow: inset 0 0 0 1px var(--rule-strong);
+}
+.ink-card .sample { font-size: 17px; font-weight: 500; }
+.ink-card .meta { font-family: var(--mono); font-size: 11.5px; color: var(--ink-3); margin-top: 6px; }
+.ink-card .ratio { font-size: 12px; color: var(--ink-2); margin-top: 4px; }
+
+.seal-card {
+  margin-top: 16px;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0;
+  border-radius: var(--r-lg);
+  overflow: hidden;
+  box-shadow: inset 0 0 0 1px var(--rule-strong);
+}
+.seal-card > div { padding: 20px 22px; background: var(--paper); }
+.seal-card > div + div { box-shadow: inset 1px 0 0 var(--rule-soft); }
+.seal-card h3 { margin: 0 0 10px; font-size: 13.5px; font-weight: 600; }
+.seal-card ul { margin: 0; padding: 0; list-style: none; font-size: 13px; color: var(--ink-2); }
+.seal-card li { padding: 3px 0 3px 16px; position: relative; }
+.seal-card li::before {
+  content: ''; position: absolute; left: 2px; top: 12px;
+  width: 4px; height: 4px; border-radius: 50%; background: var(--ink-3);
+}
+.seal-card .yes li::before { background: var(--seal); }
+.swatch-row { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
+.swatch { width: 34px; height: 34px; border-radius: var(--r-md); flex: 0 0 auto; }
+.swatch--seal { background: var(--seal); }
+.swatch--old  { background: #C45D2A; }
+.swatch-row .lbl { font-size: 12.5px; color: var(--ink-2); line-height: 1.5; }
+.swatch-row .lbl b { display: block; color: var(--ink); font-weight: 600; font-size: 13px; }
+
+/* ============================================================
+   3. 圆角
+   ============================================================ */
+
+.radii { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+.radius-card {
+  background: var(--sunk);
+  border-radius: var(--r-lg);
+  padding: 22px;
+  text-align: center;
+}
+.radius-card .demo {
+  height: 76px;
+  background: var(--paper);
+  box-shadow: inset 0 0 0 1px var(--rule-strong);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 16px;
+}
+.radius-card .demo > span {
+  width: 62px; height: 26px; background: var(--seal-soft);
+  box-shadow: inset 0 0 0 1px var(--seal);
+}
+.radius-card .r-sm-demo { border-radius: 4px; }
+.radius-card .r-md-demo { border-radius: 8px; }
+.radius-card .r-lg-demo { border-radius: 12px; }
+.radius-card .val { font-family: var(--mono); font-size: 13px; font-weight: 600; }
+.radius-card .use { font-size: 12.5px; color: var(--ink-2); margin-top: 6px; line-height: 1.6; }
+
+/* ============================================================
+   4. 图标对照
+   ============================================================ */
+
+.ico-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0;
+  border-radius: var(--r-lg); overflow: hidden;
+  box-shadow: inset 0 0 0 1px var(--rule-strong); }
+.ico-grid .col { background: var(--paper); padding: 0 0 12px; }
+.ico-grid .col + .col { box-shadow: inset 1px 0 0 var(--rule-soft); }
+.ico-grid .col h3 {
+  margin: 0; padding: 14px 18px 12px; font-size: 13px; font-weight: 600;
+  color: var(--ink-2);
+}
+.ico-row {
+  display: flex; align-items: center; gap: 10px;
+  padding: 6px 18px;
+}
+.ico-row .slot {
+  width: 24px; height: 24px; flex: 0 0 auto;
+  display: flex; align-items: center; justify-content: center;
+  color: var(--ink-2);
+  border-radius: var(--r-md);
+}
+.ico-row .lbl { font-size: 12.5px; color: var(--ink-2); }
+.ico-row .lbl em { font-style: normal; color: var(--ink-3); font-size: 11.5px; }
+
+/* 大图：把构造看清楚 */
+.ico-big { display: grid; grid-template-columns: repeat(8, 1fr); gap: 0;
+  margin-top: 16px; border-radius: var(--r-lg); overflow: hidden;
+  background: var(--paper); box-shadow: inset 0 0 0 1px var(--rule-strong); }
+.ico-big figure { margin: 0; padding: 16px 6px 12px; text-align: center; color: var(--ink); }
+.ico-big figcaption { font-size: 10.5px; color: var(--ink-3); margin-top: 8px; }
+
+/* ============================================================
+   5. 线的层次
+   ============================================================ */
+
+.rules { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+.rule-card { background: var(--paper); border-radius: var(--r-lg); padding: 18px 20px;
+  box-shadow: inset 0 0 0 1px var(--rule-strong); }
+.rule-card h3 { margin: 0 0 14px; font-size: 13px; font-weight: 600; color: var(--ink-2); }
+
+table.t-old, table.t-new { border-collapse: collapse; width: 100%; font-size: 13px; }
+table.t-old th, table.t-old td { border: 1px solid var(--rule-strong); padding: 7px 10px; text-align: left; }
+table.t-old th { background: var(--sunk); font-weight: 600; }
+table.t-new th, table.t-new td { border: 0; padding: 8px 2px; text-align: left; }
+table.t-new thead th { border-bottom: 1.5px solid var(--ink); font-weight: 600; }
+table.t-new tbody tr + tr td { border-top: 1px solid var(--rule-soft); }
+table.t-new tbody td { color: var(--ink-2); }
+
+/* ============================================================
+   6. 界面模拟
+   ============================================================ */
+
+.mock-frame { border-radius: var(--r-lg); overflow: hidden;
+  box-shadow: 0 6px 24px -8px rgba(31,28,24,.18), inset 0 0 0 1px var(--rule-strong); }
+.mock { display: flex; flex-direction: column; height: 400px; background: var(--sunk); font-size: 13px; }
+
+/* 上排：两条侧栏的顶栏 + 标签栏 */
+.mock-top { display: flex; height: 38px; flex: 0 0 auto; }
+.mock-brand { width: 150px; flex: 0 0 auto; display: flex; align-items: center; justify-content: center;
+  font-weight: 600; font-size: 13.5px; color: var(--ink); }
+.mock-tabs { flex: 1; display: flex; align-items: stretch; background: var(--sunk); }
+.mock-tab { display: flex; align-items: center; gap: 7px; padding: 0 14px; font-size: 13px;
+  background: var(--paper); color: var(--ink); border-radius: var(--r-md) var(--r-md) 0 0; }
+.mock-tab .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--seal); }
+.mock-tab .x { color: var(--ink-3); font-size: 11px; }
+.mock-outline-head { width: 140px; flex: 0 0 auto; display: flex; align-items: center; justify-content: center;
+  font-weight: 600; font-size: 13.5px; color: var(--ink); }
+
+/* 工具条那一行：三条栏同一个高度、同一个凹面色，只有中间是纸 */
+.mock-bars { display: flex; height: 30px; flex: 0 0 auto; }
+.mock-bar { width: 150px; flex: 0 0 auto; display: flex; align-items: center; gap: 2px; padding: 0 6px; }
+.mock-bar.right { width: 140px; justify-content: flex-end; }
+.mock-bar .ib { flex: 1; height: 22px; display: flex; align-items: center; justify-content: center;
+  color: var(--ink-2); border-radius: var(--r-md); }
+.mock-bar.right .ib { flex: 0 0 24px; }
+.mock-toolbar { flex: 1; display: flex; align-items: center; justify-content: center; gap: 3px; overflow: hidden; }
+.mock-toolbar .tb { width: 22px; height: 22px; display: flex; align-items: center; justify-content: center;
+  color: var(--ink-2); border-radius: var(--r-md); font-size: 11px; white-space: nowrap; }
+/* 按下的开关用**墨色**，不用朱砂——朱砂留给"活着的东西"（链接、光标、
+   未保存、同步中）。满屏的实心强调色块正是现在界面吵的来源之一。 */
+.mock-toolbar .tb.on { background: var(--ink); color: var(--paper); }
+.mock-toolbar .sep { width: 1px; height: 13px; background: var(--rule-strong); margin: 0 3px; flex: 0 0 auto; }
+
+/* 正文区 */
+.mock-body { flex: 1; display: flex; min-height: 0; }
+.mock-tree { width: 150px; flex: 0 0 auto; padding: 6px 4px; }
+.mock-row { display: flex; align-items: center; gap: 6px; height: 25px; padding: 0 7px;
+  border-radius: var(--r-md); font-size: 13px; color: var(--ink); }
+.mock-row .nm { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mock-row.d1 { padding-left: 22px; }
+.mock-row.d2 { padding-left: 38px; }
+.mock-row.on { background: var(--seal-soft); color: var(--seal); font-weight: 500; }
+.mock-row.folder .nm { font-weight: 500; }
+.mock-row svg { flex: 0 0 auto; color: var(--ink-3); }
+.mock-row.on svg { color: var(--seal); }
+
+.mock-page { flex: 1; background: var(--paper); padding: 22px 40px; overflow: hidden; }
+.mock-page h1 { font-size: 21px; font-weight: 650; margin: 0 0 14px; letter-spacing: -0.01em; }
+.mock-page p { margin: 0 0 12px; font-size: 13.5px; line-height: 1.8; }
+.mock-quote { display: flex; gap: 10px; margin: 0 0 14px; color: var(--ink-2); }
+.mock-quote .bar { width: 3px; border-radius: 2px; background: var(--rule-strong); flex: 0 0 auto; }
+.mock-quote .q { font-size: 13.5px; line-height: 1.8; }
+.mock-code { background: var(--sunk); border-radius: var(--r-md); padding: 12px 14px;
+  font-family: var(--mono); font-size: 12px; line-height: 1.75; color: var(--ink-2); }
+.mock-code .k { color: var(--seal); }
+.mock-code .s { color: #5A8A4A; }
+
+.mock-outline { width: 140px; flex: 0 0 auto; padding: 6px 8px; }
+.mock-h { height: 25px; display: flex; align-items: center; gap: 6px; padding: 0 7px;
+  border-radius: var(--r-md); font-size: 12.5px; color: var(--ink-2); }
+.mock-h.h1 { color: var(--seal); font-weight: 500; }
+.mock-h.h2 { padding-left: 18px; }
+.mock-h.h3 { padding-left: 30px; }
+
+/* 底部栏 */
+.mock-foot { height: 28px; flex: 0 0 auto; display: flex; align-items: center; padding: 0 6px;
+  font-size: 11.5px; color: var(--ink-2); }
+.mock-foot .grp { width: 150px; flex: 0 0 auto; display: flex; gap: 2px; }
+.mock-foot .fb { flex: 1; height: 22px; display: flex; align-items: center; justify-content: center;
+  color: var(--ink-2); border-radius: var(--r-md); }
+.mock-foot .mid { flex: 1; display: flex; align-items: center; justify-content: center; gap: 7px; }
+.mock-foot .status-dot { width: 6px; height: 6px; border-radius: 50%; background: #5A8A4A; }
+.mock-foot .right { flex: 0 0 auto; display: flex; gap: 12px; color: var(--ink-3); }
+
+.mock-pair { display: grid; grid-template-columns: 1fr; gap: 22px; margin-top: 18px; }
+.mock-label { font-size: 12px; color: var(--ink-3); margin-bottom: 8px; }
+
+/* 印章 */
+.seal-mark {
+  width: 40px; height: 40px; border-radius: var(--r-sm);
+  background: var(--seal); color: #fff;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 24px; font-weight: 600; line-height: 1;
+  padding-bottom: 2px;
+}
+.seal-line { display: flex; align-items: center; gap: 16px; margin-top: 18px; }
+.seal-line .txt { font-size: 13px; color: var(--ink-2); max-width: 56ch; }
+</style>
+</head>
+<body>
+
+<div class="wrap">
+
+  <header class="head">
+    <h1>知己笔记 · 视觉提案</h1>
+    <p>布局一格没动。改的是三件事：<b>线怎么画</b>、<b>面怎么分</b>、<b>笔怎么握</b>。下面每一块都是可以当场比对的——左边是现在，右边是提案。</p>
+  </header>
+
+  <!-- ========== 1. 三个面 ========== -->
+  <section class="sec">
+    <h2>面：从五层近似米色，收到三层</h2>
+    <p class="lede">
+      现在浅色模式有五个面（<span class="mono">#FDFCFA / #F7F5F0 / #EDE9E0 / #E8E3D8 / #DDD8CC</span>），但中间那一列、抬起面、纸面是同一个值——五个数在做三件事，还都只差 4%。
+      提案把它压成三层，每一层只有一个职责。
+    </p>
+
+    <div class="planes">
+      <div class="plane plane--sunk">
+        <div class="name">框</div>
+        <div class="hex">--sunk · #F1EEE7</div>
+        <div class="use">两条侧栏、标签栏、三条工具栏、底部栏。所有"不是正文"的地方。</div>
+      </div>
+      <div class="plane plane--paper">
+        <div class="name">纸</div>
+        <div class="hex">--paper · #FBFAF7</div>
+        <div class="use">正文那一块。读的地方只有这一个面。</div>
+      </div>
+      <div class="plane plane--float">
+        <div class="name">浮</div>
+        <div class="hex">--float · #FFFFFF</div>
+        <div class="use">弹窗、右键菜单、下拉。比纸更亮，加阴影——浮起来靠两层信号，不只靠阴影。</div>
+      </div>
+    </div>
+
+    <div class="ladder">
+      <div class="l-sunk">框</div>
+      <div class="l-paper">纸</div>
+      <div class="l-float">浮</div>
+    </div>
+
+    <div class="note">
+      <b>为什么这一条能去掉最多线：</b>框和纸换了颜色之后，"工具栏与正文之间"那条 1px 分隔线就不用画了——<b>面的变化就是分隔</b>。
+      一条标签栏下边框、三条工具栏下边框、两条侧栏的竖边框、底部栏上边框，这些线全部撤掉。
+      而且顺带解决一个现存的毛病：现在中间的工具条是纸色、两边侧栏的工具条是灰色，三列本来精心对齐的那条横线，被颜色拆成了两段。
+    </div>
+  </section>
+
+  <!-- ========== 2. 墨与朱砂 ========== -->
+  <section class="sec">
+    <h2>墨：三阶，并且 muted 只做元信息</h2>
+    <p class="lede">现在的 muted <span class="mono">#9C8F82</span> 偏褐，落在一堆米色上会发浑。往中性方向拉一点，让它安静地退后，而不是发脏。</p>
+
+    <div class="inks">
+      <div class="ink-card">
+        <div class="sample" style="color:var(--ink)">正文与标题</div>
+        <div class="meta">--ink · #1F1C18</div>
+        <div class="ratio">对纸 15.4 : 1</div>
+      </div>
+      <div class="ink-card">
+        <div class="sample" style="color:var(--ink-2)">次要说明、图标</div>
+        <div class="meta">--ink-2 · #6A6259</div>
+        <div class="ratio">对纸 5.8 : 1 · 过 AA</div>
+      </div>
+      <div class="ink-card">
+        <div class="sample" style="color:var(--ink-3)">字数、行号、占位</div>
+        <div class="meta">--ink-3 · #A49C92</div>
+        <div class="ratio">对纸 2.6 : 1 · 永不承载图标或标签</div>
+      </div>
+    </div>
+
+    <div class="seal-card">
+      <div>
+        <h3>强调色：赭石 → 朱砂</h3>
+        <div class="swatch-row">
+          <div class="swatch swatch--old"></div>
+          <div class="lbl"><b>现在 · #C45D2A</b>对纸 4.12 : 1 —— 用在 12px 链接文字上不达 AA（4.5）</div>
+        </div>
+        <div class="swatch-row">
+          <div class="swatch swatch--seal"></div>
+          <div class="lbl"><b>提案 · #B23A2E</b>对纸 5.7 : 1 —— 同色系里更深更红，正文与图标都过线</div>
+        </div>
+        <div class="lbl" style="margin-top:14px">
+          往红里收，也顺手离开了「暖米底 + 陶土橙」那个到处都能见到的组合——朱砂是印泥的颜色，它在这个产品里有出处。
+        </div>
+      </div>
+      <div>
+        <h3>用法收窄：只给"活着的东西"</h3>
+        <ul class="yes">
+          <li>链接</li>
+          <li>光标</li>
+          <li>未保存的小圆点</li>
+          <li>同步正在进行 / 出错</li>
+          <li>正文里当前选中的那一条（文件树、大纲）</li>
+        </ul>
+        <ul style="margin-top:12px">
+          <li>开关按钮的"开着"</li>
+          <li>工具栏里被按下的格式按钮</li>
+          <li>悬停</li>
+        </ul>
+        <div class="lbl" style="margin-top:10px;color:var(--ink-3);font-size:12px">↑ 这三样改用墨色，朱砂不再承包所有"选中"</div>
+      </div>
+    </div>
+
+    <div class="note">
+      <b>深色模式要一起改。</b>现在是 Claude 那套冷黑（<span class="mono">#151414 / #ECEDEE</span>），而浅色是暖纸（<span class="mono">#FDFCFA / #1A1714</span>）——
+      切一下主题，色相也换了，像换了个产品。提案把深色改成<b>暖黑</b>：<span class="mono">#141210 / #1B1815 / #262220</span>，文字 <span class="mono">#E9E5DE</span>。
+      关系不变（框最暗、纸上一档、浮再上一档），只是整个家族往暖里挪——它跟浅色模式才是同一个东西的两种光线。
+    </div>
+  </section>
+
+  <!-- ========== 3. 圆角 ========== -->
+  <section class="sec">
+    <h2>圆角：不是调大，是分档</h2>
+    <p class="lede">
+      真正的问题不是"圆角太小"，是<b>只有一种圆角</b>：全应用 66 处 4px、8 处 6px、15 处 8px。
+      4px 在 24px 的按钮上只占 1/6，看上去就是直角——整个界面是同一块料切的。改成三档，档与档差 ×2，不是 +2px。
+    </p>
+
+    <div class="radii">
+      <div class="radius-card">
+        <div class="demo"><span class="r-sm-demo"></span></div>
+        <div class="val">--r-sm · 4px</div>
+        <div class="use">行内的小东西：行内代码、标签、勾选框。高度 ≤ 20px</div>
+      </div>
+      <div class="radius-card">
+        <div class="demo"><span class="r-md-demo"></span></div>
+        <div class="val">--r-md · 8px</div>
+        <div class="use">一切可点的东西：图标按钮、树里的行、标签、菜单项。高度 22–32px</div>
+      </div>
+      <div class="radius-card">
+        <div class="demo"><span class="r-lg-demo"></span></div>
+        <div class="val">--r-lg · 12px</div>
+        <div class="use">浮起来或围起来的整块面：弹窗、菜单、代码块、图片</div>
+      </div>
+    </div>
+
+    <div class="note">
+      <b>两条硬规矩：</b>① 侧栏、编辑器、底部栏这些<b>贴边的整块面不给圆角</b>——纸是裁齐的，只有浮起来的和手里拿着的才收角。
+      ② 现在 <span class="mono">--radius-*</span>（CSS 里 18 处）和 Tailwind 的 <span class="mono">rounded-*</span>（TSX 里 89 处）是两套并行的系统，值刚好一样所以看不出来——改一套另一套不动。合并成一套，都读 CSS 变量。
+    </div>
+  </section>
+
+  <!-- ========== 4. 图标 ========== -->
+  <section class="sec">
+    <h2>图标：一支笔，一个网格，一条产品自己的规矩</h2>
+    <p class="lede">
+      现在是两种尺寸（工具栏 12px、侧栏与底栏 14px）配同一套 1.3–1.5 的描边，12px 那批实际渲染出来约 1.2px，在 1× 屏上是灰的。
+      提案统一到 <b>16 网格 / 1.5 描边 / 圆头圆角</b>，作画区留 1.5 白边——所有图标看起来一样大，是因为它们真的画在同一个格子里。
+    </p>
+
+    <div class="ico-grid">
+      <div class="col">
+        <h3>现在</h3>
+        <div class="ico-row"><span class="slot">
+          <svg width="12" height="12" viewBox="0 0 14 14" fill="currentColor"><path d="M3 4.5c0-1 .8-2 2-2s2 1 2 2v2.5c0 1-.8 2-2 2H4v1.5h2c2 0 4-1.5 4-4V4.5c0-2.5-2-4.5-5-4.5S2 2.5 2 4.5v1H3v-1zm7 0c0-1 .8-2 2-2s2 1 2 2v2.5c0 1-.8 2-2 2h-1v1.5h2c2 0 4-1.5 4-4V4.5c0-2.5-2-4.5-5-4.5s-5 2.5-5 4.5v1h2v-1z"/></svg>
+        </span><span class="lbl">引用 <em>· path 溢出 viewBox，画的是西文引号</em></span></div>
+        <div class="ico-row"><span class="slot">
+          <svg width="12" height="12" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.4"><line x1="2" y1="3" x2="2" y2="11"/><line x1="2" y1="3" x2="6" y2="3"/><path d="M4 3L6 7H4"/><path d="M4 7L6 11H4"/></svg>
+        </span><span class="lbl">有序列表 <em>· 读作一面旗</em></span></div>
+        <div class="ico-row"><span class="slot">
+          <svg width="12" height="12" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"><rect x="2" y="4" width="10" height="6" rx="1"/><line x1="5" y1="4" x2="9" y2="4"/></svg>
+        </span><span class="lbl">行内代码 <em>· 一个方框加一条线</em></span></div>
+        <div class="ico-row"><span class="slot">
+          <svg width="12" height="12" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"><polyline points="4,4 1,7 4,10"/><polyline points="10,4 13,7 10,10"/><line x1="9" y1="2" x2="5" y2="12"/></svg>
+        </span><span class="lbl">代码块 <em>· 与「源码」几乎一样</em></span></div>
+        <div class="ico-row"><span class="slot">
+          <svg width="12" height="12" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"><polyline points="5,4 1,7 5,10"/><polyline points="9,4 13,7 9,10"/></svg>
+        </span><span class="lbl">源码 <em>· 与「代码块」几乎一样</em></span></div>
+        <div class="ico-row"><span class="slot">
+          <svg width="12" height="12" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"><line x1="3" y1="3" x2="11" y2="11"/><line x1="11" y1="3" x2="3" y2="11"/></svg>
+        </span><span class="lbl">清除格式 <em>· 与「关标签」「收侧栏」同一个 ✕</em></span></div>
+        <div class="ico-row"><span class="slot">
+          <svg width="12" height="12" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"><path d="M4 5.5L7 2.5L10 5.5"/><path d="M4 8.5L7 11.5L10 8.5"/></svg>
+        </span><span class="lbl">全部展开 <em>· 渲染成一个菱形</em></span></div>
+        <div class="ico-row"><span class="slot">
+          <svg width="12" height="12" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.4"><line x1="1" y1="7" x2="13" y2="7"/></svg>
+        </span><span class="lbl">分割线 <em>· 读作减号</em></span></div>
+      </div>
+
+      <div class="col">
+        <h3>提案</h3>
+        <div class="ico-row"><span class="slot">
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M2.6 2.8v10.4"/><path d="M5.8 5.4h7.6"/><path d="M5.8 10.6h5.2"/></svg>
+        </span><span class="lbl">引用 <em>· 就是正文里那条竖线加两行</em></span></div>
+        <div class="ico-row"><span class="slot">
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6.6 4.6h7.2"/><path d="M6.6 11.4h7.2"/><path d="M2.2 3.2 3.5 2.4v4.2"/><path d="M2.2 9.6h2.5l-2.5 3.2h2.5"/></svg>
+        </span><span class="lbl">有序列表 <em>· 1 和 2，与无序列表共用骨架</em></span></div>
+        <div class="ico-row"><span class="slot">
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M3.6 6.4 5 4.6"/><path d="M11 6.4 12.4 4.6"/><path d="M5.6 8.6h4.8"/></svg>
+        </span><span class="lbl">行内代码 <em>· 一对反引号夹住正文</em></span></div>
+        <div class="ico-row"><span class="slot">
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5.6 4 2.4 8l3.2 4"/><path d="M10.4 4 13.6 8l-3.2 4"/><path d="M9.2 2.8 6.8 13.2"/></svg>
+        </span><span class="lbl">代码块 <em>· 通用符号</em></span></div>
+        <div class="ico-row"><span class="slot">
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M6.2 2.6 4.4 13.4"/><path d="M11.6 2.6 9.8 13.4"/><path d="M2.6 5.8h11.2"/><path d="M2.2 10.2h11.2"/></svg>
+        </span><span class="lbl">源码 <em>· # 就是标记本身</em></span></div>
+        <div class="ico-row"><span class="slot">
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M3.6 4.6h7"/><path d="M7.1 4.6v7.8"/><path d="M2.8 12.6 13.2 3.4"/></svg>
+        </span><span class="lbl">清除格式 <em>· 划掉的 T，不再是 ✕</em></span></div>
+        <div class="ico-row"><span class="slot">
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M8 6.4V2.6"/><path d="M5.6 5 8 2.6 10.4 5"/><path d="M8 9.6v3.8"/><path d="M5.6 11 8 13.4 10.4 11"/></svg>
+        </span><span class="lbl">全部展开 <em>· 撑满高度，箭头朝外</em></span></div>
+        <div class="ico-row"><span class="slot">
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M1.8 8h12.4"/></svg>
+        </span><span class="lbl">分割线 <em>· 撑满整宽，读作一整条</em></span></div>
+      </div>
+    </div>
+
+    <div class="ico-big">
+      <figure><svg width="32" height="32" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><circle cx="7" cy="7" r="4.5"/><path d="M10.3 10.3 13.5 13.5"/></svg><figcaption>搜索</figcaption></figure>
+      <figure><svg width="32" height="32" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M2.6 2.8v10.4"/><path d="M5.8 5.4h7.6"/><path d="M5.8 10.6h5.2"/></svg><figcaption>引用</figcaption></figure>
+      <figure><svg width="32" height="32" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="3.2" cy="4.8" r="1.15" fill="currentColor" stroke="none"/><circle cx="3.2" cy="11.2" r="1.15" fill="currentColor" stroke="none"/><path d="M6.6 4.8h7.2" stroke-linecap="round"/><path d="M6.6 11.2h7.2" stroke-linecap="round"/></svg><figcaption>无序列表</figcaption></figure>
+      <figure><svg width="32" height="32" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6.6 4.6h7.2"/><path d="M6.6 11.4h7.2"/><path d="M2.2 3.2 3.5 2.4v4.2"/><path d="M2.2 9.6h2.5l-2.5 3.2h2.5"/></svg><figcaption>有序列表</figcaption></figure>
+      <figure><svg width="32" height="32" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4.2" width="7.6" height="7.6" rx="2.2"/><path d="M4.1 8 5.7 9.6 8.3 6.6"/><path d="M11.8 8h2.4"/></svg><figcaption>待办项</figcaption></figure>
+      <figure><svg width="32" height="32" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5.6 4 2.4 8l3.2 4"/><path d="M10.4 4 13.6 8l-3.2 4"/><path d="M9.2 2.8 6.8 13.2"/></svg><figcaption>代码块</figcaption></figure>
+      <figure><svg width="32" height="32" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3.2" width="12" height="9.6" rx="2.2"/><circle cx="5.4" cy="6.4" r="1.05"/><path d="M2.4 11.4 5.6 8.4 8 10.7 11 7.8 13.6 10.6"/></svg><figcaption>图片</figcaption></figure>
+      <figure><svg width="32" height="32" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><rect x="2" y="3.2" width="12" height="9.6" rx="2.2"/><path d="M2 6.4h12"/><path d="M8 6.4v6.4"/></svg><figcaption>表格</figcaption></figure>
+      <figure><svg width="32" height="32" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M7.34 8.67a3.33 3.33 0 0 0 5.03.36l2-2a3.33 3.33 0 0 0-4.71-4.71l-1.15 1.14"/><path d="M10 7.33a3.33 3.33 0 0 0-5.03-.36l-2 2a3.33 3.33 0 0 0 4.71 4.71l1.14-1.14"/></svg><figcaption>链接</figcaption></figure>
+      <figure><svg width="32" height="32" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3.4 2.6h5.2l4 4v6.8h-9.2z"/><path d="M8.6 2.6v4h4"/></svg><figcaption>文件</figcaption></figure>
+      <figure><svg width="32" height="32" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M2.4 12.8V3.6h3.9l1.7 2.2h5.6v7z"/></svg><figcaption>文件夹</figcaption></figure>
+      <figure><svg width="32" height="32" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M8 1.83l4.34 1.83 1.83 4.34-1.83 4.34L8 14.17l-4.34-1.83L1.83 8l1.83-4.34z"/><circle cx="8" cy="8" r="2.4"/></svg><figcaption>设置</figcaption></figure>
+      <figure><svg width="32" height="32" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M2.6 8a5.4 5.4 0 0 1 9.2-3.8"/><path d="M13.4 8a5.4 5.4 0 0 1-9.2 3.8"/><path d="M11.8 1.6v2.6H9.2"/><path d="M4.2 14.4v-2.6h2.6"/></svg><figcaption>同步</figcaption></figure>
+      <figure><svg width="32" height="32" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="8" r="3.1"/><path d="M8 1.4v1.6M8 13v1.6M1.4 8h1.6M13 8h1.6M3.3 3.3l1.15 1.15M11.55 11.55 12.7 12.7M12.7 3.3l-1.15 1.15M4.45 11.55 3.3 12.7"/></svg><figcaption>亮色</figcaption></figure>
+      <figure><svg width="32" height="32" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M13.4 9.4A5.6 5.6 0 0 1 6.6 2.6a5.6 5.6 0 1 0 6.8 6.8z"/></svg><figcaption>深色</figcaption></figure>
+      <figure><svg width="32" height="32" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M2 6V2h4M10 2h4v4M14 10v4h-4M6 14H2v-4"/></svg><figcaption>专注</figcaption></figure>
+    </div>
+
+    <div class="note">
+      <b>产品自己的那条规矩：工具栏上的图标，画的是这个按钮产出的东西的样子。</b><br>
+      引用 → 就是正文里那条竖线加两行；行内代码 → 就是一对反引号夹着正文；源码 → 就是标记本身 <span class="mono">#</span>。
+      这条规矩一次修好三个坏图标，以后加按钮也有依据，不用每次凭感觉挑一个通用符号。<br><br>
+      <b>另外收掉三个重码：</b>现在界面上有三个 ✕（关标签、收侧栏、清除格式），一个符号三种意思——清除格式换成划掉的 T。
+      代码块和源码原来都是 <span class="mono">&lt;&gt;</span>，12px 下分不出来——源码换成 <span class="mono">#</span>。
+    </div>
+  </section>
+
+  <!-- ========== 5. 线 ========== -->
+  <section class="sec">
+    <h2>线：两档，而不是一档通吃</h2>
+    <p class="lede">
+      全应用的分隔线、外框、表格格、代码块、每个标签的右边——都是同一根 <span class="mono">1px solid var(--border-color)</span>。
+      线的粗细一样，就等于没有层次。提案只留两档，并且<b>表格改成印刷表格：只要横线，不要竖线</b>。
+    </p>
+
+    <div class="rules">
+      <div class="rule-card">
+        <h3>现在 · 每格都封边</h3>
+        <table class="t-old">
+          <thead><tr><th>笔记</th><th>字数</th><th>更新</th></tr></thead>
+          <tbody>
+            <tr><td>逐字索引</td><td>1,204</td><td>3 天前</td></tr>
+            <tr><td>索引体积实测</td><td>860</td><td>上周</td></tr>
+            <tr><td>正则备忘</td><td>412</td><td>上周</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="rule-card">
+        <h3>提案 · 横线分栏，竖线交给留白</h3>
+        <table class="t-new">
+          <thead><tr><th>笔记</th><th>字数</th><th>更新</th></tr></thead>
+          <tbody>
+            <tr><td>逐字索引</td><td>1,204</td><td>3 天前</td></tr>
+            <tr><td>索引体积实测</td><td>860</td><td>上周</td></tr>
+            <tr><td>正则备忘</td><td>412</td><td>上周</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="note">
+      <b>两档线的分工：</b>
+      <span class="mono">--rule-strong</span> 只用在"框与纸的交界"和"浮起来的东西的外轮廓"；
+      <span class="mono">--rule-soft</span> 用在区域内部的细线（表格横线、工具条里的分隔）。
+      其余一律不画——靠面的变化和留白。
+    </div>
+  </section>
+
+  <!-- ========== 6. 界面模拟 ========== -->
+  <section class="sec">
+    <h2>合起来是什么样</h2>
+    <p class="lede">同一个布局、同样的三条横栏、同样的按钮位置。只有面、线、圆角、图标换了。</p>
+
+    <div class="mock-pair">
+
+      <div>
+        <div class="mock-label">浅色</div>
+        <div class="mock-frame">
+          <div class="mock">
+            <div class="mock-top">
+              <div class="mock-brand">知己笔记</div>
+              <div class="mock-tabs">
+                <div class="mock-tab"><span class="dot"></span>语法全集<span class="x">✕</span></div>
+              </div>
+              <div class="mock-outline-head">大纲</div>
+            </div>
+
+            <div class="mock-bars">
+              <div class="mock-bar">
+                <span class="ib"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M9.6 3.6 5.4 8l4.2 4.4"/></svg></span>
+                <span class="ib"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M8 6.4V2.6"/><path d="M5.6 5 8 2.6 10.4 5"/><path d="M8 9.6v3.8"/><path d="M5.6 11 8 13.4 10.4 11"/></svg></span>
+                <span class="ib"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M8 2.6v3.8"/><path d="M5.6 4 8 6.4 10.4 4"/><path d="M8 13.4V9.6"/><path d="M5.6 12 8 9.6 10.4 12"/></svg></span>
+                <span class="ib"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><circle cx="7" cy="7" r="4.5"/><path d="M10.3 10.3 13.5 13.5"/></svg></span>
+              </div>
+              <div class="mock-toolbar">
+                <span class="tb"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><circle cx="7" cy="7" r="4.5"/><path d="M10.3 10.3 13.5 13.5"/></svg></span>
+                <span class="sep"></span>
+                <span class="tb" style="width:auto;padding:0 7px">正文</span>
+                <span class="tb"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M2.6 2.8v10.4"/><path d="M5.8 5.4h7.6"/><path d="M5.8 10.6h5.2"/></svg></span>
+                <span class="sep"></span>
+                <span class="tb"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><circle cx="3.2" cy="4.8" r="1.15" fill="currentColor" stroke="none"/><circle cx="3.2" cy="11.2" r="1.15" fill="currentColor" stroke="none"/><path d="M6.6 4.8h7.2"/><path d="M6.6 11.2h7.2"/></svg></span>
+                <span class="tb"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6.6 4.6h7.2"/><path d="M6.6 11.4h7.2"/><path d="M2.2 3.2 3.5 2.4v4.2"/><path d="M2.2 9.6h2.5l-2.5 3.2h2.5"/></svg></span>
+                <span class="tb"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4.2" width="7.6" height="7.6" rx="2.2"/><path d="M4.1 8 5.7 9.6 8.3 6.6"/><path d="M11.8 8h2.4"/></svg></span>
+                <span class="sep"></span>
+                <span class="tb"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5.6 4 2.4 8l3.2 4"/><path d="M10.4 4 13.6 8l-3.2 4"/><path d="M9.2 2.8 6.8 13.2"/></svg></span>
+                <span class="tb"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3.2" width="12" height="9.6" rx="2.2"/><circle cx="5.4" cy="6.4" r="1.05"/><path d="M2.4 11.4 5.6 8.4 8 10.7 11 7.8 13.6 10.6"/></svg></span>
+                <span class="tb"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><rect x="2" y="3.2" width="12" height="9.6" rx="2.2"/><path d="M2 6.4h12"/><path d="M8 6.4v6.4"/></svg></span>
+                <span class="sep"></span>
+                <span class="tb" style="font-weight:700">B</span>
+                <span class="tb" style="font-style:italic;font-weight:500">I</span>
+                <span class="tb" style="text-decoration:line-through;font-weight:500">S</span>
+                <span class="tb"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M1.8 8h12.4"/></svg></span>
+                <span class="tb"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M7.34 8.67a3.33 3.33 0 0 0 5.03.36l2-2a3.33 3.33 0 0 0-4.71-4.71l-1.15 1.14"/><path d="M10 7.33a3.33 3.33 0 0 0-5.03-.36l-2 2a3.33 3.33 0 0 0 4.71 4.71l1.14-1.14"/></svg></span>
+                <span class="tb"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M3.6 6.4 5 4.6"/><path d="M11 6.4 12.4 4.6"/><path d="M5.6 8.6h4.8"/></svg></span>
+                <span class="sep"></span>
+                <span class="tb on"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M6.2 2.6 4.4 13.4"/><path d="M11.6 2.6 9.8 13.4"/><path d="M2.6 5.8h11.2"/><path d="M2.2 10.2h11.2"/></svg></span>
+                <span class="tb"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M3.6 4.6h7"/><path d="M7.1 4.6v7.8"/><path d="M2.8 12.6 13.2 3.4"/></svg></span>
+              </div>
+              <div class="mock-bar right">
+                <span class="ib"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><circle cx="7" cy="7" r="4.5"/><path d="M10.3 10.3 13.5 13.5"/></svg></span>
+                <span class="ib"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M8 2.6v3.8"/><path d="M5.6 4 8 6.4 10.4 4"/><path d="M8 13.4V9.6"/><path d="M5.6 12 8 9.6 10.4 12"/></svg></span>
+                <span class="ib"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M8 6.4V2.6"/><path d="M5.6 5 8 2.6 10.4 5"/><path d="M8 9.6v3.8"/><path d="M5.6 11 8 13.4 10.4 11"/></svg></span>
+                <span class="ib"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6.4 3.6 10.6 8l-4.2 4.4"/></svg></span>
+              </div>
+            </div>
+
+            <div class="mock-body">
+              <div class="mock-tree">
+                <div class="mock-row on"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3.4 2.6h5.2l4 4v6.8h-9.2z"/><path d="M8.6 2.6v4h4"/></svg><span class="nm">语法全集</span></div>
+                <div class="mock-row folder"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M9.6 3.6 5.4 8l4.2 4.4"/></svg><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M2.4 12.8V3.6h3.9l1.7 2.2h5.6v7z"/></svg><span class="nm">技术</span></div>
+                <div class="mock-row d1"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3.4 2.6h5.2l4 4v6.8h-9.2z"/><path d="M8.6 2.6v4h4"/></svg><span class="nm">为什么是逐字索引</span></div>
+                <div class="mock-row d1"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3.4 2.6h5.2l4 4v6.8h-9.2z"/><path d="M8.6 2.6v4h4"/></svg><span class="nm">索引体积实测</span></div>
+                <div class="mock-row folder"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M9.6 3.6 5.4 8l4.2 4.4"/></svg><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M2.4 12.8V3.6h3.9l1.7 2.2h5.6v7z"/></svg><span class="nm">待整理</span></div>
+                <div class="mock-row d1"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3.4 2.6h5.2l4 4v6.8h-9.2z"/><path d="M8.6 2.6v4h4"/></svg><span class="nm">正则备忘</span></div>
+                <div class="mock-row d1"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3.4 2.6h5.2l4 4v6.8h-9.2z"/><path d="M8.6 2.6v4h4"/></svg><span class="nm">工具箱</span></div>
+                <div class="mock-row folder"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M9.6 3.6 5.4 8l4.2 4.4"/></svg><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M2.4 12.8V3.6h3.9l1.7 2.2h5.6v7z"/></svg><span class="nm">思考</span></div>
+                <div class="mock-row d1"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3.4 2.6h5.2l4 4v6.8h-9.2z"/><path d="M8.6 2.6v4h4"/></svg><span class="nm">知识与连接</span></div>
+              </div>
+
+              <div class="mock-page">
+                <h1>一级标题</h1>
+                <p>这是一段普通正文，包含<b>粗体</b>、<i>斜体</i>、<span style="text-decoration:line-through">删除线</span>、<span style="font-family:var(--mono);font-size:12px;background:var(--sunk);padding:1px 5px;border-radius:var(--r-sm);color:var(--seal)">行内代码</span>，以及一个<a style="color:var(--seal);text-decoration:none">链接</a>。</p>
+                <div class="mock-quote">
+                  <div class="bar"></div>
+                  <div class="q">这是一段引用。<br>引用可以有多行。</div>
+                </div>
+                <div class="mock-code">
+                  <span class="k">function</span> greet(name) {<br>
+                  &nbsp;&nbsp;<span class="k">const</span> message = <span class="s">"Hello, "</span> + name<br>
+                  &nbsp;&nbsp;<span class="k">return</span> message<br>
+                  }
+                </div>
+              </div>
+
+              <div class="mock-outline">
+                <div class="mock-h h1"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6.4 3.6 10.6 8l-4.2 4.4"/></svg>一级标题</div>
+                <div class="mock-h h2"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6.4 3.6 10.6 8l-4.2 4.4"/></svg>二级标题</div>
+                <div class="mock-h h3"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6.4 3.6 10.6 8l-4.2 4.4"/></svg>三级标题</div>
+                <div class="mock-h h2"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6.4 3.6 10.6 8l-4.2 4.4"/></svg>四级标题</div>
+              </div>
+            </div>
+
+            <div class="mock-foot">
+              <div class="grp">
+                <span class="fb"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M8 1.83l4.34 1.83 1.83 4.34-1.83 4.34L8 14.17l-4.34-1.83L1.83 8l1.83-4.34z"/><circle cx="8" cy="8" r="2.4"/></svg></span>
+                <span class="fb"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M2.6 8a5.4 5.4 0 0 1 9.2-3.8"/><path d="M13.4 8a5.4 5.4 0 0 1-9.2 3.8"/><path d="M11.8 1.6v2.6H9.2"/><path d="M4.2 14.4v-2.6h2.6"/></svg></span>
+                <span class="fb"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M13.4 9.4A5.6 5.6 0 0 1 6.6 2.6a5.6 5.6 0 1 0 6.8 6.8z"/></svg></span>
+                <span class="fb"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M2 6V2h4M10 2h4v4M14 10v4h-4M6 14H2v-4"/></svg></span>
+              </div>
+              <div class="mid"><span class="status-dot"></span>本次已同步</div>
+              <div class="right"><span>427 字</span><span>63 行</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="page-dark" style="border-radius:var(--r-lg)">
+        <div class="mock-label" style="padding-top:6px">深色 · 同一个色相家族，只是换一种光线</div>
+        <div class="mock-frame">
+          <div class="mock">
+            <div class="mock-top">
+              <div class="mock-brand">知己笔记</div>
+              <div class="mock-tabs">
+                <div class="mock-tab"><span class="dot"></span>语法全集<span class="x">✕</span></div>
+              </div>
+              <div class="mock-outline-head">大纲</div>
+            </div>
+
+            <div class="mock-bars">
+              <div class="mock-bar">
+                <span class="ib"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M9.6 3.6 5.4 8l4.2 4.4"/></svg></span>
+                <span class="ib"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M8 6.4V2.6"/><path d="M5.6 5 8 2.6 10.4 5"/><path d="M8 9.6v3.8"/><path d="M5.6 11 8 13.4 10.4 11"/></svg></span>
+                <span class="ib"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M8 2.6v3.8"/><path d="M5.6 4 8 6.4 10.4 4"/><path d="M8 13.4V9.6"/><path d="M5.6 12 8 9.6 10.4 12"/></svg></span>
+                <span class="ib"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><circle cx="7" cy="7" r="4.5"/><path d="M10.3 10.3 13.5 13.5"/></svg></span>
+              </div>
+              <div class="mock-toolbar">
+                <span class="tb"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><circle cx="7" cy="7" r="4.5"/><path d="M10.3 10.3 13.5 13.5"/></svg></span>
+                <span class="sep"></span>
+                <span class="tb" style="width:auto;padding:0 7px">正文</span>
+                <span class="tb"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M2.6 2.8v10.4"/><path d="M5.8 5.4h7.6"/><path d="M5.8 10.6h5.2"/></svg></span>
+                <span class="sep"></span>
+                <span class="tb"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><circle cx="3.2" cy="4.8" r="1.15" fill="currentColor" stroke="none"/><circle cx="3.2" cy="11.2" r="1.15" fill="currentColor" stroke="none"/><path d="M6.6 4.8h7.2"/><path d="M6.6 11.2h7.2"/></svg></span>
+                <span class="tb"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6.6 4.6h7.2"/><path d="M6.6 11.4h7.2"/><path d="M2.2 3.2 3.5 2.4v4.2"/><path d="M2.2 9.6h2.5l-2.5 3.2h2.5"/></svg></span>
+                <span class="tb"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4.2" width="7.6" height="7.6" rx="2.2"/><path d="M4.1 8 5.7 9.6 8.3 6.6"/><path d="M11.8 8h2.4"/></svg></span>
+                <span class="sep"></span>
+                <span class="tb"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5.6 4 2.4 8l3.2 4"/><path d="M10.4 4 13.6 8l-3.2 4"/><path d="M9.2 2.8 6.8 13.2"/></svg></span>
+                <span class="tb"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3.2" width="12" height="9.6" rx="2.2"/><circle cx="5.4" cy="6.4" r="1.05"/><path d="M2.4 11.4 5.6 8.4 8 10.7 11 7.8 13.6 10.6"/></svg></span>
+                <span class="tb"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><rect x="2" y="3.2" width="12" height="9.6" rx="2.2"/><path d="M2 6.4h12"/><path d="M8 6.4v6.4"/></svg></span>
+                <span class="sep"></span>
+                <span class="tb" style="font-weight:700">B</span>
+                <span class="tb" style="font-style:italic;font-weight:500">I</span>
+                <span class="tb" style="text-decoration:line-through;font-weight:500">S</span>
+                <span class="tb"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M1.8 8h12.4"/></svg></span>
+                <span class="tb"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M7.34 8.67a3.33 3.33 0 0 0 5.03.36l2-2a3.33 3.33 0 0 0-4.71-4.71l-1.15 1.14"/><path d="M10 7.33a3.33 3.33 0 0 0-5.03-.36l-2 2a3.33 3.33 0 0 0 4.71 4.71l1.14-1.14"/></svg></span>
+                <span class="tb"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M3.6 6.4 5 4.6"/><path d="M11 6.4 12.4 4.6"/><path d="M5.6 8.6h4.8"/></svg></span>
+                <span class="sep"></span>
+                <span class="tb on"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M6.2 2.6 4.4 13.4"/><path d="M11.6 2.6 9.8 13.4"/><path d="M2.6 5.8h11.2"/><path d="M2.2 10.2h11.2"/></svg></span>
+                <span class="tb"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M3.6 4.6h7"/><path d="M7.1 4.6v7.8"/><path d="M2.8 12.6 13.2 3.4"/></svg></span>
+              </div>
+              <div class="mock-bar right">
+                <span class="ib"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><circle cx="7" cy="7" r="4.5"/><path d="M10.3 10.3 13.5 13.5"/></svg></span>
+                <span class="ib"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M8 2.6v3.8"/><path d="M5.6 4 8 6.4 10.4 4"/><path d="M8 13.4V9.6"/><path d="M5.6 12 8 9.6 10.4 12"/></svg></span>
+                <span class="ib"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M8 6.4V2.6"/><path d="M5.6 5 8 2.6 10.4 5"/><path d="M8 9.6v3.8"/><path d="M5.6 11 8 13.4 10.4 11"/></svg></span>
+                <span class="ib"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6.4 3.6 10.6 8l-4.2 4.4"/></svg></span>
+              </div>
+            </div>
+
+            <div class="mock-body">
+              <div class="mock-tree">
+                <div class="mock-row on"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3.4 2.6h5.2l4 4v6.8h-9.2z"/><path d="M8.6 2.6v4h4"/></svg><span class="nm">语法全集</span></div>
+                <div class="mock-row folder"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M9.6 3.6 5.4 8l4.2 4.4"/></svg><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M2.4 12.8V3.6h3.9l1.7 2.2h5.6v7z"/></svg><span class="nm">技术</span></div>
+                <div class="mock-row d1"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3.4 2.6h5.2l4 4v6.8h-9.2z"/><path d="M8.6 2.6v4h4"/></svg><span class="nm">为什么是逐字索引</span></div>
+                <div class="mock-row d1"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3.4 2.6h5.2l4 4v6.8h-9.2z"/><path d="M8.6 2.6v4h4"/></svg><span class="nm">索引体积实测</span></div>
+                <div class="mock-row folder"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M9.6 3.6 5.4 8l4.2 4.4"/></svg><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M2.4 12.8V3.6h3.9l1.7 2.2h5.6v7z"/></svg><span class="nm">待整理</span></div>
+                <div class="mock-row d1"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3.4 2.6h5.2l4 4v6.8h-9.2z"/><path d="M8.6 2.6v4h4"/></svg><span class="nm">正则备忘</span></div>
+                <div class="mock-row folder"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M9.6 3.6 5.4 8l4.2 4.4"/></svg><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M2.4 12.8V3.6h3.9l1.7 2.2h5.6v7z"/></svg><span class="nm">思考</span></div>
+                <div class="mock-row d1"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3.4 2.6h5.2l4 4v6.8h-9.2z"/><path d="M8.6 2.6v4h4"/></svg><span class="nm">知识与连接</span></div>
+              </div>
+
+              <div class="mock-page">
+                <h1>一级标题</h1>
+                <p>这是一段普通正文，包含<b>粗体</b>、<i>斜体</i>、<span style="text-decoration:line-through">删除线</span>、<span style="font-family:var(--mono);font-size:12px;background:var(--sunk);padding:1px 5px;border-radius:var(--r-sm);color:var(--seal)">行内代码</span>，以及一个<a style="color:var(--seal);text-decoration:none">链接</a>。</p>
+                <div class="mock-quote">
+                  <div class="bar"></div>
+                  <div class="q">这是一段引用。<br>引用可以有多行。</div>
+                </div>
+                <div class="mock-code">
+                  <span class="k">function</span> greet(name) {<br>
+                  &nbsp;&nbsp;<span class="k">const</span> message = <span class="s">"Hello, "</span> + name<br>
+                  &nbsp;&nbsp;<span class="k">return</span> message<br>
+                  }
+                </div>
+              </div>
+
+              <div class="mock-outline">
+                <div class="mock-h h1"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6.4 3.6 10.6 8l-4.2 4.4"/></svg>一级标题</div>
+                <div class="mock-h h2"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6.4 3.6 10.6 8l-4.2 4.4"/></svg>二级标题</div>
+                <div class="mock-h h3"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6.4 3.6 10.6 8l-4.2 4.4"/></svg>三级标题</div>
+                <div class="mock-h h2"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6.4 3.6 10.6 8l-4.2 4.4"/></svg>四级标题</div>
+              </div>
+            </div>
+
+            <div class="mock-foot">
+              <div class="grp">
+                <span class="fb"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M8 1.83l4.34 1.83 1.83 4.34-1.83 4.34L8 14.17l-4.34-1.83L1.83 8l1.83-4.34z"/><circle cx="8" cy="8" r="2.4"/></svg></span>
+                <span class="fb"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M2.6 8a5.4 5.4 0 0 1 9.2-3.8"/><path d="M13.4 8a5.4 5.4 0 0 1-9.2 3.8"/><path d="M11.8 1.6v2.6H9.2"/><path d="M4.2 14.4v-2.6h2.6"/></svg></span>
+                <span class="fb"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="8" r="3.1"/><path d="M8 1.4v1.6M8 13v1.6M1.4 8h1.6M13 8h1.6M3.3 3.3l1.15 1.15M11.55 11.55 12.7 12.7M12.7 3.3l-1.15 1.15M4.45 11.55 3.3 12.7"/></svg></span>
+                <span class="fb"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M2 6V2h4M10 2h4v4M14 10v4h-4M6 14H2v-4"/></svg></span>
+              </div>
+              <div class="mid"><span class="status-dot"></span>本次已同步</div>
+              <div class="right"><span>427 字</span><span>63 行</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    <div class="note">
+      <b>还有一件事，是可选的。</b>收起侧栏时现在显示一个「知」字，跟展开时的「知己笔记」同字体同字重——这个思路是对的。
+      但「知」单独一个字，本来就是一个<b>印</b>。把它做成朱砂的印章方块（下面这样），全应用只出现两处：收起后的侧栏、空状态。
+      整个界面是墨与纸，只有一个朱砂的点——这就是那件"记得住的事"，其余的保持安静。
+    </div>
+
+    <div class="seal-line">
+      <div class="seal-mark">知</div>
+      <div class="txt">一个 40px 的朱砂方块，圆角 4px，里面一个「知」。不用渐变、不用描边、不用阴影——印泥就是一块平的色。</div>
+    </div>
+  </section>
+
+</div>
+
+</body>
+</html>

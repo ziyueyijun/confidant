@@ -1,16 +1,47 @@
 /** @type {import('tailwindcss').Config} */
 export default {
   content: ['./index.html', './src/**/*.{ts,tsx}'],
+  darkMode: 'class',
   theme: {
     extend: {
       fontFamily: {
-        // 中文正文优先用系统 UI 字体链
         sans: [
-          '-apple-system', 'BlinkMacSystemFont', 'Segoe UI',
-          'Microsoft YaHei', 'PingFang SC', 'Hiragino Sans GB',
-          'Source Han Sans SC', 'Noto Sans CJK SC', 'sans-serif',
+          '-apple-system', 'BlinkMacSystemFont',
+          '"SF Pro Display"', '"SF Pro Text"', 'PingFang SC',
+          'Segoe UI',
+          'Noto Sans SC', 'Microsoft YaHei',
         ],
-        mono: ['Cascadia Code', 'Consolas', 'SF Mono', 'Menlo', 'monospace'],
+        mono: [
+          '"SF Mono"', 'Cascadia Code', 'Menlo',
+          'Consolas',
+        ],
+      },
+      colors: {
+        accent: {
+          DEFAULT: 'var(--accent)',
+          hover: 'var(--accent-hover)',
+          light: 'var(--accent-light)',
+        },
+        surface: {
+          primary: 'var(--surface-primary)',
+          secondary: 'var(--surface-secondary)',
+          tertiary: 'var(--surface-tertiary)',
+          hover: 'var(--surface-hover)',
+        },
+        content: {
+          primary: 'var(--content-primary)',
+          secondary: 'var(--content-secondary)',
+          muted: 'var(--content-muted)',
+        },
+        border: {
+          DEFAULT: 'var(--border-color)',
+          hover: 'var(--border-hover)',
+          strong: 'var(--border-strong)',
+        },
+      },
+      spacing: {
+        sidebar: '220px',
+        outline: '200px',
       },
     },
   },

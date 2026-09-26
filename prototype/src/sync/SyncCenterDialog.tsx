@@ -9,6 +9,10 @@ import { 状态文字, 配置, type SyncMock, type Conflict } from './data'
  *
  * 页签放在**内容区顶部**而不是标题栏——「同步中心」是标题，
  * 页签是导航，两者不是一回事。把标题做成页签会让人以为点它有反应。
+ *
+ * **弹窗高度固定**，与设置弹窗同一个值（640px / 85vh 兜底）：两个页签的
+ * 内容长短差得远（概览四块、冲突可能只有两条），跟着内容变的话，切一下页签
+ * 整个窗口跳一次，用户还得重新找刚才那个按钮在哪儿。
  */
 export function SyncCenterDialog({
   mock,
@@ -26,33 +30,35 @@ export function SyncCenterDialog({
   const [armed, setArmed] = useState<null | '上传' | '下载'>(null)
 
   return (
-    <div className="fixed inset-0 z-40 flex items-center justify-center bg-slate-900/30 p-6">
-      <div className="flex max-h-[85vh] w-full max-w-3xl flex-col overflow-hidden rounded-lg bg-white shadow-2xl">
-        <div className="flex shrink-0 items-center border-b border-slate-200 px-4 py-2.5">
-          <span className="text-sm font-medium text-slate-700">同步中心</span>
+    <div className="fixed inset-0 z-40 flex items-center justify-center p-6" style={{ backgroundColor: 'rgba(26,23,20,0.15)' }}>
+      <div className="flex h-[640px] max-h-[85vh] w-full max-w-3xl flex-col overflow-hidden shadow-2xl" style={{ borderRadius: 'var(--radius-lg)', backgroundColor: 'var(--surface-primary)', border: '1px solid var(--border-color)' }}>
+        <div className="flex shrink-0 items-center px-4 py-2.5" style={{ borderBottom: '1px solid var(--border-color)' }}>
+          <span className="text-sm font-medium" style={{ color: 'var(--content-primary)' }}>同步中心</span>
           <button
             onClick={onClose}
-            className="ml-auto rounded px-2 py-0.5 text-xs text-slate-500 hover:bg-slate-100 hover:text-slate-800"
+            className="ml-auto rounded px-2 py-0.5 text-xs transition-colors hover:bg-[var(--surface-hover)]"
+            style={{ color: 'var(--content-muted)' }}
           >
             关闭
           </button>
         </div>
 
         <div className="flex min-h-0 flex-1 flex-col">
-          <div className="flex shrink-0 items-center gap-1 border-b border-slate-200 bg-white px-4">
+          <div className="flex shrink-0 items-center gap-1 px-4" style={{ borderBottom: '1px solid var(--border-color)', backgroundColor: 'var(--surface-secondary)' }}>
             {(['overview', 'conflicts'] as const).map((t) => (
               <button
                 key={t}
                 onClick={() => setTab(t)}
-                className={`-mb-px border-b-2 px-3 py-2 text-xs transition ${
-                  tab === t
-                    ? 'border-slate-800 font-medium text-slate-900'
-                    : 'border-transparent text-slate-500 hover:text-slate-800'
-                }`}
+                className="-mb-px border-b-2 px-3 py-2 text-xs transition"
+                style={{
+                  borderColor: tab === t ? 'var(--accent)' : 'transparent',
+                  color: tab === t ? 'var(--accent)' : 'var(--content-secondary)',
+                  fontWeight: tab === t ? 500 : 400,
+                }}
               >
                 {{ overview: '概览', conflicts: '冲突' }[t]}
                 {t === 'conflicts' && hasConflicts && (
-                  <span className="ml-1.5 rounded bg-amber-400 px-1 text-[10px] text-slate-900">
+                  <span className="ml-1.5 rounded px-1 text-[10pxpx]" style={{ backgroundColor: 'var(--accent)', color: 'white' }}>
                     {mock.conflicts.length}
                   </span>
                 )}
@@ -60,7 +66,7 @@ export function SyncCenterDialog({
             ))}
           </div>
 
-          <div className="min-h-0 flex-1 overflow-auto bg-slate-50">
+          <div className="min-h-0 flex-1 overflow-auto" style={{ backgroundColor: 'var(--surface-secondary)' }}>
             <div className="p-5">
               {tab === 'overview' ? (
                 <div className="space-y-4">
@@ -99,11 +105,11 @@ function StatusCard({
 }) {
   const s = mock.status
   return (
-    <section className="rounded-lg border border-slate-200 bg-white p-4">
+    <section className="rounded-lg border p-4" style={{ borderColor: 'var(--border-color)', backgroundColor: 'var(--surface-primary)' }}>
       <div className="flex items-baseline justify-between">
         <div>
-          <div className="text-sm font-semibold text-slate-800">{状态文字(s)}</div>
-          <div className="mt-0.5 text-[11px] text-slate-500">
+          <div className="text-sm font-semibold" style={{ color: 'var(--content-primary)' }}>{状态文字(s)}</div>
+          <div className="mt-0.5 text-[11px]" style={{ color: 'var(--content-muted)' }}>
             {s.phase === 'unconfigured'
               ? '还没填 WebDAV 信息，去菜单 →「设置…」里填好就能开始同步。'
               : `远端 ${配置.server}${配置.path}`}
@@ -112,13 +118,14 @@ function StatusCard({
         {s.phase === 'never' && (
           <button
             onClick={() => onOverlay('first')}
-            className="rounded bg-sky-600 px-3 py-1.5 text-xs text-white hover:bg-sky-500"
+            className="rounded px-3 py-1.5 text-xs text-white transition-colors"
+            style={{ backgroundColor: 'var(--accent)' }}
           >
             开始首次同步
           </button>
         )}
         {s.phase === 'failed' && (
-          <button className="rounded border border-slate-300 bg-white px-3 py-1.5 text-xs hover:bg-slate-100">
+          <button className="rounded border px-3 py-1.5 text-xs transition-colors hover:bg-[var(--surface-hover)]" style={{ borderColor: 'var(--border-color)', backgroundColor: 'var(--surface-primary)', color: 'var(--content-secondary)' }}>
             立即重试
           </button>
         )}
@@ -126,13 +133,13 @@ function StatusCard({
 
       {s.phase === 'syncing' && s.progress && (
         <div className="mt-3">
-          <div className="h-1.5 overflow-hidden rounded-full bg-slate-200">
+          <div className="h-1.5 overflow-hidden rounded-full" style={{ backgroundColor: 'var(--surface-tertiary)' }}>
             <div
-              className="h-full bg-sky-500"
-              style={{ width: `${(s.progress.done / s.progress.total) * 100}%` }}
+              className="h-full"
+              style={{ width: `${(s.progress.done / s.progress.total) * 100}%`, backgroundColor: 'var(--accent)' }}
             />
           </div>
-          <div className="mt-1.5 flex justify-between text-[11px] text-slate-500">
+          <div className="mt-1.5 flex justify-between text-[11px]" style={{ color: 'var(--content-muted)' }}>
             <span className="truncate">{s.currentFile}</span>
             <span className="shrink-0">
               {s.progress.done} / {s.progress.total}
@@ -142,7 +149,7 @@ function StatusCard({
       )}
 
       {s.phase === 'failed' && s.error && (
-        <div className="mt-3 rounded border border-amber-200 bg-amber-50 px-3 py-2 text-[11px] leading-relaxed text-amber-900">
+        <div className="mt-3 rounded border px-3 py-2 text-[11px] leading-relaxed" style={{ borderColor: 'var(--accent)', backgroundColor: 'var(--accent-subtle)', color: 'var(--accent-hover)' }}>
           {s.error}
         </div>
       )}
@@ -158,14 +165,15 @@ function DeleteWarning({
   onOverlay: (o: 'delete') => void
 }) {
   return (
-    <section className="rounded-lg border border-amber-300 bg-amber-50 p-4">
-      <div className="text-xs font-medium text-amber-900">这次同步要删 {count} 篇笔记</div>
-      <div className="mt-1 text-[11px] leading-relaxed text-amber-800">
+    <section className="rounded-lg border p-4" style={{ borderColor: 'var(--accent)', backgroundColor: 'var(--accent-subtle)' }}>
+      <div className="text-xs font-medium" style={{ color: 'var(--accent-hover)' }}>这次同步要删 {count} 篇笔记</div>
+      <div className="mt-1 text-[11px] leading-relaxed" style={{ color: 'var(--accent)' }}>
         超过阈值（10 篇），需要你确认后才会继续。
       </div>
       <button
         onClick={() => onOverlay('delete')}
-        className="mt-2 rounded bg-amber-700 px-3 py-1.5 text-xs text-white hover:bg-amber-600"
+        className="mt-2 rounded px-3 py-1.5 text-xs text-white transition-colors"
+        style={{ backgroundColor: 'var(--accent-hover)' }}
       >
         查看并确认
       </button>
@@ -186,15 +194,15 @@ function PendingSection({
     return null
   }
   return (
-    <section className="rounded-lg border border-slate-200 bg-white p-4">
-      <div className="mb-2.5 text-xs font-medium text-slate-700">待处理</div>
+    <section className="rounded-lg border p-4" style={{ borderColor: 'var(--border-color)', backgroundColor: 'var(--surface-primary)' }}>
+      <div className="mb-2.5 text-xs font-medium" style={{ color: 'var(--content-primary)' }}>待处理</div>
       <div className="grid grid-cols-3 gap-2">
         <Stat label="本地改动待上传" value={byKind('upload')} />
         <Stat label="远端改动待下载" value={byKind('download')} />
         <Stat
           label="冲突待处理"
           value={mock.conflicts.length}
-          tone="amber"
+          tone="accent"
           onClick={onJumpToConflicts}
         />
       </div>
@@ -213,8 +221,8 @@ function Operations({
 }) {
   const byKind = (k: string) => mock.changes.filter((c) => c.kind === k).length
   return (
-    <section className="rounded-lg border border-slate-200 bg-white">
-      <div className="border-b border-slate-100 px-4 py-2.5 text-xs font-medium text-slate-700">
+    <section className="rounded-lg border" style={{ borderColor: 'var(--border-color)', backgroundColor: 'var(--surface-primary)' }}>
+      <div className="border-b px-4 py-2.5 text-xs font-medium" style={{ borderColor: 'var(--border-color)', color: 'var(--content-primary)' }}>
         操作
       </div>
 
@@ -224,7 +232,7 @@ function Operations({
         consequence="不覆盖任何一侧；两边都改过的走冲突处理"
         tone="safe"
         action={
-          <button className="rounded bg-slate-800 px-3 py-1.5 text-xs text-white hover:bg-slate-700">
+          <button className="rounded px-3 py-1.5 text-xs transition-colors" style={{ backgroundColor: 'var(--solid-bg)', color: 'var(--solid-fg)' }}>
             执行
           </button>
         }
@@ -245,7 +253,8 @@ function Operations({
           ) : (
             <button
               onClick={() => setArmed('上传')}
-              className="rounded border border-red-300 bg-white px-3 py-1.5 text-xs text-red-800 hover:bg-red-50"
+              className="rounded border px-3 py-1.5 text-xs transition-colors hover:bg-red-50"
+              style={{ borderColor: '#dc2626', color: '#dc2626' }}
             >
               上传…
             </button>
@@ -268,7 +277,8 @@ function Operations({
           ) : (
             <button
               onClick={() => setArmed('下载')}
-              className="rounded border border-red-300 bg-white px-3 py-1.5 text-xs text-red-800 hover:bg-red-50"
+              className="rounded border px-3 py-1.5 text-xs transition-colors hover:bg-red-50"
+              style={{ borderColor: '#dc2626', color: '#dc2626' }}
             >
               下载…
             </button>
@@ -287,21 +297,21 @@ function Stat({
 }: {
   label: string
   value: number
-  tone?: 'amber'
+  tone?: 'accent'
   onClick?: () => void
 }) {
   const Comp = onClick ? 'button' : 'div'
   return (
     <Comp
       onClick={onClick}
-      className={`rounded border px-2.5 py-2 text-left ${
-        tone === 'amber' && value > 0
-          ? 'border-amber-200 bg-amber-50 hover:bg-amber-100'
-          : 'border-slate-200 bg-slate-50'
-      }`}
+      className="rounded border px-2.5 py-2 text-left"
+      style={{
+        borderColor: tone === 'accent' && value > 0 ? 'var(--accent)' : 'var(--border-color)',
+        backgroundColor: tone === 'accent' && value > 0 ? 'var(--accent-subtle)' : 'var(--surface-secondary)',
+      }}
     >
-      <div className="text-[10px] text-slate-500">{label}</div>
-      <div className="text-base font-semibold text-slate-800">{value}</div>
+      <div className="text-[10px]" style={{ color: 'var(--content-muted)' }}>{label}</div>
+      <div className="text-base font-semibold" style={{ color: 'var(--content-primary)' }}>{value}</div>
     </Comp>
   )
 }
@@ -321,21 +331,25 @@ function CommandRow({
 }) {
   return (
     <div
-      className={`flex items-center gap-4 border-b border-slate-100 px-4 py-3 last:border-b-0 ${
-        tone === 'danger' ? 'bg-red-50/40' : ''
-      }`}
+      className="flex items-center gap-4 border-b px-4 py-3 last:border-b-0"
+      style={{
+        borderColor: 'var(--border-color)',
+        backgroundColor: tone === 'danger' ? 'rgba(220,38,38,0.04)' : 'transparent',
+      }}
     >
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-2">
           <span
-            className={`text-sm font-medium ${tone === 'danger' ? 'text-red-800' : 'text-slate-800'}`}
+            className="text-sm font-medium"
+            style={{ color: tone === 'danger' ? '#dc2626' : 'var(--content-primary)' }}
           >
             {title}
           </span>
-          <span className="text-[11px] text-slate-500">{desc}</span>
+          <span className="text-[11px]" style={{ color: 'var(--content-muted)' }}>{desc}</span>
         </div>
         <div
-          className={`mt-0.5 text-[11px] ${tone === 'danger' ? 'text-red-600' : 'text-slate-400'}`}
+          className="mt-0.5 text-[11px]"
+          style={{ color: tone === 'danger' ? '#dc2626' : 'var(--content-muted)' }}
         >
           {tone === 'danger' ? '⚠ ' : ''}
           {consequence}
@@ -359,9 +373,9 @@ function ConfirmInline({
   const ok = typed === word
   return (
     <div className="flex items-center gap-1.5">
-      <div className="text-right text-[10px] leading-tight text-red-700">
+      <div className="text-right text-[10px] leading-tight" style={{ color: '#dc2626' }}>
         <div>将覆盖{target}</div>
-        <div className="text-slate-500">
+        <div style={{ color: 'var(--content-muted)' }}>
           输入 <span className="font-mono font-medium">{word}</span> 确认
         </div>
       </div>
@@ -369,21 +383,23 @@ function ConfirmInline({
         autoFocus
         value={typed}
         onChange={(e) => setTyped(e.target.value)}
-        className="w-16 rounded border border-red-300 px-1.5 py-0.5 text-xs outline-none focus:border-red-500"
+        className="w-16 rounded border px-1.5 py-0.5 text-xs outline-none"
+        style={{ borderColor: 'var(--border-color)', backgroundColor: 'var(--surface-primary)' }}
       />
       <button
         disabled={!ok}
-        className={`rounded px-2 py-1 text-xs ${
-          ok
-            ? 'bg-red-700 text-white hover:bg-red-600'
-            : 'cursor-not-allowed bg-slate-200 text-slate-400'
-        }`}
+        className="rounded px-2 py-1 text-xs"
+        style={{
+          backgroundColor: ok ? '#dc2626' : 'var(--surface-tertiary)',
+          color: ok ? 'white' : 'var(--content-muted)',
+        }}
       >
         执行
       </button>
       <button
         onClick={onCancel}
-        className="rounded px-1.5 py-1 text-xs text-slate-500 hover:bg-slate-100"
+        className="rounded px-1.5 py-1 text-xs transition-colors hover:bg-[var(--surface-hover)]"
+        style={{ color: 'var(--content-muted)' }}
       >
         取消
       </button>
@@ -402,9 +418,9 @@ function ConflictList({
 }) {
   if (conflicts.length === 0) {
     return (
-      <div className="rounded-lg border border-dashed border-slate-300 bg-white py-16 text-center">
-        <div className="text-sm text-slate-400">没有待处理的冲突</div>
-        <div className="mt-1 text-[11px] text-slate-400">
+      <div className="rounded-lg border border-dashed p-16 text-center" style={{ borderColor: 'var(--border-color)', backgroundColor: 'var(--surface-primary)' }}>
+        <div className="text-sm" style={{ color: 'var(--content-muted)' }}>没有待处理的冲突</div>
+        <div className="mt-1 text-[11px]" style={{ color: 'var(--content-muted)' }}>
           两处都改了同一篇且无法自动合并时，会出现在这里
         </div>
       </div>
@@ -412,39 +428,38 @@ function ConflictList({
   }
 
   return (
-    <section className="rounded-lg border border-amber-200 bg-white p-4">
+    <section className="rounded-lg border p-4" style={{ borderColor: 'var(--accent)', backgroundColor: 'var(--surface-primary)' }}>
       <div className="flex items-baseline gap-2">
-        <span className="text-xs font-medium text-slate-700">待处理的冲突</span>
-        <span className="text-[11px] text-amber-700">{conflicts.length} 条</span>
+        <span className="text-xs font-medium" style={{ color: 'var(--content-primary)' }}>待处理的冲突</span>
+        <span className="text-[11px]" style={{ color: 'var(--accent)' }}>{conflicts.length} 条</span>
       </div>
-      <p className="mt-1 text-[11px] leading-relaxed text-slate-500">
+      <p className="mt-1 text-[11px] leading-relaxed" style={{ color: 'var(--content-muted)' }}>
         两处都改了同一篇、且无法自动合并。副本存在{' '}
-        <code className="rounded bg-slate-100 px-1">.confidant/conflicts/</code>
-        ，它们是真实的 <code className="rounded bg-slate-100 px-1">.md</code> 文件，
+        <code className="rounded px-1" style={{ backgroundColor: 'var(--surface-tertiary)' }}>.confidant/conflicts/</code>
+        ，它们是真实的 <code className="rounded px-1" style={{ backgroundColor: 'var(--surface-tertiary)' }}>.md</code> 文件，
         用记事本也能打开。处理完就从这里消失。
       </p>
 
       <div className="mt-3 space-y-2">
         {conflicts.map((c) => (
-          <div key={c.id} className="rounded border border-amber-200 bg-amber-50/50 p-3">
+          <div key={c.id} className="rounded border p-3" style={{ borderColor: 'var(--accent)', backgroundColor: 'var(--accent-subtle)' }}>
             <div className="flex items-baseline gap-2">
-              <span className="text-sm font-medium text-slate-800">{c.path}</span>
-              <span className="ml-auto text-[10px] text-slate-500">
+              <span className="text-sm font-medium" style={{ color: 'var(--content-primary)' }}>{c.path}</span>
+              <span className="ml-auto text-[10px]" style={{ color: 'var(--content-muted)' }}>
                 {c.at} · 来自 {c.from}
               </span>
             </div>
-            <div className="mt-1 truncate font-mono text-[10px] text-slate-400">{c.copyName}</div>
+            <div className="mt-1 truncate font-mono text-[10px]" style={{ color: 'var(--content-muted)' }}>{c.copyName}</div>
             <div className="mt-2.5 flex items-center gap-2">
-              <button className="rounded bg-slate-800 px-3 py-1.5 text-xs text-white hover:bg-slate-700">
+              <button className="rounded px-3 py-1.5 text-xs transition-colors" style={{ backgroundColor: 'var(--solid-bg)', color: 'var(--solid-fg)' }}>
                 保留我的
               </button>
-              <button className="rounded border border-slate-300 bg-white px-3 py-1.5 text-xs hover:bg-slate-100">
+              <button className="rounded border px-3 py-1.5 text-xs transition-colors hover:bg-[var(--surface-hover)]" style={{ borderColor: 'var(--border-color)', backgroundColor: 'var(--surface-primary)', color: 'var(--content-secondary)' }}>
                 保留远端的
               </button>
               <button
                 onClick={() => onOpen(c)}
-                className="rounded border border-slate-300 bg-white px-3 py-1.5 text-xs hover:bg-slate-100"
-              >
+                className="rounded border px-3 py-1.5 text-xs transition-colors hover:bg-[var(--surface-hover)]" style={{ borderColor: 'var(--border-color)', backgroundColor: 'var(--surface-primary)', color: 'var(--content-secondary)' }}>
                 手工合并…
               </button>
             </div>
@@ -464,14 +479,14 @@ export function ConflictCompare({
 }) {
   const [pick, setPick] = useState<'local' | 'remote' | null>(null)
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-6">
-      <div className="w-full max-w-4xl overflow-hidden rounded-lg bg-white shadow-2xl">
-        <div className="flex items-baseline justify-between border-b border-slate-200 px-5 py-3">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-6" style={{ backgroundColor: 'rgba(26,23,20,0.2)' }}>
+      <div className="w-full max-w-4xl overflow-hidden shadow-2xl" style={{ borderRadius: 'var(--radius-lg)', backgroundColor: 'var(--surface-primary)', border: '1px solid var(--border-color)' }}>
+        <div className="flex items-baseline justify-between px-5 py-3" style={{ borderBottom: '1px solid var(--border-color)' }}>
           <div>
-            <h3 className="text-sm font-semibold text-slate-800">{conflict.path}</h3>
-            <div className="font-mono text-[10px] text-slate-500">{conflict.copyName}</div>
+            <h3 className="text-sm font-semibold" style={{ color: 'var(--content-primary)' }}>{conflict.path}</h3>
+            <div className="font-mono text-[10px]" style={{ color: 'var(--content-muted)' }}>{conflict.copyName}</div>
           </div>
-          <button onClick={onClose} className="text-xs text-slate-500 hover:text-slate-800">
+          <button onClick={onClose} className="text-xs transition-colors hover:bg-[var(--surface-hover)]" style={{ color: 'var(--content-muted)' }}>
             关闭
           </button>
         </div>
@@ -486,34 +501,34 @@ export function ConflictCompare({
             <button
               key={key}
               onClick={() => setPick(key)}
-              className={`rounded border-2 text-left transition ${
-                pick === key
-                  ? 'border-sky-500 bg-sky-50/50'
-                  : 'border-slate-200 bg-white hover:border-slate-300'
-              }`}
+              className="rounded border-2 text-left transition"
+              style={{
+                borderColor: pick === key ? 'var(--accent)' : 'var(--border-color)',
+                backgroundColor: pick === key ? 'var(--accent-subtle)' : 'var(--surface-primary)',
+              }}
             >
-              <div className="border-b border-slate-100 px-3 py-2">
-                <div className="text-xs font-medium text-slate-700">{title}</div>
-                <div className="text-[10px] text-slate-400">{sub}</div>
+              <div className="border-b px-3 py-2" style={{ borderColor: 'var(--border-color)' }}>
+                <div className="text-xs font-medium" style={{ color: 'var(--content-primary)' }}>{title}</div>
+                <div className="text-[10px]" style={{ color: 'var(--content-muted)' }}>{sub}</div>
               </div>
-              <pre className="max-h-72 overflow-auto whitespace-pre-wrap px-3 py-2.5 font-sans text-[12px] leading-[1.8] text-slate-700">
+              <pre className="max-h-72 overflow-auto whitespace-pre-wrap px-3 py-2.5 font-sans text-[12px] leading-[1.8]" style={{ color: 'var(--content-secondary)' }}>
                 {body}
               </pre>
             </button>
           ))}
         </div>
 
-        <div className="flex items-center gap-2 border-t border-slate-200 bg-slate-50 px-5 py-3">
-          <span className="text-[11px] text-slate-500">
+        <div className="flex items-center gap-2 px-5 py-3" style={{ borderTop: '1px solid var(--border-color)', backgroundColor: 'var(--surface-secondary)' }}>
+          <span className="text-[11px]" style={{ color: 'var(--content-muted)' }}>
             {pick ? '点「采用」后，另一份会保留为副本。' : '点一边把它选为最终版本。'}
           </span>
           <button
             disabled={!pick}
-            className={`ml-auto rounded px-3 py-1.5 text-xs ${
-              pick
-                ? 'bg-slate-800 text-white hover:bg-slate-700'
-                : 'cursor-not-allowed bg-slate-200 text-slate-400'
-            }`}
+            className="ml-auto rounded px-3 py-1.5 text-xs"
+            style={{
+              backgroundColor: pick ? 'var(--content-primary)' : 'var(--surface-tertiary)',
+              color: pick ? 'white' : 'var(--content-muted)',
+            }}
           >
             采用选中的版本
           </button>

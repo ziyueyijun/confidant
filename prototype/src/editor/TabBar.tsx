@@ -1,12 +1,9 @@
 /**
  * 标签栏。每块分屏各有一条。
- *
- * 右键菜单：关闭当前标签 / 关闭其他标签 / 向右分屏 / 刷新 / 保存。
- * 关闭按钮和菜单里的「关闭」都只发请求（onCloseRequest），由上层决定
- * 要不要先弹保存确认——脏状态只有上层知道。
  */
 import { useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
+import { IconClose } from '../icons'
 
 export interface TabItem {
   path: string
@@ -18,10 +15,6 @@ interface Props {
   paneId: string
   tabs: TabItem[]
   active: string | null
-  /**
-   * 挪动项的文案与可用性，由上层按当前栏的位置给出：「向右分屏」/
-   * 「移到左栏」/「移到右栏」。disabled 时文案不变，只是置灰。
-   */
   moveLabel: { label: string; enabled: boolean }
   onActivate: (paneId: string, path: string) => void
   onCloseRequest: (paneId: string, path: string) => void
@@ -54,7 +47,6 @@ export function TabBar({
 }: Props) {
   const [menu, setMenu] = useState<MenuState | null>(null)
 
-  // 点别处、按 Esc、滚动或改窗口大小都收起菜单
   useEffect(() => {
     if (!menu) return
     const dismiss = () => setMenu(null)
@@ -75,13 +67,9 @@ export function TabBar({
 
   const items = menu
     ? [
-        { label: '关闭当前标签', run: () => onCloseRequest(paneId, menu.path) },
+        { label: '关闭标签', run: () => onCloseRequest(paneId, menu.path) },
         { label: '关闭其他标签', run: () => onCloseOthers(paneId, menu.path), disabled: tabs.length < 2 },
-        {
-          label: moveLabel.label,
-          run: () => onMove(paneId, menu.path),
-          disabled: !moveLabel.enabled,
-        },
+        { label: moveLabel.label, run: () => onMove(paneId, menu.path), disabled: !moveLabel.enabled },
         { label: '刷新', run: () => onRefresh(paneId, menu.path) },
         { label: '保存', run: () => onSave(menu.path) },
       ]
@@ -89,7 +77,14 @@ export function TabBar({
 
   return (
     <>
-      <div className="flex h-9 shrink-0 items-stretch overflow-x-auto border-b border-slate-200 bg-slate-50/70">
+      <div
+        /* h-10 与两侧的顶栏同高——三条横栏的下边缘对齐。
+           shrink-0 是必须的：它住在 flex-col 的 pane 里，不加的话高度会被压。
+           cm-tab-bar 是给测试用的稳定钩子：Tailwind 类名组合到处都是，
+           拿它当选择器太脆（侧栏工具条也曾用过 items-stretch，一撞就选错）。 */
+        className="cm-tab-bar flex h-10 shrink-0 items-stretch overflow-x-auto"
+        style={{ backgroundColor: 'var(--surface-secondary)', borderBottom: '1px solid var(--border-color)' }}
+      >
         {tabs.map((t) => {
           const isActive = t.path === active
           return (
@@ -102,19 +97,24 @@ export function TabBar({
                 setMenu({ x: e.clientX, y: e.clientY, path: t.path })
               }}
               title={t.path}
-              className={`group flex shrink-0 cursor-default items-center gap-1 border-r border-slate-200 px-3 text-xs transition-colors ${
-                isActive
-                  ? 'bg-white text-slate-800'
-                  : 'text-slate-500 hover:bg-slate-100 hover:text-slate-700'
-              }`}
+              className="group flex shrink-0 cursor-default items-center gap-2 border-r px-3 text-sm transition-colors"
+              style={{
+                borderColor: 'var(--border-color)',
+                // 选中的标签用**正文那一块的面色**（surface-center）：它跟下面
+                // 的工具栏、编辑区连成一片，读起来是"这一页正摊开在桌上"，
+                // 而不是"另一个被选中的按钮"。未选中的透出标签栏底色。
+                backgroundColor: isActive ? 'var(--surface-center)' : 'transparent',
+                color: isActive ? 'var(--content-primary)' : 'var(--content-secondary)',
+              }}
             >
               {t.dirty && (
                 <span
-                  className="h-1.5 w-1.5 shrink-0 rounded-full bg-amber-500"
+                  className="h-2 w-2 shrink-0 rounded-full"
+                  style={{ backgroundColor: 'var(--accent)' }}
                   title="有未保存的更改"
                 />
               )}
-              <span className="max-w-[10rem] truncate">{t.title}</span>
+              <span className="max-w-[8rem] truncate">{t.title}</span>
               <button
                 onMouseDown={(e) => e.stopPropagation()}
                 onClick={(e) => {
@@ -122,11 +122,10 @@ export function TabBar({
                   onCloseRequest(paneId, t.path)
                 }}
                 title="关闭"
-                className={`ml-0.5 shrink-0 rounded px-1 leading-none transition-opacity ${
-                  isActive ? 'opacity-60 hover:bg-slate-200 hover:opacity-100' : 'opacity-0 group-hover:opacity-60 hover:!opacity-100'
-                }`}
+                className="shrink-0 rounded p-0.5 opacity-0 transition-all group-hover:opacity-100"
+                style={{ color: 'var(--content-muted)' }}
               >
-                ×
+                <IconClose size={14} />
               </button>
             </div>
           )
@@ -137,14 +136,16 @@ export function TabBar({
         createPortal(
           <div
             role="menu"
-            // 拦下 mousedown，否则 window 上的 dismiss 会在 click 之前把菜单拆掉
             onMouseDown={(e) => e.stopPropagation()}
             onContextMenu={(e) => e.preventDefault()}
             style={{
               left: Math.min(menu.x, window.innerWidth - MENU_WIDTH - 8),
               top: Math.min(menu.y, window.innerHeight - MENU_HEIGHT - 8),
+              backgroundColor: 'var(--surface-primary)',
+              borderColor: 'var(--border-color)',
+              color: 'var(--content-primary)',
             }}
-            className="fixed z-50 min-w-[9rem] overflow-hidden rounded-lg border border-slate-200 bg-white py-1 shadow-lg"
+            className="fixed z-50 min-w-[9rem] overflow-hidden rounded-lg border py-1 shadow-lg"
           >
             {items.map((it) => (
               <button
@@ -155,7 +156,8 @@ export function TabBar({
                   it.run()
                   setMenu(null)
                 }}
-                className="block w-full px-3 py-1.5 text-left text-xs text-slate-700 hover:bg-slate-100 disabled:cursor-default disabled:text-slate-300 disabled:hover:bg-transparent"
+                className="block w-full px-3 py-1.5 text-left text-sm transition-colors disabled:cursor-default disabled:opacity-50"
+                style={{ color: it.disabled ? 'var(--content-muted)' : 'var(--content-primary)' }}
               >
                 {it.label}
               </button>

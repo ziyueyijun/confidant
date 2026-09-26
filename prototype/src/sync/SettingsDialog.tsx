@@ -1,67 +1,91 @@
 import { useState } from 'react'
 import { 配置, 远端目录, type SyncMock, type TestOutcome } from './data'
+import type { SyntaxReveal } from '../editor/markdownLivePreview'
 
 /**
- * 设置——**从菜单进入的弹窗**。
+ * 设置——**从底部栏进入的弹窗**。
  *
- * 分组与顺序：编辑器 / 外观 / 快捷键 / 同步 / 更新。
+ * 分组与顺序：编辑器 / 外观 / 快捷键 / 同步 / **工作空间** / 更新 / 关于知己笔记。
  *
  * **没有「文件关联」。** 装好 exe 之后用户在 Windows 设置里自己决定
  * 要不要设为默认程序——应用不该在这里再给一个入口，更不该检测与提醒。
  *
- * 「工作空间」不在这里——它是**菜单里的一项**（见 `AppMenu`），
- * 因为它管的是「打开哪个文件夹」这种应用级动作，不是一项偏好设置。
+ * **「工作空间」在这里**，挨着「同步」：它管的是「打开哪个文件夹」，
+ * 与同步同属"整个库的事"——两件都是低频、要停下来想一下的动作，挨着才顺。
+ * 它确实不是一项偏好，但设置是它唯一的家：底部栏那一排只放每天都在用的入口。
+ *
+ * **「关于」排在「更新」下面**：两者都是"这个应用自己"的事，挨着看才顺。
+ *
+ * **弹窗高度固定**，不随分组变——理由见下面那段注释。
  */
 const 设置分组 = [
   { key: 'editor', label: '编辑器' },
   { key: 'appearance', label: '外观' },
   { key: 'shortcuts', label: '快捷键' },
   { key: 'sync', label: '同步' },
+  { key: 'workspace', label: '工作空间' },
   { key: 'update', label: '更新' },
+  { key: 'about', label: '关于知己笔记' },
 ] as const
 
-export function SettingsDialog({ onClose }: { onClose: () => void }) {
+export function SettingsDialog({
+  onClose,
+  reveal,
+  onReveal,
+}: {
+  onClose: () => void
+  /** 语法标记显示方式。**它是应用状态**（编辑器按它渲染），所以由外面给 */
+  reveal: SyntaxReveal
+  onReveal: (v: SyntaxReveal) => void
+}) {
   const [section, setSection] = useState<(typeof 设置分组)[number]['key']>('editor')
 
   return (
-    <div className="fixed inset-0 z-40 flex items-center justify-center bg-slate-900/30 p-6">
-      {/* 高度随内容（`max-h` 而非固定 `h`）——多数分组只有几个字段，
-          固定高度会让它们撑在一片空白里。 */}
-      <div className="flex max-h-[80vh] w-full max-w-3xl flex-col overflow-hidden rounded-lg bg-white shadow-2xl">
-        <div className="flex shrink-0 items-center border-b border-slate-200 px-4 py-2.5">
-          <span className="text-sm font-medium text-slate-700">设置</span>
+    <div className="fixed inset-0 z-40 flex items-center justify-center p-6" style={{ backgroundColor: 'rgba(26,23,20,0.15)' }}>
+      {/* 高度**固定**，不随分组变。
+          之前是 max-h：哪个分组内容长，窗口就跟着长——切一下分组整个弹窗
+          跳一次，右边的滚动条、底下的留白全跟着动。用户在"切换分组"这个
+          动作上不该付出任何注意力，所以取一个定值：640px（多数屏幕上放得下），
+          窗口更矮时由 85vh 兜住——两种情况下**各分组都还是同一个高度**。 */}
+      <div className="flex h-[640px] max-h-[85vh] w-full max-w-3xl flex-col overflow-hidden shadow-2xl" style={{ borderRadius: 'var(--radius-lg)', backgroundColor: 'var(--surface-primary)', border: '1px solid var(--border-color)' }}>
+        <div className="flex shrink-0 items-center px-4 py-2.5" style={{ borderBottom: '1px solid var(--border-color)' }}>
+          <span className="text-sm font-medium" style={{ color: 'var(--content-primary)' }}>设置</span>
           <button
             onClick={onClose}
-            className="ml-auto rounded px-2 py-0.5 text-xs text-slate-500 hover:bg-slate-100 hover:text-slate-800"
+            className="ml-auto rounded px-2 py-0.5 text-xs transition-colors hover:bg-[var(--surface-hover)]"
+            style={{ color: 'var(--content-muted)' }}
           >
             关闭
           </button>
         </div>
 
         <div className="flex min-h-0 flex-1">
-          <nav className="w-28 shrink-0 border-r border-slate-200 bg-slate-50/70 py-2">
+          <nav className="w-28 shrink-0 py-2" style={{ borderRight: '1px solid var(--border-color)', backgroundColor: 'var(--surface-secondary)' }}>
             {设置分组.map((g) => (
               <button
                 key={g.key}
                 onClick={() => setSection(g.key)}
-                className={`block w-full px-3 py-1.5 text-left text-xs ${
-                  section === g.key
-                    ? 'bg-white font-medium text-slate-900'
-                    : 'text-slate-600 hover:bg-slate-100'
-                }`}
+                className="block w-full px-3 py-1.5 text-left text-xs transition-colors"
+                style={{
+                  backgroundColor: section === g.key ? 'var(--surface-primary)' : 'transparent',
+                  color: section === g.key ? 'var(--content-primary)' : 'var(--content-secondary)',
+                  fontWeight: section === g.key ? 500 : 400,
+                }}
               >
                 {g.label}
               </button>
             ))}
           </nav>
 
-          <div className="min-h-0 min-w-0 flex-1 overflow-auto bg-slate-50">
+          <div className="min-h-0 min-w-0 flex-1 overflow-auto" style={{ backgroundColor: 'var(--surface-secondary)' }}>
             <div className="p-5">
-              {section === 'editor' && <EditorSection />}
+              {section === 'editor' && <EditorSection reveal={reveal} onReveal={onReveal} />}
               {section === 'appearance' && <AppearanceSection />}
               {section === 'shortcuts' && <ShortcutsSection />}
               {section === 'sync' && <SyncSection />}
+              {section === 'workspace' && <WorkspaceSection />}
               {section === 'update' && <UpdateSection />}
+              {section === 'about' && <AboutSection />}
             </div>
           </div>
         </div>
@@ -74,8 +98,8 @@ export function SettingsDialog({ onClose }: { onClose: () => void }) {
 
 function Card({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <section className="mb-4 rounded-lg border border-slate-200 bg-white p-4">
-      <div className="mb-3 text-xs font-medium text-slate-700">{title}</div>
+    <section className="mb-4 rounded-lg border p-4" style={{ borderColor: 'var(--border-color)', backgroundColor: 'var(--surface-primary)' }}>
+      <div className="mb-3 text-xs font-medium" style={{ color: 'var(--content-primary)' }}>{title}</div>
       {children}
     </section>
   )
@@ -92,10 +116,10 @@ function Row({
   children: React.ReactNode
 }) {
   return (
-    <div className="flex items-center gap-4 border-b border-slate-100 py-2 last:border-b-0">
+    <div className="flex items-center gap-4 border-b py-2 last:border-b-0" style={{ borderColor: 'var(--border-color)' }}>
       <div className="min-w-0 flex-1">
-        <div className="text-xs text-slate-700">{label}</div>
-        {desc && <div className="mt-0.5 text-[10px] leading-relaxed text-slate-400">{desc}</div>}
+        <div className="text-xs" style={{ color: 'var(--content-primary)' }}>{label}</div>
+        {desc && <div className="mt-0.5 text-[10px] leading-relaxed" style={{ color: 'var(--content-muted)' }}>{desc}</div>}
       </div>
       <div className="shrink-0">{children}</div>
     </div>
@@ -112,16 +136,16 @@ function Segmented<T extends string>({
   onChange: (v: T) => void
 }) {
   return (
-    <div className="flex rounded border border-slate-300 p-0.5">
+    <div className="flex rounded border p-0.5" style={{ borderColor: 'var(--border-color)' }}>
       {options.map((o) => (
         <button
           key={o.value}
           onClick={() => onChange(o.value)}
-          className={`rounded px-2 py-0.5 text-[11px] transition ${
-            value === o.value
-              ? 'bg-slate-800 text-white'
-              : 'text-slate-600 hover:bg-slate-100'
-          }`}
+          className="rounded px-2 py-0.5 text-[11px] transition"
+          style={{
+            backgroundColor: value === o.value ? 'var(--solid-bg)' : 'transparent',
+            color: value === o.value ? 'var(--solid-fg)' : 'var(--content-secondary)',
+          }}
         >
           {o.label}
         </button>
@@ -135,12 +159,12 @@ function Toggle({ on }: { on: boolean }) {
   return (
     <button
       onClick={() => setV((x) => !x)}
-      className={`flex h-4 w-7 items-center rounded-full px-0.5 transition ${
-        v ? 'bg-sky-500' : 'bg-slate-300'
-      }`}
+      className="flex h-4 w-7 items-center rounded-full px-0.5 transition"
+      style={{ backgroundColor: v ? 'var(--accent)' : 'var(--surface-tertiary)' }}
     >
       <span
-        className={`h-3 w-3 rounded-full bg-white transition ${v ? 'translate-x-3' : ''}`}
+        className="h-3 w-3 rounded-full transition"
+        style={{ backgroundColor: 'white', transform: v ? 'translateX(12px)' : '' }}
       />
     </button>
   )
@@ -150,7 +174,8 @@ function Select({ value, options }: { value: string; options: string[] }) {
   return (
     <select
       defaultValue={value}
-      className="rounded border border-slate-300 bg-white px-1.5 py-0.5 text-[11px] outline-none focus:border-sky-500"
+      className="rounded border px-1.5 py-0.5 text-[11px] outline-none"
+      style={{ borderColor: 'var(--border-color)', backgroundColor: 'var(--surface-primary)', color: 'var(--content-primary)' }}
     >
       {options.map((o) => (
         <option key={o}>{o}</option>
@@ -161,10 +186,11 @@ function Select({ value, options }: { value: string; options: string[] }) {
 
 function NumberInput({ value, suffix }: { value: string; suffix?: string }) {
   return (
-    <span className="flex items-center gap-1 text-[11px] text-slate-500">
+    <span className="flex items-center gap-1 text-[11px]" style={{ color: 'var(--content-muted)' }}>
       <input
         defaultValue={value}
-        className="w-12 rounded border border-slate-300 px-1.5 py-0.5 text-[11px] outline-none focus:border-sky-500"
+        className="w-12 rounded border px-1.5 py-0.5 text-[11px] outline-none"
+        style={{ borderColor: 'var(--border-color)', backgroundColor: 'var(--surface-primary)', color: 'var(--content-primary)' }}
       />
       {suffix}
     </span>
@@ -173,19 +199,30 @@ function NumberInput({ value, suffix }: { value: string; suffix?: string }) {
 
 // ---------------------------------------------------------------- 1 编辑器
 
-function EditorSection() {
-  const [reveal, setReveal] = useState<'line' | 'marker' | 'never'>('line')
-
+/**
+ * 编辑器。
+ *
+ * 「语法标记 → 显示方式」这一档是**真的**：它接在应用状态上，编辑器当场
+ * 按它换渲染（另外几项还是假的——原型只验这一条）。原来它挂在编辑器工具栏
+ * 右端，现在只留在这里：它是"正文怎么显示"，不是"改正文"。
+ */
+function EditorSection({
+  reveal,
+  onReveal,
+}: {
+  reveal: SyntaxReveal
+  onReveal: (v: SyntaxReveal) => void
+}) {
   return (
     <>
       <Card title="语法标记">
         <Row
           label="显示方式"
-          desc="Markdown 标记（** 、## 、` 等）在正文里怎么显示"
+          desc="** 、## 、` 这些标记在正文里露出来多少。整行＝光标所在那一行全露；标记＝只露光标挨着的那个；不展开＝从不露"
         >
           <Segmented
             value={reveal}
-            onChange={setReveal}
+            onChange={onReveal}
             options={[
               { value: 'line', label: '整行' },
               { value: 'marker', label: '标记' },
@@ -199,9 +236,6 @@ function EditorSection() {
       </Card>
 
       <Card title="代码块">
-        <Row label="等宽字体">
-          <Select value="Cascadia Code" options={['Cascadia Code', 'Consolas', 'JetBrains Mono', '系统默认']} />
-        </Row>
         <Row label="自动换行" desc="长行不出现横向滚动条">
           <Toggle on />
         </Row>
@@ -249,18 +283,6 @@ function AppearanceSection() {
         </Row>
       </Card>
 
-      <Card title="字体">
-        <Row label="正文字体">
-          <Select value="系统默认" options={['系统默认', '微软雅黑', '思源黑体', '霞鹜文楷']} />
-        </Row>
-        <Row label="字号">
-          <NumberInput value="16" suffix="px" />
-        </Row>
-        <Row label="行高">
-          <NumberInput value="1.85" />
-        </Row>
-      </Card>
-
       <Card title="语言">
         <Row label="界面语言">
           <Select value="简体中文" options={['简体中文', '繁體中文', 'English']} />
@@ -295,12 +317,12 @@ const 快捷键表: [string, string][] = [
 function ShortcutsSection() {
   return (
     <Card title="快捷键">
-      <div className="mb-3 text-[11px] leading-relaxed text-slate-400">
+      <div className="mb-3 text-[11px] leading-relaxed" style={{ color: 'var(--content-muted)' }}>
         第一版只列出这些，暂不允许自定义。
       </div>
       {快捷键表.map(([name, keys]) => (
         <Row key={name} label={name}>
-          <kbd className="rounded border border-slate-300 bg-slate-50 px-2 py-0.5 font-mono text-[11px] text-slate-600">
+          <kbd className="rounded border px-2 py-0.5 font-mono text-[11px]" style={{ borderColor: 'var(--border-color)', backgroundColor: 'var(--surface-secondary)', color: 'var(--content-secondary)' }}>
             {keys}
           </kbd>
         </Row>
@@ -311,20 +333,17 @@ function ShortcutsSection() {
 
 // ---------------------------------------------------------------- 4 同步
 
+/**
+ * 同步。
+ *
+ * **没有「自动同步」。** 程序只允许手动同步：自动同步意味着应用会在用户
+ * 没看着的时候动他的笔记，而这一票的结论是——同步是一件用户按下去、
+ * 看得见结果的事。所以这里没有开关、没有间隔，只有连接与删除保护。
+ */
 function SyncSection() {
   return (
     <>
       <WebdavBlock />
-
-      <Card title="自动同步">
-        {/* 默认不勾选——软件装好后不该自己开始动用户的笔记。 */}
-        <Row label="启用自动同步" desc="默认关闭。不勾选时应用不会在后台动你的笔记">
-          <Toggle on={false} />
-        </Row>
-        <Row label="间隔" desc="另有两次：应用启动时、本地攒下一批改动之后">
-          <NumberInput value="10" suffix="分钟" />
-        </Row>
-      </Card>
 
       <Card title="批量删除保护">
         <Row
@@ -393,14 +412,14 @@ function WebdavBlock() {
   const chosen = 目录.find((e) => e.path === picked)
 
   return (
-    <section className="mb-4 overflow-hidden rounded-lg border border-slate-200 bg-white">
-      <div className="border-b border-slate-100 px-4 py-2.5 text-xs font-medium text-slate-700">
+    <section className="mb-4 overflow-hidden rounded-lg border" style={{ borderColor: 'var(--border-color)', backgroundColor: 'var(--surface-primary)' }}>
+      <div className="border-b px-4 py-2.5 text-xs font-medium" style={{ borderColor: 'var(--border-color)', color: 'var(--content-primary)' }}>
         4.1　WebDAV 同步
       </div>
 
       <div className="flex">
         {/* ---- 左：连接。窄栏——输入框本来就短，不需要 500px ---- */}
-        <div className="w-56 shrink-0 border-r border-slate-100 p-4">
+        <div className="w-56 shrink-0 border-r p-4" style={{ borderColor: 'var(--border-color)' }}>
           <div className="space-y-3">
             <Field label="服务器地址" value={server} onChange={dirty(setServer)} />
             <Field label="用户名" value={username} onChange={dirty(setUsername)} />
@@ -416,34 +435,34 @@ function WebdavBlock() {
           <button
             onClick={runTest}
             disabled={test === 'testing'}
-            className={`mt-3 w-full rounded px-3 py-1.5 text-xs ${
-              test === 'testing'
-                ? 'cursor-wait bg-slate-100 text-slate-400'
-                : 'bg-slate-800 text-white hover:bg-slate-700'
-            }`}
+            className="mt-3 w-full rounded px-3 py-1.5 text-xs transition-colors"
+            style={{
+              backgroundColor: test === 'testing' ? 'var(--surface-tertiary)' : 'var(--solid-bg)',
+              color: test === 'testing' ? 'var(--content-muted)' : 'var(--solid-fg)',
+            }}
           >
             {test === 'testing' ? '正在连接…' : '测试连接'}
           </button>
 
           {test === 'ok' && (
-            <div className="mt-2 flex items-center gap-1 text-[11px] text-emerald-700">
-              <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+            <div className="mt-2 flex items-center gap-1 text-[11px]" style={{ color: '#5A8A4A' }}>
+              <span className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: '#5A8A4A' }} />
               连接成功
             </div>
           )}
           {test === 'fail' && (
-            <div className="mt-2 rounded border border-red-200 bg-red-50 px-2 py-1.5 text-[11px] leading-relaxed text-red-700">
+            <div className="mt-2 rounded border px-2 py-1.5 text-[11px] leading-relaxed" style={{ borderColor: '#dc2626', backgroundColor: 'rgba(220,38,38,0.05)', color: '#dc2626' }}>
               连接失败：401 未授权
-              <div className="text-red-500">用户名或密码不对</div>
+              <div style={{ color: '#dc2626', opacity: 0.7 }}>用户名或密码不对</div>
             </div>
           )}
 
-          <div className="mt-3 border-t border-slate-100 pt-2 text-[10px] leading-relaxed text-slate-400">
+          <div className="mt-3 border-t pt-2 text-[10px] leading-relaxed" style={{ borderColor: 'var(--border-color)', color: 'var(--content-muted)' }}>
             密码存系统凭据库，不写进库文件——否则它会被同步到<b>它自己要连的那台服务器</b>上。
           </div>
 
           {/* 原型专用：手动切换结果，好把样子都看一遍 */}
-          <div className="mt-3 border-t border-dashed border-slate-200 pt-2 text-[10px] text-slate-400">
+          <div className="mt-3 border-t border-dashed pt-2 text-[10px]" style={{ borderColor: 'var(--border-color)', color: 'var(--content-muted)' }}>
             <div className="mb-1">原型开关</div>
             <div className="flex flex-wrap gap-1">
               {(['ok', 'fail'] as const).map((o) => (
@@ -454,7 +473,8 @@ function WebdavBlock() {
                     setPicked(null)
                     setSaved(false)
                   }}
-                  className="rounded border border-slate-200 px-1.5 py-0.5 hover:bg-slate-100"
+                  className="rounded border px-1.5 py-0.5 transition-colors hover:bg-[var(--surface-hover)]"
+                  style={{ borderColor: 'var(--border-color)' }}
                 >
                   {o === 'ok' ? '成功' : '失败'}
                 </button>
@@ -466,7 +486,8 @@ function WebdavBlock() {
                   setPicked(null)
                   setSaved(false)
                 }}
-                className="rounded border border-slate-200 px-1.5 py-0.5 hover:bg-slate-100"
+                className="rounded border px-1.5 py-0.5 transition-colors hover:bg-[var(--surface-hover)]"
+                style={{ borderColor: 'var(--border-color)' }}
               >
                 {onlyOne ? '多目录' : '单目录'}
               </button>
@@ -475,32 +496,32 @@ function WebdavBlock() {
         </div>
 
         {/* ---- 右：远端目录。宽栏，路径长 ---- */}
-        <div className="min-w-0 flex-1 bg-slate-50/60 p-4">
-          <div className="mb-2.5 text-[11px] font-medium text-slate-600">选择远端目录</div>
+        <div className="min-w-0 flex-1 p-4" style={{ backgroundColor: 'var(--surface-secondary)' }}>
+          <div className="mb-2.5 text-[11px] font-medium" style={{ color: 'var(--content-secondary)' }}>选择远端目录</div>
 
           {test !== 'ok' ? (
-            <div className="rounded-lg border border-dashed border-slate-300 bg-white py-12 text-center">
-              <div className="text-xs text-slate-400">先测试连接</div>
-              <div className="mt-1 text-[11px] text-slate-400">
+            <div className="rounded-lg border border-dashed p-12 text-center" style={{ borderColor: 'var(--border-color)', backgroundColor: 'var(--surface-primary)' }}>
+              <div className="text-xs" style={{ color: 'var(--content-muted)' }}>先测试连接</div>
+              <div className="mt-1 text-[11px]" style={{ color: 'var(--content-muted)' }}>
                 连上之后这里会列出服务器上的目录
               </div>
             </div>
           ) : (
             <>
-              <p className="mb-2.5 text-[11px] leading-relaxed text-slate-500">
+              <p className="mb-2.5 text-[11px] leading-relaxed" style={{ color: 'var(--content-muted)' }}>
                 {目录.length === 1 ? (
                   <>
-                    服务器上只有一个目录，<b className="text-slate-600">已经替你选好了</b>。
+                    服务器上只有一个目录，<b style={{ color: 'var(--content-secondary)' }}>已经替你选好了</b>。
                   </>
                 ) : (
                   <>
                     选一个作为要同步的位置——
-                    <b className="text-slate-600">选错了会把笔记同步到别的库上</b>。
+                    <b style={{ color: 'var(--content-secondary)' }}>选错了会把笔记同步到别的库上</b>。
                   </>
                 )}
               </p>
 
-              <ul className="overflow-hidden rounded-lg border border-slate-200 bg-white">
+              <ul className="overflow-hidden rounded-lg border" style={{ borderColor: 'var(--border-color)', backgroundColor: 'var(--surface-primary)' }}>
                 {目录.map((e) => {
                   const active = picked === e.path
                   return (
@@ -510,24 +531,22 @@ function WebdavBlock() {
                           setPicked(e.path)
                           setSaved(false)
                         }}
-                        className={`flex w-full items-center gap-2 border-b border-slate-100 px-3 py-2 text-left last:border-b-0 ${
-                          active ? 'bg-sky-50' : 'hover:bg-slate-50'
-                        }`}
+                        className="flex w-full items-center gap-2 border-b px-3 py-2 text-left last:border-b-0 transition-colors"
+                        style={{ borderColor: 'var(--border-color)', backgroundColor: active ? 'var(--accent-subtle)' : 'transparent' }}
                       >
                         <span
-                          className={`flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded-full border ${
-                            active ? 'border-sky-500 bg-sky-500' : 'border-slate-300'
-                          }`}
+                          className="flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded-full border"
+                          style={{ borderColor: active ? 'var(--accent)' : 'var(--border-color)', backgroundColor: active ? 'var(--accent)' : 'transparent' }}
                         >
-                          {active && <span className="h-1.5 w-1.5 rounded-full bg-white" />}
+                          {active && <span className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: 'white' }} />}
                         </span>
-                        <span className="truncate font-mono text-xs text-slate-700">{e.path}</span>
+                        <span className="truncate font-mono text-xs" style={{ color: 'var(--content-primary)' }}>{e.path}</span>
                         {e.isVault && (
-                          <span className="shrink-0 rounded bg-amber-100 px-1.5 py-0.5 text-[10px] text-amber-800">
+                          <span className="shrink-0 rounded px-1.5 py-0.5 text-[10px]" style={{ backgroundColor: 'var(--accent-subtle)', color: 'var(--accent)' }}>
                             已有库
                           </span>
                         )}
-                        <span className="ml-auto shrink-0 text-[10px] text-slate-400">
+                        <span className="ml-auto shrink-0 text-[10px]" style={{ color: 'var(--content-muted)' }}>
                           {e.count} 项 · {e.modified}
                         </span>
                       </button>
@@ -537,8 +556,8 @@ function WebdavBlock() {
               </ul>
 
               {chosen?.isVault && (
-                <div className="mt-2.5 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-[11px] leading-relaxed text-amber-900">
-                  这个目录里已经有 <code className="rounded bg-amber-100 px-1">.confidant/</code>
+                <div className="mt-2.5 rounded-lg border px-3 py-2 text-[11px] leading-relaxed" style={{ borderColor: 'var(--accent)', backgroundColor: 'var(--accent-subtle)', color: 'var(--accent-hover)' }}>
+                  这个目录里已经有 <code className="rounded px-1" style={{ backgroundColor: 'var(--accent-subtle-hover)' }}>.confidant/</code>
                   ——它已经是一个知己笔记的库。选它等于**接上那个库**，
                   两边内容不同时首次同步会停下来问你。
                 </div>
@@ -549,22 +568,22 @@ function WebdavBlock() {
       </div>
 
       {/* ---- 底部：保存。贴在这个区块底部，不随内容滚走 ---- */}
-      <div className="flex items-center gap-3 border-t border-slate-100 bg-white px-4 py-2.5">
+      <div className="flex items-center gap-3 border-t px-4 py-2.5" style={{ borderColor: 'var(--border-color)', backgroundColor: 'var(--surface-secondary)' }}>
         <div className="flex min-w-0 items-center gap-3 text-[11px]">
-          <span className="shrink-0 text-slate-400">将保存</span>
-          <span className="truncate font-mono text-slate-700">{server || '（未填服务器）'}</span>
-          <span className="shrink-0 text-slate-300">→</span>
-          <span className={`truncate font-mono ${picked ? 'text-slate-700' : 'text-slate-400'}`}>
+          <span className="shrink-0" style={{ color: 'var(--content-muted)' }}>将保存</span>
+          <span className="truncate font-mono" style={{ color: 'var(--content-primary)' }}>{server || '（未填服务器）'}</span>
+          <span className="shrink-0" style={{ color: 'var(--content-muted)' }}>→</span>
+          <span className="truncate font-mono" style={{ color: picked ? 'var(--content-primary)' : 'var(--content-muted)' }}>
             {picked ?? '（未选目录）'}
           </span>
         </div>
 
         <div className="ml-auto flex shrink-0 items-center gap-2">
           {saved ? (
-            <span className="text-[11px] text-emerald-700">已保存，下次打开还在</span>
+            <span className="text-[11px]" style={{ color: '#5A8A4A' }}>已保存，下次打开还在</span>
           ) : (
             !canSave && (
-              <span className="text-[11px] text-slate-400">
+              <span className="text-[11px]" style={{ color: 'var(--content-muted)' }}>
                 {test !== 'ok' ? '先测试连接' : '先选一个远端目录'}
               </span>
             )
@@ -572,13 +591,11 @@ function WebdavBlock() {
           <button
             onClick={() => canSave && setSaved(true)}
             disabled={!canSave || saved}
-            className={`rounded px-4 py-1.5 text-xs ${
-              saved
-                ? 'cursor-default bg-emerald-50 text-emerald-700'
-                : canSave
-                  ? 'bg-slate-800 text-white hover:bg-slate-700'
-                  : 'cursor-not-allowed bg-slate-200 text-slate-400'
-            }`}
+            className="rounded px-4 py-1.5 text-xs transition-colors"
+            style={{
+              backgroundColor: saved ? 'var(--accent-subtle)' : canSave ? 'var(--solid-bg)' : 'var(--surface-tertiary)',
+              color: saved ? 'var(--accent)' : canSave ? 'var(--solid-fg)' : 'var(--content-muted)',
+            }}
           >
             {saved ? '已保存' : '保存'}
           </button>
@@ -588,32 +605,236 @@ function WebdavBlock() {
   )
 }
 
-// ---------------------------------------------------------------- 5 更新
+// ---------------------------------------------------------------- 5 工作空间
+
+/**
+ * 工作空间。
+ *
+ * 「工作空间」是用户在界面上看到的名字；在库里它对应的就是那个文件夹
+ * （`CONTEXT.md` 里叫「库」）。
+ *
+ * ## 只有两个按钮
+ *
+ * - **打开工作空间**——在文件管理器里打开当前这个文件夹。
+ * - **切换工作空间**——**弹出系统文件夹选择器**，让用户自己挑位置。
+ *
+ * **不显示「最近打开的」列表。** 那是一个应用替用户维护的隐式状态：
+ * 它会过期，会指向已删除的文件夹、会让用户以为「选过的东西就不用再想」。
+ * 而切换工作空间是一件低频，需要明确知道自己在选什么的事——
+ * 每次都从文件系统里现挑，比从一个可能过期的列表里挑更可靠。
+ *
+ * ## 为什么它住在设置里
+ *
+ * 它管的确实不是偏好，是「打开哪个文件夹」这种应用级动作。但底部栏那一排
+ * 只放每天都在用的入口（设置、同步中心、主题、专注模式），而工作空间
+ * 一个月也未必切一次——放在设置里挨着「同步」，与另一件"整个库的事"作伴。
+ */
+function WorkspaceSection() {
+  const [picking, setPicking] = useState(false)
+
+  return (
+    <>
+      <Card title="位置">
+        <div className="rounded-lg border p-3" style={{ borderColor: 'var(--border-color)', backgroundColor: 'var(--surface-secondary)' }}>
+          <div className="mb-1 text-[11px]" style={{ color: 'var(--content-secondary)' }}>当前</div>
+          <div className="truncate font-mono text-xs" style={{ color: 'var(--content-primary)' }}>
+            %USERPROFILE%\知己笔记
+          </div>
+          <div className="mt-1 text-[10px]" style={{ color: 'var(--content-secondary)' }}>1284 篇笔记</div>
+        </div>
+
+        <div className="mt-3 flex gap-2">
+          <button
+            className="flex-1 rounded px-3 py-2 text-xs transition-colors"
+            style={{ backgroundColor: 'var(--solid-bg)', color: 'var(--solid-fg)' }}
+          >
+            打开工作空间
+          </button>
+          <button
+            onClick={() => setPicking(true)}
+            className="flex-1 rounded border px-3 py-2 text-xs transition-colors hover:bg-[var(--surface-hover)]"
+            style={{ borderColor: 'var(--border-color)', backgroundColor: 'var(--surface-primary)', color: 'var(--content-secondary)' }}
+          >
+            切换工作空间
+          </button>
+        </div>
+      </Card>
+
+      <Card title="同一时刻只打开一个">
+        <div className="text-[11px] leading-relaxed" style={{ color: 'var(--content-secondary)' }}>
+          切换会重新建立索引——搜索与反向链接都只作用于当前这一个。
+        </div>
+        <div className="mt-2 text-[11px] leading-relaxed" style={{ color: 'var(--content-muted)' }}>
+          没有「最近打开的」列表：那是应用替用户维护的隐式状态，会过期，
+          也会指向已经删掉的文件夹。每次现挑，比从一个可能过期的列表里挑更可靠。
+        </div>
+      </Card>
+
+      {picking && <FolderPicker onClose={() => setPicking(false)} />}
+    </>
+  )
+}
+
+/**
+ * 系统文件夹选择器（原型里的样子）。
+ *
+ * 真机上这是 `dialog.showOpenDialog({ properties: ['openDirectory'] })`——
+ * 由操作系统画的窗口，应用控制不了它的外观，也不该试图控制。
+ * 这里画出来只是为了让流程看得见。
+ */
+function FolderPicker({ onClose }: { onClose: () => void }) {
+  const [path, setPath] = useState('D:\\笔记\\工作')
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-6" style={{ backgroundColor: 'rgba(26,23,20,0.2)' }}>
+      <div className="w-full max-w-lg overflow-hidden border shadow-2xl" style={{ borderRadius: 'var(--radius-lg)', backgroundColor: 'var(--surface-secondary)', borderColor: 'var(--border-color)' }}>
+        {/* 模仿系统窗口的标题栏 */}
+        <div className="flex items-center gap-2 px-3 py-1.5" style={{ borderBottom: '1px solid var(--border-color)', backgroundColor: 'var(--surface-tertiary)' }}>
+          <span className="text-[11px]" style={{ color: 'var(--content-secondary)' }}>选择文件夹</span>
+          <span className="ml-auto text-[10px]" style={{ color: 'var(--content-muted)' }}>原型：这是系统窗口，不是应用画的</span>
+        </div>
+
+        <div className="p-3">
+          <div className="mb-2 flex gap-2 text-[11px]">
+            <button className="rounded border px-2 py-0.5 transition-colors hover:bg-[var(--surface-hover)]"
+              style={{ borderColor: 'var(--border-color)', backgroundColor: 'var(--surface-primary)', color: 'var(--content-secondary)' }}>
+              ←
+            </button>
+            <button className="rounded border px-2 py-0.5 transition-colors hover:bg-[var(--surface-hover)]"
+              style={{ borderColor: 'var(--border-color)', backgroundColor: 'var(--surface-primary)', color: 'var(--content-secondary)' }}>
+              →
+            </button>
+            <input
+              value={path}
+              onChange={(e) => setPath(e.target.value)}
+              className="flex-1 rounded border px-2 py-0.5 font-mono text-[11px] outline-none"
+              style={{ borderColor: 'var(--border-color)', backgroundColor: 'var(--surface-primary)', color: 'var(--content-primary)' }}
+            />
+          </div>
+
+          <div className="h-44 overflow-auto rounded border p-1" style={{ borderColor: 'var(--border-color)', backgroundColor: 'var(--surface-primary)' }}>
+            {[
+              ['技术'],
+              ['思考'],
+              ['写作'],
+              ['旧稿'],
+            ].map(([name]) => (
+              <button
+                key={name}
+                className="flex w-full items-center gap-2 rounded px-2 py-1 text-left text-[11px] transition-colors hover:bg-[var(--surface-hover)]"
+                style={{ color: 'var(--content-secondary)' }}
+              >
+                <span>📁</span>
+                {name}
+              </button>
+            ))}
+          </div>
+
+          <div className="mt-2 flex items-center gap-2">
+            <span className="text-[11px]" style={{ color: 'var(--content-muted)' }}>文件夹名</span>
+            <input
+              defaultValue="工作"
+              className="flex-1 rounded border px-2 py-0.5 text-[11px] outline-none"
+              style={{ borderColor: 'var(--border-color)', backgroundColor: 'var(--surface-primary)', color: 'var(--content-primary)' }}
+            />
+          </div>
+        </div>
+
+        <div className="flex items-center gap-2 px-3 py-2" style={{ borderTop: '1px solid var(--border-color)', backgroundColor: 'var(--surface-tertiary)' }}>
+          <button
+            onClick={onClose}
+            className="ml-auto rounded border px-4 py-1 text-[11px] transition-colors hover:bg-[var(--surface-hover)]"
+            style={{ borderColor: 'var(--border-color)', backgroundColor: 'var(--surface-secondary)', color: 'var(--content-secondary)' }}
+          >
+            取消
+          </button>
+          <button
+            onClick={onClose}
+            className="rounded px-4 py-1 text-[11px] transition-colors"
+            style={{ backgroundColor: 'var(--accent)', color: 'white' }}
+          >
+            选择文件夹
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ---------------------------------------------------------------- 6 更新
 
 function UpdateSection() {
   return (
     <Card title="版本">
       <dl className="space-y-1 text-[11px]">
         <div className="flex gap-2">
-          <dt className="w-24 text-slate-400">当前版本</dt>
-          <dd className="text-slate-700">v1.0.0</dd>
+          <dt className="w-24" style={{ color: 'var(--content-muted)' }}>当前版本</dt>
+          <dd style={{ color: 'var(--content-primary)' }}>v1.0.0</dd>
         </div>
         <div className="flex gap-2">
-          <dt className="w-24 text-slate-400">上次检查</dt>
-          <dd className="text-slate-700">今天 09:12</dd>
+          <dt className="w-24" style={{ color: 'var(--content-muted)' }}>上次检查</dt>
+          <dd style={{ color: 'var(--content-primary)' }}>今天 09:12</dd>
         </div>
         <div className="flex gap-2">
-          <dt className="w-24 text-slate-400">上次结果</dt>
-          <dd className="text-amber-700">下载失败：连接超时（下次启动自动重试）</dd>
+          <dt className="w-24" style={{ color: 'var(--content-muted)' }}>上次结果</dt>
+          <dd style={{ color: 'var(--accent)' }}>下载失败：连接超时（下次启动自动重试）</dd>
         </div>
       </dl>
-      <button className="mt-3 rounded border border-slate-300 bg-white px-3 py-1.5 text-xs hover:bg-slate-100">
+      <button className="mt-3 rounded border px-3 py-1.5 text-xs transition-colors hover:bg-[var(--surface-hover)]" style={{ borderColor: 'var(--border-color)', backgroundColor: 'var(--surface-primary)', color: 'var(--content-secondary)' }}>
         立即检查更新
       </button>
-      <div className="mt-2 text-[11px] leading-relaxed text-slate-400">
+      <div className="mt-2 text-[11px] leading-relaxed" style={{ color: 'var(--content-muted)' }}>
         启动时与每 24 小时自动检查。下载完会提示你，不会自动重启。
       </div>
     </Card>
+  )
+}
+
+// ---------------------------------------------------------------- 7 关于知己笔记
+
+/**
+ * 关于。
+ *
+ * 只放事实，不放「感谢使用」之类的客套——用户点进这一页通常是两种时候：
+ * 想知道自己装的是哪个版本，或者想确认笔记到底存在哪儿。两件事答上，
+ * 这一页就写完了。
+ */
+function AboutSection() {
+  return (
+    <>
+      <Card title="知己笔记">
+        <div className="flex items-start gap-3">
+          {/* 与左栏顶栏那个「知」是同一个字——这里把它放大成标识 */}
+          <span
+            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg text-lg font-semibold"
+            style={{ backgroundColor: 'var(--accent-subtle)', color: 'var(--accent)' }}
+          >
+            知
+          </span>
+          <div className="min-w-0">
+            <div className="text-sm font-medium" style={{ color: 'var(--content-primary)' }}>知己笔记</div>
+            <div className="mt-0.5 font-mono text-[11px]" style={{ color: 'var(--content-muted)' }}>
+              confidant v1.0.0
+            </div>
+            <p className="mt-2 text-[11px] leading-relaxed" style={{ color: 'var(--content-secondary)' }}>
+              本地优先的个人知识管理。笔记是你自己的纯 Markdown 文件——
+              不用导出，也不锁在任何一种格式里。
+            </p>
+          </div>
+        </div>
+      </Card>
+
+      <Card title="你的笔记在哪儿">
+        <Row label="当前工作空间" desc="笔记就是这个文件夹里的 .md 文件，用别的编辑器也能打开">
+          <span className="font-mono text-[11px]" style={{ color: 'var(--content-primary)' }}>
+            %USERPROFILE%\知己笔记
+          </span>
+        </Row>
+        <Row label="索引与回收站" desc=".confidant/ 子目录。删掉它不会丢笔记，下次打开重建">
+          <span className="font-mono text-[11px]" style={{ color: 'var(--content-primary)' }}>.confidant/</span>
+        </Row>
+      </Card>
+    </>
   )
 }
 
@@ -636,18 +857,23 @@ function Field({
 }) {
   return (
     <label className="block">
-      <div className="mb-1 text-[11px] text-slate-500">{label}</div>
+      <div className="mb-1 text-[11px]" style={{ color: 'var(--content-muted)' }}>{label}</div>
       <input
         {...(onChange
           ? { value, onChange: (e) => onChange(e.target.value) }
           : { defaultValue: value })}
         type={type}
         placeholder={placeholder}
-        className={`w-full rounded border border-slate-300 px-2 py-1 text-xs outline-none focus:border-sky-500 ${
-          mono ? 'font-mono text-[10px]' : ''
-        }`}
+        className="w-full rounded border px-2 py-1 text-xs outline-none"
+        style={{
+          borderColor: 'var(--border-color)',
+          backgroundColor: 'var(--surface-primary)',
+          color: 'var(--content-primary)',
+          fontFamily: mono ? 'inherit' : undefined,
+          fontSize: mono ? '10px' : undefined,
+        }}
       />
-      {hint && <div className="mt-1 text-[10px] text-slate-400">{hint}</div>}
+      {hint && <div className="mt-1 text-[10px]" style={{ color: 'var(--content-muted)' }}>{hint}</div>}
     </label>
   )
 }
@@ -658,25 +884,25 @@ export function FirstSyncDialog({ mock, onClose }: { mock: SyncMock; onClose: ()
   const f = mock.firstSync!
   const [pick, setPick] = useState<null | 'local' | 'remote' | 'merge'>(null)
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-6">
-      <div className="w-full max-w-2xl overflow-hidden rounded-lg bg-white shadow-2xl">
-        <div className="border-b border-slate-200 px-5 py-3">
-          <h3 className="text-sm font-semibold text-slate-800">远端已有一个库，两边内容不同</h3>
-          <p className="mt-1 text-[11px] leading-relaxed text-slate-500">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-6" style={{ backgroundColor: 'rgba(26,23,20,0.2)' }}>
+      <div className="w-full max-w-2xl overflow-hidden shadow-2xl" style={{ borderRadius: 'var(--radius-lg)', backgroundColor: 'var(--surface-primary)', border: '1px solid var(--border-color)' }}>
+        <div className="border-b px-5 py-3" style={{ borderColor: 'var(--border-color)' }}>
+          <h3 className="text-sm font-semibold" style={{ color: 'var(--content-primary)' }}>远端已有一个库，两边内容不同</h3>
+          <p className="mt-1 text-[11px] leading-relaxed" style={{ color: 'var(--content-muted)' }}>
             第一次同步没有「上次同步」可参照，所以无法判断哪边更新。
-            <b className="text-slate-700">不会自动合并</b>——选一个。
+            <b style={{ color: 'var(--content-secondary)' }}>不会自动合并</b>——选一个。
           </p>
         </div>
 
-        <div className="grid grid-cols-2 divide-x divide-slate-200">
+        <div className="grid grid-cols-2" style={{ borderColor: 'var(--border-color)' }}>
           {[
             ['本地', f.localCount, '刚刚'],
             ['远端', f.remoteCount, f.remoteAt],
           ].map(([title, count, when]) => (
-            <div key={title as string} className="px-5 py-3">
-              <div className="mb-1 text-xs font-medium text-slate-700">{title}</div>
-              <div className="text-[11px] text-slate-600">{count} 篇笔记</div>
-              <div className="text-[11px] text-slate-400">最后改动 {when}</div>
+            <div key={title as string} className="px-5 py-3" style={{ borderColor: 'var(--border-color)' }}>
+              <div className="mb-1 text-xs font-medium" style={{ color: 'var(--content-primary)' }}>{title}</div>
+              <div className="text-[11px]" style={{ color: 'var(--content-secondary)' }}>{count} 篇笔记</div>
+              <div className="text-[11px]" style={{ color: 'var(--content-muted)' }}>最后改动 {when}</div>
             </div>
           ))}
         </div>
@@ -692,39 +918,40 @@ export function FirstSyncDialog({ mock, onClose }: { mock: SyncMock; onClose: ()
             <button
               key={key}
               onClick={() => setPick(key)}
-              className={`block w-full rounded border-2 px-3 py-2 text-left transition ${
-                pick === key
-                  ? danger
-                    ? 'border-red-500 bg-red-50'
-                    : 'border-sky-500 bg-sky-50'
-                  : danger
-                    ? 'border-red-200 bg-red-50/40 hover:bg-red-50'
-                    : 'border-slate-200 bg-white hover:bg-slate-50'
-              }`}
+              className="block w-full rounded border-2 px-3 py-2 text-left transition"
+              style={{
+                borderColor: pick === key
+                  ? (danger ? '#dc2626' : 'var(--accent)')
+                  : 'var(--border-color)',
+                backgroundColor: pick === key
+                  ? (danger ? 'rgba(220,38,38,0.05)' : 'var(--accent-subtle)')
+                  : 'transparent',
+              }}
             >
-              <div className={`text-xs font-medium ${danger ? 'text-red-800' : 'text-slate-800'}`}>
+              <div className="text-xs font-medium" style={{ color: danger ? '#dc2626' : 'var(--content-primary)' }}>
                 {title}
               </div>
-              <div className="mt-0.5 text-[11px] leading-relaxed text-slate-500">{desc}</div>
+              <div className="mt-0.5 text-[11px] leading-relaxed" style={{ color: 'var(--content-muted)' }}>{desc}</div>
             </button>
           ))}
         </div>
 
-        <div className="flex items-center gap-2 border-t border-slate-200 bg-slate-50 px-5 py-3">
-          <span className="text-[11px] text-slate-500">覆盖类操作执行前会自动落一份快照。</span>
+        <div className="flex items-center gap-2 border-t px-5 py-3" style={{ borderColor: 'var(--border-color)', backgroundColor: 'var(--surface-secondary)' }}>
+          <span className="text-[11px]" style={{ color: 'var(--content-muted)' }}>覆盖类操作执行前会自动落一份快照。</span>
           <button
             onClick={onClose}
-            className="ml-auto rounded border border-slate-300 bg-white px-3 py-1.5 text-xs hover:bg-slate-100"
+            className="ml-auto rounded border px-3 py-1.5 text-xs transition-colors hover:bg-[var(--surface-hover)]"
+            style={{ borderColor: 'var(--border-color)', backgroundColor: 'var(--surface-primary)', color: 'var(--content-secondary)' }}
           >
             取消
           </button>
           <button
             disabled={!pick}
-            className={`rounded px-3 py-1.5 text-xs ${
-              pick
-                ? 'bg-slate-800 text-white hover:bg-slate-700'
-                : 'cursor-not-allowed bg-slate-200 text-slate-400'
-            }`}
+            className="rounded px-3 py-1.5 text-xs"
+            style={{
+              backgroundColor: pick ? 'var(--solid-bg)' : 'var(--surface-tertiary)',
+              color: pick ? 'var(--solid-fg)' : 'var(--content-muted)',
+            }}
           >
             继续
           </button>
@@ -738,16 +965,16 @@ export function DeleteDialog({ count, onClose }: { count: number; onClose: () =>
   const [typed, setTyped] = useState('')
   const ok = typed === '删除'
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-6">
-      <div className="w-full max-w-lg overflow-hidden rounded-lg bg-white shadow-2xl">
-        <div className="border-b border-slate-200 px-5 py-3">
-          <h3 className="text-sm font-semibold text-red-800">这次同步要删 {count} 篇笔记</h3>
-          <p className="mt-1 text-[11px] leading-relaxed text-slate-500">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-6" style={{ backgroundColor: 'rgba(26,23,20,0.2)' }}>
+      <div className="w-full max-w-lg overflow-hidden shadow-2xl" style={{ borderRadius: 'var(--radius-lg)', backgroundColor: 'var(--surface-primary)', border: '1px solid var(--border-color)' }}>
+        <div className="border-b px-5 py-3" style={{ borderColor: 'var(--border-color)' }}>
+          <h3 className="text-sm font-semibold" style={{ color: '#dc2626' }}>这次同步要删 {count} 篇笔记</h3>
+          <p className="mt-1 text-[11px] leading-relaxed" style={{ color: 'var(--content-muted)' }}>
             超过阈值（10 篇），所以停下来问你——误判的 stat 曾让别家的同步器删光过整个库。
           </p>
         </div>
         <div className="px-5 py-4">
-          <div className="mb-3 max-h-40 overflow-auto rounded border border-slate-200 bg-slate-50 p-2 font-mono text-[11px] text-slate-600">
+          <div className="mb-3 max-h-40 overflow-auto rounded border p-2 font-mono text-[11px]" style={{ borderColor: 'var(--border-color)', backgroundColor: 'var(--surface-secondary)', color: 'var(--content-secondary)' }}>
             {[
               '技术/待整理/旧草稿-01.md',
               '技术/待整理/旧草稿-02.md',
@@ -757,35 +984,37 @@ export function DeleteDialog({ count, onClose }: { count: number; onClose: () =>
               <div key={p}>{p}</div>
             ))}
           </div>
-          <div className="text-[11px] text-slate-600">
+          <div className="text-[11px]" style={{ color: 'var(--content-secondary)' }}>
             删掉的内容会先进回收站（
-            <code className="rounded bg-slate-100 px-1">.confidant/trash/</code>），可还原。
+            <code className="rounded px-1" style={{ backgroundColor: 'var(--surface-tertiary)' }}>.confidant/trash/</code>），可还原。
           </div>
           <div className="mt-3 flex items-center gap-2">
-            <span className="text-[11px] text-slate-500">
-              输入 <span className="font-mono font-medium text-slate-700">删除</span> 确认
+            <span className="text-[11px]" style={{ color: 'var(--content-muted)' }}>
+              输入 <span className="font-mono font-medium" style={{ color: 'var(--content-primary)' }}>删除</span> 确认
             </span>
             <input
               value={typed}
               onChange={(e) => setTyped(e.target.value)}
-              className="w-20 rounded border border-red-300 px-2 py-0.5 text-xs outline-none focus:border-red-500"
+              className="w-20 rounded border px-2 py-0.5 text-xs outline-none"
+              style={{ borderColor: '#dc2626', backgroundColor: 'var(--surface-primary)', color: 'var(--content-primary)' }}
             />
           </div>
         </div>
-        <div className="flex items-center gap-2 border-t border-slate-200 bg-slate-50 px-5 py-3">
+        <div className="flex items-center gap-2 border-t px-5 py-3" style={{ borderColor: 'var(--border-color)', backgroundColor: 'var(--surface-secondary)' }}>
           <button
             onClick={onClose}
-            className="ml-auto rounded border border-slate-300 bg-white px-3 py-1.5 text-xs hover:bg-slate-100"
+            className="ml-auto rounded border px-3 py-1.5 text-xs transition-colors hover:bg-[var(--surface-hover)]"
+            style={{ borderColor: 'var(--border-color)', backgroundColor: 'var(--surface-primary)', color: 'var(--content-secondary)' }}
           >
             取消同步
           </button>
           <button
             disabled={!ok}
-            className={`rounded px-3 py-1.5 text-xs ${
-              ok
-                ? 'bg-red-700 text-white hover:bg-red-600'
-                : 'cursor-not-allowed bg-slate-200 text-slate-400'
-            }`}
+            className="rounded px-3 py-1.5 text-xs"
+            style={{
+              backgroundColor: ok ? '#dc2626' : 'var(--surface-tertiary)',
+              color: ok ? 'white' : 'var(--content-muted)',
+            }}
           >
             确认删除并继续
           </button>

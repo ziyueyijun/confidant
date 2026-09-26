@@ -2,113 +2,605 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ========================================
+   主题系统 - CSS 变量
+   ======================================== */
+
+/* 浅色模式（默认）— 墨与纸 */
 :root {
+  /* ---- 面：三层，不是一个五档的米色梯子 ----
+     原来有五个值，但中间那一列、抬起面、纸面是同一个色——五个数在做三件
+     事，彼此还只差 4%，看的人分不出来，改的人也不知道该动哪个。现在每层
+     只有一个职责。 */
+
+  /* 纸：正文那一块。全应用只有这一个"读的地方"。
+     比纯白略深一点，是为了让"浮"那一层真有地方可浮：如果纸是 #FBFAF7，
+     弹窗（纯白）对它的对比只有 1.04——"浮起来"就只剩阴影这一个信号了。
+     现在框→纸 1.08、纸→浮 1.07，两级台阶一样宽。 */
+  --surface-center: #F9F7F2;
+
+  /* 框：两条侧栏、标签栏、底部栏——所有"不是正文"的地方。
+     浅色下它比纸深一档：框退后，纸在前。 */
+  --surface-secondary: #F1EEE7;
+
+  /* 凹：代码块、表头、行内代码。嵌在纸里面的面，与框同值——
+     "不是纸的地方"就这一个颜色。 */
+  --surface-tertiary: #F1EEE7;
+
+  /* 浮：弹窗 / 菜单 / 卡片 / 输入框。比纸更亮，再叠阴影——
+     浮起来靠两层信号，不只靠阴影。 */
+  --surface-primary: #FFFFFF;
+
+  /* ---- 悬停与按下：半透明的墨 ----
+     不写死颜色，是因为同一个值落在纸上和落在框上会是两种观感，得为每个
+     底色各配一套。半透明是"往这一块上滴一滴墨"——在哪种底色上都对。 */
+  --surface-hover: rgba(31, 28, 24, 0.055);
+  --surface-active: rgba(31, 28, 24, 0.095);
+
+  /* ---- 墨：三阶 ----
+     muted 偏中性而不是偏褐：偏褐的灰落在米色上会发浑。
+     muted 永不承载图标或标签（对纸只有 2.6:1），只做元信息。 */
+  --content-primary: #1F1C18;
+  --content-secondary: #6A6259;
+  --content-muted: #A49C92;
+
+  /* ---- 朱砂：印泥的颜色 ----
+     原来用赭石 #C45D2A，它对纸只有 4.12:1——用在链接文字和大纲选中项
+     （12–13px）上不达 AA 的 4.5。朱砂更深更红，5.7:1，正文与图标都过线；
+     顺带也离开了"暖米底 + 陶土橙"那个到处都是的组合。 */
+  --accent: #B23A2E;
+  --accent-hover: #94291F;
+  --accent-light: #CF5A4A;
+  --accent-subtle: #F6EBE8;
+  --accent-subtle-hover: #EFDCD7;
+
+  /* 边框 */
+  --border-color: #DFD9CD;
+  --border-hover: #C9C2B4;
+  --border-strong: #A49C92;
+
+  /* ---- 实心填充：主按钮，以及**按下的开关** ----
+     开关的按下态用墨色，不用朱砂——朱砂留给"活着的东西"（链接、光标、
+     未保存的小圆点、同步进行中）。原来悬停、选中、开关打开三件事共用
+     一个强调色，满屏实心色块，指示性反而没了。
+     不能拿 --content-primary 当填充色：它在深色下是近白色，配上写死的
+     白字就是白底白字，按钮会整个消失。 */
+  --solid-bg: #1F1C18;
+  --solid-fg: #FFFFFF;
+
+  /* 阴影 */
+  --shadow-sm: 0 1px 2px rgba(31, 28, 24, 0.04);
+  --shadow-md: 0 4px 12px -2px rgba(31, 28, 24, 0.08), 0 2px 4px -1px rgba(31, 28, 24, 0.04);
+
+  /* 圆角 */
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 8px;
+
   color-scheme: light;
 }
+
+/* 深色模式 — 暖黑，与浅色同一个色相家族 */
+.dark {
+  /* 原来是 Claude 那套冷黑（#151414 / #ECEDEE），而浅色是暖纸——切一下
+     主题，色相也换了，像换了个产品。现在两边都是"墨与纸"，只是换了光线：
+     框最深、纸上一档、浮再上一档，**与浅色模式的上下关系完全一致**。 */
+
+  /* 框：全应用最深的一块。 */
+  --surface-secondary: #141210;
+  --surface-tertiary: #141210;
+
+  /* 纸：比框亮一档——框在纸后面，跟浅色同一个关系。 */
+  --surface-center: #1B1815;
+
+  /* 浮：比纸再亮一档。深色下弹窗只能往亮里走：往下走就是"挖洞"，而地板
+     已经定了。往亮里走还有个好处——**跟浅色语义一致了**：两种模式下弹窗
+     都读作"浮在上面"，只是方向相反。 */
+  --surface-primary: #262220;
+
+  /* 悬停与按下：同样是半透明的墨，只是换成浅色的墨。 */
+  --surface-hover: rgba(233, 229, 222, 0.065);
+  --surface-active: rgba(233, 229, 222, 0.11);
+
+  /* 墨：暖白，不是冷白。 */
+  --content-primary: #E9E5DE;
+  --content-secondary: #A69E94;
+  --content-muted: #6B655D;
+
+  /* 朱砂在深色下提亮一档 */
+  --accent: #E0705C;
+  --accent-hover: #EE8A76;
+  --accent-light: #C4523E;
+  --accent-subtle: #35211D;
+  --accent-subtle-hover: #432A25;
+
+  /* 边框 */
+  --border-color: #2C2823;
+  --border-hover: #3E3833;
+  --border-strong: #6B655D;
+
+  /* 实心按钮：深色模式下反转为浅底深字 */
+  --solid-bg: #E9E5DE;
+  --solid-fg: #1B1815;
+
+  /* 阴影 */
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --shadow-md: 0 4px 12px -2px rgba(0, 0, 0, 0.5), 0 2px 4px -1px rgba(0, 0, 0, 0.4);
+
+  color-scheme: dark;
+}
+
+/* ========================================
+   原型控制条
+   ======================================== */
+
+/*
+ * 控制条横跨很宽（里面按钮多，又 whitespace-nowrap），窄一点的窗口里它会
+ * 压住两侧侧栏底部的按钮——用户点"全部折叠"点不动，因为点在控制条的**空白
+ * 区域**上。
+ *
+ * 把容器设成 pointer-events: none，只让真正的按钮恢复接收事件。这样控制条
+ * 上没内容的地方"透过去"，底下的界面照常可点；按钮自己仍然好使。
+ */
+.proto-control-bar,
+.proto-control-bar * {
+  pointer-events: none;
+}
+.proto-control-bar button {
+  pointer-events: auto;
+}
+
+/* ========================================
+   侧栏宽度拖拽手柄
+   ======================================== */
+
+/*
+ * 手柄骑在侧栏的边框上：一半在栏内、一半在栏外（位置由 left/right 内联给）。
+ * 6px 是**可点区域**，看得见的只有中间那 2px——平时透明，hover / 聚焦 /
+ * 拖动时才亮成强调色。平时就画一条线的话，界面里会平白多出两道竖线。
+ */
+.resize-handle {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 6px;
+  z-index: 20;
+  cursor: col-resize;
+}
+.resize-handle::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 50%;
+  width: 2px;
+  transform: translateX(-50%);
+  background: transparent;
+  transition: background-color 0.12s ease;
+}
+.resize-handle:hover::after,
+.resize-handle:focus-visible::after,
+.resize-handle.is-dragging::after {
+  background: var(--accent);
+}
+.resize-handle:focus {
+  outline: none;
+}
+
+/*
+ * 拖动中：光标锁成 col-resize 并且禁掉选中。
+ * 不锁的话，鼠标一快就滑出那 6px，光标变回箭头、文字被一路刷蓝——
+ * 拖动的手感立刻散掉。
+ */
+body.is-resizing,
+body.is-resizing * {
+  cursor: col-resize !important;
+  user-select: none !important;
+}
+
+/* ========================================
+   全局样式
+   ======================================== */
 
 html, body, #root {
   height: 100%;
   margin: 0;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+html::-webkit-scrollbar,
+body::-webkit-scrollbar,
+#root::-webkit-scrollbar {
+  display: none;
+}
+
+/* CodeMirror 在 widget 替换位置插入的占位 img。
+   默认是 `display: inline; height: 16px`——会在每个 cm-line 里撑高容器，让相邻
+   cm-line 之间的边界有视觉空隙（约一个 img 高度）。把它降到 0 高、不参与 layout，
+   就能让 cm-line 之间紧贴（行高由 line-height 决定）。 */
+.cm-widgetBuffer {
+  display: inline-block;
+  height: 0 !important;
+  width: 0 !important;
+  vertical-align: baseline !important;
 }
 
 body {
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Microsoft YaHei',
-    'PingFang SC', 'Hiragino Sans GB', 'Source Han Sans SC', 'Noto Sans CJK SC', sans-serif;
+  font-family: 'SF Pro Text', 'SF Pro Display', 'PingFang SC',
+    -apple-system, 'BlinkMacSystemFont',
+    'Segoe UI', 'Noto Sans SC', 'Microsoft YaHei', sans-serif;
   -webkit-font-smoothing: antialiased;
+  /* 用**内容面**而不是抬起面：这是应用的地板色，不是弹窗色。
+     拿 `--surface-primary` 的话，深色下首屏（React 挂载之前那一瞬）会是
+     比正文更亮的 #1C1C1C，闪一下。 */
+  background-color: var(--surface-center);
+  color: var(--content-primary);
 }
 
-/* ---- CodeMirror 中文排版微调 ---- */
+/* ========================================
+   CodeMirror 编辑器
+   ======================================== */
+
 .cm-editor {
   height: 100%;
   font-size: 16px;
+  /* 引用行会把 font-size 压到 0 来消掉多余的 line box（见 .cm-quote-line），
+     引用正文再靠这个变量把字号要回来。用变量而不是写死 1rem：后者取决于
+     根元素字号，跟这里的设置可能不一致。 */
+  --cm-editor-font-size: 16px;
+  background-color: var(--surface-center);
+}
+.cm-editor,
+.cm-scroller,
+.cm-editor .cm-content {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.cm-editor::-webkit-scrollbar,
+.cm-scroller::-webkit-scrollbar {
+  display: none;
 }
 .cm-editor.cm-focused {
   outline: none;
 }
-.cm-scroller {
-  font-family: inherit;
+/* CodeMirror 基础主题里有一条 `.ͼ1 .cm-scroller { font-family: monospace }`，
+   权重 0,2,0。选择器必须同为两级才能靠后者胜出——写成 `.cm-scroller`
+   会输，编辑器正文会掉进 Consolas/宋体。 */
+.cm-editor .cm-scroller {
+  font-family: var(--font-sans);
   line-height: 1.85;
 }
 .cm-content {
   padding: 0;
-  caret-color: #2563eb;
+  caret-color: var(--accent);
 }
-/* 行高要作用在每一行上（.cm-scroller 的会被 .cm-line 覆盖） */
+
+/* CodeMirror 选中样式。
+   ⚠️ 别用 accent-subtle 当选择色：它是 #F6EBE8，而代码块的底色是
+   --surface-tertiary #F1EEE7——两者几乎同色，在代码块里拖拽选中后
+   用户根本看不出选中了什么，会以为"选不中、复制不了"（问题 4）。
+   改成半透明的 accent，在任何底色上都压得住。 */
+.cm-content ::selection {
+  background-color: rgba(178, 58, 46, 0.20) !important;
+}
+.cm-editor .cm-selectionBackground {
+  background-color: rgba(178, 58, 46, 0.20) !important;
+}
+.dark .cm-editor .cm-selectionBackground {
+  background-color: rgba(224, 112, 92, 0.30) !important;
+}
+.dark .cm-content ::selection {
+  background-color: rgba(224, 112, 92, 0.30) !important;
+}
+
+/* 行高 */
 .cm-line {
   padding: 0;
   line-height: 1.85;
+  color: var(--content-primary);
 }
 
-/* 注意：以下样式必须作用在带 class 的 <span> 上（Decoration.mark 加在文本区间上），
-   而不是 .cm-line 行容器上——否则选择器不匹配，样式静默失效。 */
-span.cm-md-h1 { font-size: 1.7em; font-weight: 700; line-height: 1.4; }
-span.cm-md-h2 { font-size: 1.4em; font-weight: 650; line-height: 1.45; }
-span.cm-md-h3 { font-size: 1.18em; font-weight: 600; }
+/* 光标颜色。
+   CodeMirror 基础主题的 `.cm-cursor` 把 border 写死成黑色，深色背景下看不见（#2）。
+   浅色下用 content-primary（墨色）就够；深色下用 accent（赭石亮），比纯白柔。 */
+.cm-editor .cm-cursor {
+  border-left-color: var(--content-primary);
+}
+.dark .cm-editor .cm-cursor {
+  border-left-color: var(--accent);
+}
+
+/* ========================================
+   Markdown 渲染样式
+   ======================================== */
+
+/* 标题 */
+span.cm-md-h1 { font-size: 1.7em; font-weight: 700; line-height: 1.4; color: var(--content-primary); text-decoration: none; }
+span.cm-md-h2 { font-size: 1.4em; font-weight: 650; line-height: 1.45; color: var(--content-primary); text-decoration: none; }
+span.cm-md-h3 { font-size: 1.18em; font-weight: 600; color: var(--content-primary); text-decoration: none; }
+span.cm-md-h4 { font-size: 1.06em; font-weight: 600; color: var(--content-primary); text-decoration: none; }
+span.cm-md-h5 { font-size: 1.03em; font-weight: 500; color: var(--content-secondary); text-decoration: none; }
+span.cm-md-h6 { font-size: 1em; font-weight: 500; color: var(--content-muted); text-decoration: none; }
+
+/* ⚠️ 必须连**内层**一起管。
+   CodeMirror 的 `defaultHighlightStyle` 会给 Markdown 语法节点套一层
+   `<span class="ͼN">`，类名是它运行时生成的，样式挂在语法节点**内层**——
+   比我们挂在外层的 `.cm-md-*` 更"近"，于是标题的下划线、URL 的深蓝都从
+   那里冒出来（问题 1、2）。子选择器 (0,1,1) 比 `.ͼN` (0,1,0) 权重高，
+   所以这几条能盖住它。 */
+span.cm-md-h1 *,
+span.cm-md-h2 *,
+span.cm-md-h3 *,
+span.cm-md-h4 *,
+span.cm-md-h5 *,
+span.cm-md-h6 * {
+  text-decoration: inherit;
+}
+
+/* 行内格式 */
 span.cm-md-bold { font-weight: 700; }
 span.cm-md-italic { font-style: italic; }
 span.cm-md-code {
   font-family: 'Cascadia Code', Consolas, 'SF Mono', Menlo, monospace;
-  background: #f1f5f9;
-  border-radius: 3px;
+  background: var(--surface-tertiary);
+  border-radius: var(--radius-sm);
   padding: 0.1em 0.3em;
   font-size: 0.92em;
+  color: var(--accent);
 }
+
+/* 引用块：
+   - block 化让它占满整行
+   - min-height 让空引用行（`>` 后面什么都没有）也撑得起竖线（#3）
+   - line-height 必须**显式**给：下面的 .cm-quote-line 把行高压成了 0，
+     不显式设的话引用正文会继承 0 而叠成一团
+   - box-sizing: border-box 让 padding 不撑大 box，border-left 位置稳定
+   - 真正的"连通"靠 ::before 伪元素：每行的 ::before 用 absolute 跨越自身 box
+     上下各 1em，覆盖行间距，于是上下两行的竖线在视觉上真的接起来（#8）。
+     注意负的 top/bottom 会让 ::before 越过 cm-line 边界——cm-line 默认
+     overflow: visible，所以能正常显示。 */
 span.cm-md-quote {
-  color: #475569;
-  border-left: 3px solid #cbd5e1;
+  display: block;
+  /* 字号从变量要回来——.cm-quote-line 把它压成了 0 */
+  font-size: var(--cm-editor-font-size, 16px);
+  min-height: 1.85em;
+  line-height: 1.85;
   padding-left: 0.75em;
+  color: var(--content-secondary);
+  box-sizing: border-box;
+  position: relative;
 }
+
+/* ⚠️ 引用行的 cm-line 里有一条**多余的 line box**。
+   隐藏 `>` 前缀用的是 Decoration.replace，它会产生一个空 widget，CodeMirror
+   在 widget 两侧各插一个 `cm-widgetBuffer`——这三个 inline 元素撑出一条
+   line box。它叠在 .cm-md-quote（block，又占一个行高）上面，cm-line 就变成
+   两个行高：用户看到的是「引用块里多出空白行」（问题 7）。
+   两条都要压：
+   - line-height: 0 消灭 line box 的高度；
+   - font-size: 0 消灭 strut——baseline 的位置由父元素字体的 ascent 决定，
+     只压 line-height 的话 baseline 仍停在 6px 处，cm-line 还会多出那 6px。 */
+.cm-line.cm-quote-line {
+  line-height: 0;
+  font-size: 0;
+}
+
+span.cm-md-quote::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  /* 上下各延伸 1em 跨过行间缝隙，让相邻两行的竖线接上（#8） */
+  top: -1em;
+  bottom: -1em;
+  width: 3px;
+  background: var(--border-color);
+  border-radius: 1.5px;
+  pointer-events: none;
+}
+
+/* 首行不向上延伸、末行不向下延伸——延伸出去的那一截会戳进引用块**外面**
+   的段落里，让引用块看起来上下各多出一段竖线（问题 7 续）。 */
+span.cm-md-quote-first::before {
+  top: 0;
+}
+span.cm-md-quote-last::before {
+  bottom: 0;
+}
+
+/* 空引用行（整行只有一个 `>`）：字符保留在 DOM 里撑住 Mark 装饰，
+   但涂成透明——用户看到的只有竖线（#3）。
+   ⚠️ 内层也要管：CM 给 `>` 套了一层 `<span class="ͼ5">`，它带自己的颜色，
+   只设外层会露出一个 `>`（就是用户看到的"小箭头"）。 */
+span.cm-md-quote-empty,
+span.cm-md-quote-empty * {
+  color: transparent;
+}
+
+/* 链接：去掉默认下划线（#7）。
+   颜色用 accent 已经够明显——下划线在密集文本里反而是噪声。 */
 span.cm-md-link {
-  color: #2563eb;
+  color: var(--accent);
+  text-decoration: none;
+}
+/* 深色模式下链接再亮一档。accent 在深色下是 #E0705C，本就够亮，
+   但代码区背景会压一点——这里把 hover/active 提一档。 */
+.dark span.cm-md-link {
+  color: var(--accent-hover);
+}
+
+/* 同标题：链接的内层也归我们管。
+   裸 URL 的内层是 CM 的 `.ͼc`（默认给 `rgb(34,17,153)` 深蓝），
+   `[`、`]` 这些标记的内层是 `.ͼ5`（暗绿 + 下划线）——两者都盖住了外层
+   的橙色，深色模式下尤其看不清（问题 2）。让内层直接继承外层颜色。 */
+span.cm-md-link * {
+  color: inherit;
+  text-decoration: inherit;
+}
+
+/* 按住 Ctrl / Cmd 时链接变成手型 + 下划线——**让 Ctrl+点击这个功能可被发现**。
+   没有这个提示，用户不会知道链接能点开（VS Code、Typora 都是这个套路）。
+   类由 markdownLivePreview 的 modifierHeldPlugin 挂在编辑器根节点上。 */
+.cm-editor.cm-link-modifier-held span.cm-md-link,
+.cm-editor.cm-link-modifier-held span.cm-md-link * {
+  cursor: pointer;
   text-decoration: underline;
   text-underline-offset: 2px;
 }
-span.cm-md-bullet { color: #64748b; }
-span.cm-md-strike { text-decoration: line-through; color: #94a3b8; }
-span.cm-md-link { color: #2563eb; text-decoration: underline; text-underline-offset: 2px; }
-span.cm-md-image { color: #7c3aed; }
 
-/* ---- 代码块（整块背景，围栏行在光标不在时藏掉）---- */
-span.cm-md-codeblock {
-  background: #f1f5f9;
-  font-family: 'Cascadia Code', Consolas, 'SF Mono', Menlo, monospace;
-  font-size: 0.92em;
+span.cm-md-bullet {
+  color: var(--content-muted);
+  /* 符号与正文之间留出空隙。有序列表的 `1.` 与无序的 `•` 共用这一条，
+     所以两者间距一致（问题 6）。 */
+  margin-right: 0.5em;
+}
+span.cm-md-strike { text-decoration: line-through; color: var(--content-muted); }
+span.cm-md-image {
+  display: inline-block;
+  max-width: 100%;
+  height: auto;
+  margin: 0.3em 0;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-color);
+}
+span.cm-md-image-wrap {
+  display: block;
+  margin: 0.4em 0;
+}
+span.cm-md-image-wrap > img.cm-md-image {
+  display: block;
+}
+span.cm-md-image-fallback {
+  display: inline-block;
+  padding: 0.4em 0.7em;
+  border: 1px dashed var(--border-strong);
+  border-radius: var(--radius-sm);
+  color: var(--content-secondary);
+  font-size: 0.88em;
+  background: var(--surface-secondary);
 }
 
-/* ---- 任务列表的勾选框 ---- */
+/* ========================================
+   代码块
+   ======================================== */
+
+.cm-codeblock-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5em;
+  /* 负 margin 抵消 .cm-line 的左右 padding（CM 默认 `0 2px 0 6px`）。
+     头栏住在 cm-line 内部，不抵消的话它比下面的代码正文左右各窄一截，
+     看起来就是"没对齐"（问题 5）。 */
+  margin: 0.4em -2px 0 -6px;
+  padding: 0.25em 0.75em;
+  border: 1px solid var(--border-color);
+  border-bottom: none;
+  border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+  background: var(--surface-tertiary);
+  font-size: 0.75em;
+  line-height: 1.6;
+}
+.cm-codeblock-lang {
+  border: none;
+  background: none;
+  padding: 0;
+  font: inherit;
+  color: var(--content-secondary);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.cm-codeblock-lang:hover {
+  color: var(--accent);
+}
+.cm-codeblock-copy {
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  background: var(--surface-primary);
+  padding: 0.1em 0.6em;
+  font: inherit;
+  color: var(--content-secondary);
+  cursor: pointer;
+  transition: all 0.15s ease;
+  font-size: 0.9em;
+}
+.cm-codeblock-copy:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+.cm-codeblock-copy.is-done {
+  border-color: #22c55e;
+  color: #16a34a;
+}
+
+.cm-codeblock-line {
+  border-left: 1px solid var(--border-color);
+  border-right: 1px solid var(--border-color);
+  background: var(--surface-tertiary);
+  font-family: 'Cascadia Code', Consolas, 'SF Mono', Menlo, Monaco, monospace;
+  font-size: 1em;
+  line-height: 1.85;
+  padding: 0 0.75em;
+}
+.cm-codeblock-last {
+  border-bottom: 1px solid var(--border-color);
+  border-radius: 0 0 var(--radius-lg) var(--radius-lg);
+  padding-bottom: 0.5em;
+  margin-bottom: 0.4em;
+}
+.cm-codeblock-fence {
+  font-family: 'Cascadia Code', Consolas, 'SF Mono', Menlo, monospace;
+  font-size: 0.92em;
+  color: var(--content-muted);
+}
+
+/* ========================================
+   任务列表勾选框
+   ======================================== */
+
 span.cm-md-checkbox {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 0.95em;
-  height: 0.95em;
-  /* 它同时承担了项目符号的位置，所以左右都要有间距 */
+  width: 1em;
+  height: 1em;
   margin-right: 0.4em;
-  border: 1.5px solid #94a3b8;
-  border-radius: 3px;
+  border: 1.5px solid var(--border-strong);
+  border-radius: var(--radius-sm);
   font-size: 0.75em;
   line-height: 1;
-  color: #fff;
+  color: transparent;
   vertical-align: -0.08em;
   cursor: pointer;
-  transition: background 0.12s, border-color 0.12s;
+  transition: all 0.12s ease;
 }
 span.cm-md-checkbox:hover {
-  border-color: #2563eb;
+  border-color: var(--accent);
 }
 span.cm-md-checkbox.is-checked {
-  background: #2563eb;
-  border-color: #2563eb;
+  background: var(--accent);
+  border-color: var(--accent);
+  color: white;
 }
 
-/* ---- 分割线 ---- */
+/* ========================================
+   分割线
+   ======================================== */
+
 .cm-md-rule {
+  display: inline-block;
+  width: 100%;
   height: 1px;
-  margin: 0.7em 0;
-  background: #e2e8f0;
+  background: var(--border-color);
+  vertical-align: middle;
+  margin: 0.5em 0;
 }
 
-/* ---- 表格（整块替换渲染）---- */
+/* ========================================
+   表格
+   ======================================== */
+
 .cm-md-table-wrap {
   padding: 0.35em 0;
   overflow-x: auto;
@@ -121,16 +613,88 @@ span.cm-md-checkbox.is-checked {
 }
 .cm-md-table th,
 .cm-md-table td {
-  border: 1px solid #e2e8f0;
-  padding: 0.35em 0.8em;
+  border: 1px solid var(--border-color);
+  padding: 0.5em 0.8em;
   text-align: left;
   white-space: nowrap;
 }
 .cm-md-table th {
-  background: #f8fafc;
+  background: var(--surface-tertiary);
   font-weight: 600;
-  color: #334155;
+  color: var(--content-primary);
 }
 .cm-md-table tr:hover td {
-  background: #fafbfc;
+  background: var(--surface-hover);
 }
+
+/* ========================================
+   代码块语法高亮
+   ======================================== */
+
+.cm-codeblock-line,
+.cm-codeblock-last {
+  font-family: 'Cascadia Code', Consolas, 'SF Mono', Menlo, Monaco, monospace;
+}
+
+/* 赭石暖调语法高亮 */
+span.cm-hljs-keyword,
+span.cm-hljs-built_in { color: #B23A2E; }
+span.cm-hljs-type { color: #B8860B; }
+span.cm-hljs-literal,
+span.cm-hljs-number { color: #C07030; }
+span.cm-hljs-string { color: #5A8A4A; }
+span.cm-hljs-comment { color: #9C8F82; font-style: italic; }
+span.cm-hljs-doctag { color: #B23A2E; }
+span.cm-hljs-meta { color: #8B7355; }
+span.cm-hljs-function { color: #4A7A9A; }
+span.cm-hljs-title { color: #4A7A9A; }
+span.cm-hljs-params { color: #B8860B; }
+span.cm-hljs-variable { color: #A05040; }
+span.cm-hljs-attr { color: #C07030; }
+span.cm-hljs-attribute { color: #5A8A4A; }
+span.cm-hljs-selector-tag { color: #A05040; }
+span.cm-hljs-selector-class { color: #C07030; }
+span.cm-hljs-selector-id { color: #4A7A9A; }
+span.cm-hljs-operator { color: #5A9A8A; }
+span.cm-hljs-punctuation { color: #8B7355; }
+span.cm-hljs-regexp { color: #5A8A4A; }
+span.cm-hljs-template-variable { color: #B23A2E; }
+span.cm-hljs-addition { color: #5A8A4A; background: rgba(90, 138, 74, 0.15); }
+span.cm-hljs-deletion { color: #A05040; background: rgba(160, 80, 64, 0.15); }
+span.cm-hljs-section { color: #4A7A9A; font-weight: bold; }
+span.cm-hljs-name { color: #A05040; }
+span.cm-hljs-selector-attr { color: #C07030; }
+span.cm-hljs-selector-pseudo { color: #B23A2E; }
+
+/* ========================================
+   深色模式下的语法高亮（保持暖调）
+   ======================================== */
+
+.dark span.cm-hljs-keyword,
+.dark span.cm-hljs-built_in { color: #E0705C; }
+.dark span.cm-hljs-type { color: #E8C060; }
+.dark span.cm-hljs-literal,
+.dark span.cm-hljs-number { color: #E09850; }
+.dark span.cm-hljs-string { color: #7BBF60; }
+.dark span.cm-hljs-comment { color: #7A7068; font-style: italic; }
+.dark span.cm-hljs-function,
+.dark span.cm-hljs-title { color: #70A8D0; }
+.dark span.cm-hljs-params { color: #E8C060; }
+.dark span.cm-hljs-variable { color: #D07868; }
+.dark span.cm-hljs-attr { color: #E09850; }
+.dark span.cm-hljs-operator { color: #60B8B0; }
+.dark span.cm-hljs-punctuation { color: #8A8070; }
+.dark span.cm-hljs-doctag { color: #E0705C; }
+.dark span.cm-hljs-meta { color: #A09080; }
+.dark span.cm-hljs-attribute { color: #7BBF60; }
+.dark span.cm-hljs-selector-tag { color: #D07868; }
+.dark span.cm-hljs-selector-class { color: #E09850; }
+.dark span.cm-hljs-selector-id { color: #70A8D0; }
+.dark span.cm-hljs-regexp { color: #7BBF60; }
+.dark span.cm-hljs-template-variable { color: #E0705C; }
+.dark span.cm-hljs-addition { color: #7BBF60; background: rgba(123, 191, 96, 0.15); }
+.dark span.cm-hljs-deletion { color: #D07868; background: rgba(208, 120, 104, 0.15); }
+.dark span.cm-hljs-section { color: #70A8D0; font-weight: bold; }
+.dark span.cm-hljs-name { color: #D07868; }
+.dark span.cm-hljs-selector-attr { color: #E09850; }
+.dark span.cm-hljs-selector-pseudo { color: #E0705C; }

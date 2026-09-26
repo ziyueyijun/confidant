@@ -92,6 +92,10 @@ const 语法全集 = `# 一级标题
 
 #### 四级标题
 
+##### 五级标题
+
+###### 六级标题
+
 这是一段普通正文，包含**粗体**、*斜体*、***粗斜体***、~~删除线~~、\`行内代码\`，
 以及一个[链接](https://example.com)和一个裸地址 https://example.org 。
 
@@ -115,6 +119,15 @@ const 语法全集 = `# 一级标题
 
 - [ ] 未完成的任务
 - [x] 已完成的任务
+
+\`\`\`javascript
+function greet(name) {
+  const message = "Hello, " + name + "!"
+  return message
+}
+
+console.log(greet("World"))
+\`\`\`
 
 \`\`\`
 这是代码块。

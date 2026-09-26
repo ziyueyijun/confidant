@@ -1,24 +1,50 @@
 import { useEffect, useImperativeHandle, useRef } from 'react'
 import type { Ref } from 'react'
 import { EditorSelection, EditorState } from '@codemirror/state'
-import { EditorView, keymap, highlightActiveLine, drawSelection } from '@codemirror/view'
+import { EditorView, keymap, drawSelection } from '@codemirror/view'
 import { defaultKeymap, history, historyKeymap, indentWithTab } from '@codemirror/commands'
 import { markdown, markdownLanguage } from '@codemirror/lang-markdown'
 import { syntaxHighlighting, defaultHighlightStyle, bracketMatching } from '@codemirror/language'
 import { markdownLivePreview, type SyntaxReveal } from './markdownLivePreview'
-
+import { findHighlight, setQuery, findNext, findPrev, findStatus } from './find'
 /** 外部（如大纲、工具栏）驱动编辑器的入口 */
 export interface EditorApi {
   /** 滚到指定行并把光标放上去。line 是 0-based 行号。 */
   scrollToLine: (line: number) => void
   /** 在光标处插入文本（工具栏用） */
   insert: (text: string) => void
+  /**
+   * 插入一段**独占整行**的块级内容（表格、代码块、分割线）。
+   *
+   * 和 `insert` 分开是因为语义不同：`insert` 是行内的，而块级内容必须
+   * 落在行边界上。在「## 标题」行首用 `insert` 插表格会得到
+   * `| 列 1 | 列 2 |## 标题`——表格把标题吃了，两样一起废掉。
+   * 这里在需要时补换行，保证块的前后都是行边界。
+   *
+   * `cursorOffset` 是插入后光标落在块内的第几个字符，默认落在末尾。
+   * 代码块要落在围栏**里面**，就传它。
+   */
+  insertBlock: (text: string, cursorOffset?: number) => void
   /** 用包裹标记包住选区（粗体、斜体……）；已包裹则去掉 */
   wrap: (before: string, after: string, placeholder: string) => void
   /** 把当前行（或选中的若干行）的行首加上前缀；已有则去掉 */
   prefixLines: (prefix: string) => void
+  /**
+   * 设置当前行（或选中的若干行）的标题级别；`0` 表示去掉标题、回到正文。
+   *
+   * 和 `prefixLines` 分开是因为标题要**替换**而不是叠加：从 H3 改成 H5
+   * 是换掉 `### `，不是再加两个 `#`。
+   */
+  setHeading: (level: 0 | 1 | 2 | 3 | 4 | 5 | 6) => void
   /** 清掉选区内的 Markdown 标记，只留文字 */
   clearFormat: () => void
+  /** 设查找词（在本文中查找）。空串清掉高亮 */
+  setFindQuery: (q: string) => void
+  /** 跳到下一个 / 上一个命中。没有命中返回 false */
+  findNext: () => boolean
+  findPrev: () => boolean
+  /** 当前查到第几个 / 共几个。没设查找词时返回 null */
+  findStatus: () => { index: number; total: number } | null
 }
 
 interface Props {
@@ -27,6 +53,8 @@ interface Props {
   sourceMode: boolean
   renderTables: boolean
   onChange?: (text: string) => void
+  /** 光标所在行的标题级别（0 = 不是标题）。工具栏拿它显示当前级别。 */
+  onHeadingLevel?: (level: number) => void
   ref?: Ref<EditorApi>
 }
 
@@ -35,12 +63,20 @@ interface Props {
  * 刻意不做的：文件读写、撤销持久化、多光标特殊处理、粘贴图片。
  * 只做「能打字、能看手感」这一件事。
  */
-export function MarkdownEditor({ initialDoc, reveal, sourceMode, renderTables, onChange, ref }: Props) {
+export function MarkdownEditor({ initialDoc, reveal, sourceMode, renderTables, onChange, onHeadingLevel, ref }: Props) {
   const host = useRef<HTMLDivElement>(null)
   const viewRef = useRef<EditorView | null>(null)
+  /**
+   * 当前查找词。**只为了让视图重建后还能接着高亮**——真正的真相在编辑器的
+   * StateField 里（见 `find.ts`）。切源码视图、换语法标记方式都会重建视图，
+   * 重建完在这里补 dispatch 一次，查找条开着的时候就不会突然"什么都不亮"。
+   */
+  const findQueryRef = useRef('')
   // 把回调放进 ref，避免因回调变化重建编辑器（那会丢光标）
   const onChangeRef = useRef(onChange)
   onChangeRef.current = onChange
+  const onHeadingLevelRef = useRef(onHeadingLevel)
+  onHeadingLevelRef.current = onHeadingLevel
 
   useImperativeHandle(ref, () => ({
     scrollToLine(line: number) {
@@ -62,6 +98,33 @@ export function MarkdownEditor({ initialDoc, reveal, sourceMode, renderTables, o
       view.dispatch({
         changes: { from, to, insert: text },
         selection: { anchor: from + text.length },
+      })
+      view.focus()
+    },
+
+    /**
+     * 插入块级内容，必要时在前后补换行让它独占整行。
+     *
+     * 前后各判一次，因为两种情形都会遇到：在行中间插（后面要断）、
+     * 在行首插（前面要断）。已经在行边界上就不重复补，免得每插一次
+     * 就多出空行。
+     */
+    insertBlock(text: string, cursorOffset?: number) {
+      const view = viewRef.current
+      if (!view) return
+      const { from, to } = view.state.selection.main
+      const doc = view.state.doc
+      const atLineStart = from === doc.lineAt(from).from
+      const atLineEnd = to === doc.lineAt(to).to
+
+      const lead = atLineStart ? '' : '\n'
+      const tail = atLineEnd ? '' : '\n'
+      const content = lead + text + tail
+      // 光标默认落在块末尾；给了偏移就落在块内那一位（代码块要进围栏里面）
+      const anchor = from + lead.length + (cursorOffset ?? text.length)
+      view.dispatch({
+        changes: { from, to, insert: content },
+        selection: { anchor },
       })
       view.focus()
     },
@@ -123,6 +186,32 @@ export function MarkdownEditor({ initialDoc, reveal, sourceMode, renderTables, o
       view.focus()
     },
 
+    /**
+     * 设置标题级别。**替换**已有的 `#` 序列，而不是叠加。
+     *
+     * 用 `prefixLines` 做不到这件事：H3 上点 H5 会变成 `#####`（8 个井号），
+     * 在 Markdown 里那不是标题。所以这里先把 `^#{1,6}\s+` 摘掉再加新的。
+     */
+    setHeading(level) {
+      const view = viewRef.current
+      if (!view) return
+      const sel = view.state.selection.main
+      const doc = view.state.doc
+      const first = doc.lineAt(sel.from)
+      const last = doc.lineAt(sel.to)
+      const lines = []
+      for (let n = first.number; n <= last.number; n++) lines.push(doc.line(n))
+
+      const prefix = '#'.repeat(level) + (level > 0 ? ' ' : '')
+      const changes = lines.map((l) => {
+        const m = /^#{1,6}\s+/.exec(l.text)
+        const stripTo = l.from + (m ? m[0].length : 0)
+        return { from: l.from, to: stripTo, insert: prefix }
+      })
+      view.dispatch({ changes })
+      view.focus()
+    },
+
     /** 清掉选区（或整行）里的 Markdown 标记，只留文字。 */
     clearFormat() {
       const view = viewRef.current
@@ -140,6 +229,28 @@ export function MarkdownEditor({ initialDoc, reveal, sourceMode, renderTables, o
       })
       view.focus()
     },
+
+    setFindQuery(q) {
+      const view = viewRef.current
+      if (!view) return
+      findQueryRef.current = q
+      setQuery(view, q)
+    },
+
+    findNext() {
+      const view = viewRef.current
+      return view ? findNext(view) : false
+    },
+
+    findPrev() {
+      const view = viewRef.current
+      return view ? findPrev(view) : false
+    },
+
+    findStatus() {
+      const view = viewRef.current
+      return view ? findStatus(view) : null
+    },
   }), [])
 
   useEffect(() => {
@@ -148,15 +259,18 @@ export function MarkdownEditor({ initialDoc, reveal, sourceMode, renderTables, o
     const extensions = [
       history(),
       drawSelection(),
-      highlightActiveLine(),
       bracketMatching(),
       EditorState.allowMultipleSelections.of(true),
       keymap.of([indentWithTab, ...defaultKeymap, ...historyKeymap]),
       markdown({ base: markdownLanguage, codeLanguages: [] }),
       syntaxHighlighting(defaultHighlightStyle, { fallback: true }),
+      findHighlight(),
       EditorView.lineWrapping,
       EditorView.updateListener.of((u) => {
         if (u.docChanged) onChangeRef.current?.(u.state.doc.toString())
+        if (u.docChanged || u.selectionSet) {
+          onHeadingLevelRef.current?.(headingLevelAtCursor(u.state))
+        }
       }),
       ...(sourceMode ? [] : [markdownLivePreview({ reveal, renderTables })]),
     ]
@@ -166,7 +280,11 @@ export function MarkdownEditor({ initialDoc, reveal, sourceMode, renderTables, o
       parent: host.current,
     })
     viewRef.current = view
+    // 视图是刚建的：查找词补回去，查找条开着的时候不会突然什么都不亮
+    if (findQueryRef.current) setQuery(view, findQueryRef.current)
     view.focus()
+    // 挂载时先报一次，否则工具栏会停留在上一篇笔记的级别上
+    onHeadingLevelRef.current?.(headingLevelAtCursor(view.state))
 
     return () => {
       view.destroy()
@@ -177,6 +295,18 @@ export function MarkdownEditor({ initialDoc, reveal, sourceMode, renderTables, o
   }, [reveal, sourceMode, renderTables])
 
   return <div ref={host} className="h-full w-full overflow-auto" />
+}
+
+/**
+ * 光标所在行的标题级别；不是标题行返回 0。
+ *
+ * 用正则而不是 syntaxTree：`setHeading` 也是按同一个正则改写的，
+ * 两边规则一致，工具栏显示的级别和点下去的结果不会打架。
+ */
+export function headingLevelAtCursor(state: EditorState): number {
+  const line = state.doc.lineAt(state.selection.main.head)
+  const m = /^#{1,6}\s+/.exec(line.text)
+  return m ? m[0].trimEnd().length : 0
 }
 
 /**
@@ -215,5 +345,5 @@ export function stripMarkdown(s: string): string {
 
 /** 只读预览用的最小渲染（不走 CodeMirror，够原型展示即可） */
 export function plainPreview({ text }: { text: string }) {
-  return <pre className="whitespace-pre-wrap text-sm text-slate-600">{text}</pre>
+  return <pre className="whitespace-pre-wrap text-sm" style={{ color: 'var(--content-secondary)' }}>{text}</pre>
 }
