@@ -54,8 +54,23 @@
   --accent-subtle: #F6EBE8;
   --accent-subtle-hover: #EFDCD7;
 
-  /* 边框 */
+  /* 印章（应用的标识，见 Seal.tsx）。底与字是独立的一对，不直接拿
+     --accent——深色下 accent 会提亮一档，白字压上去就不够对比了。
+     印泥上的字是刻掉的、露出纸色，所以永远是白字，不跟着主题反色。 */
+  --seal-bg: #B23A2E;
+  --seal-fg: #FFFFFF;
+
+  /* ---- 线：只有两档 ----
+     原来全应用就 --border-color 一个值，分隔线、外框、表格格、代码块、
+     每个标签的右边全是同一根——线的粗细一样，就等于没有层次，界面读起来
+     像表单。
+
+     --border-color 是**强**的那档：只画在"框与纸的交界"（两条侧栏的竖边、
+     底部栏的上边）和"浮起来的东西的外轮廓"（弹窗、菜单）。全应用数得过来。
+     --rule-soft 是**弱**的那档：区域内部的细线——表格的行线、工具条里的
+     分隔。除此之外**一律不画**：靠面的变化和留白分隔。 */
   --border-color: #DFD9CD;
+  --rule-soft: #ECE8E0;
   --border-hover: #C9C2B4;
   --border-strong: #A49C92;
 
@@ -68,14 +83,43 @@
   --solid-bg: #1F1C18;
   --solid-fg: #FFFFFF;
 
-  /* 阴影 */
+  /* 阴影：三枚，按"浮多高"分。
+     --shadow-md 是弹窗那一档，太轻，**菜单不能用它**：菜单是纯白（#FFFFFF）
+     浮在纸（#F9F7F2）上，两者只差 1.07——"浮起来"几乎全靠阴影这一个信号，
+     弱阴影下菜单看着像半透明的。--shadow-pop 是菜单、气泡这类小浮层的一档：
+     暖色、更实，但不像 Tailwind 的 shadow-2xl 那样是冷黑的一大团。 */
   --shadow-sm: 0 1px 2px rgba(31, 28, 24, 0.04);
   --shadow-md: 0 4px 12px -2px rgba(31, 28, 24, 0.08), 0 2px 4px -1px rgba(31, 28, 24, 0.04);
+  --shadow-pop: 0 10px 24px -4px rgba(31, 28, 24, 0.18), 0 3px 8px -2px rgba(31, 28, 24, 0.10);
 
-  /* 圆角 */
+  /* ---- 圆角：按"这个东西有多大"分三档，不按"它多重要" ----
+     原来是 4/6/8 三档、档间只差 +2px，等于没分——全应用 66 处 4px，而
+     4px 在 24px 的按钮上只占 1/6，看上去就是直角；整块面 8px 也显方。
+     现在档与档差 ×2，每一档对应一类东西：
+
+       sm  4px  行内的小东西：小标签、行内代码、勾选框（高度 20px 以下）
+       md  8px  一切可点的控件：按钮、输入框、树里的行、标签页、菜单项
+       lg 12px  浮起来或围起来的整块面：弹窗、菜单、代码块、图片、卡片
+
+     **判据是"这个角平时看不看得见"**：带边框、带底色的控件（输入框、下拉、
+     分段控件的外框、小按钮）一律 md——4px 在 20px 高的东西上看着就是直角；
+     纯文字的碎按钮（「关闭」「清空」）和 kbd、行内代码留在 sm，它们的角只在
+     悬停底色上闪一下，圆不圆没人看得出来。
+
+     **标签页是特例：只收上边两角**（rounded-t-md），而且**要用一根强档线
+     把形状画出来**（内阴影，见 TabBar.tsx）——纸与框只差 1.08，光收角看不
+     出来。它的纸色是一路通到正文的（标签栏是框色，标签下面的工具栏与正文
+     都是纸色），底边并不存在——收底角会把那条纸带切断，读成"浮在框上的一
+     枚片"。理由详见 TabBar.tsx。
+
+     **贴边的整块面不给圆角**（侧栏、编辑器、底部栏）——纸是裁齐的，
+     只有浮起来的和手里拿着的才收角。
+
+     Tailwind 的 `rounded-*` 直接读这三个变量（见 tailwind.config.js），
+     所以全应用只有一套圆角，改这里就全改了。 */
   --radius-sm: 4px;
-  --radius-md: 6px;
-  --radius-lg: 8px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
 
   color-scheme: light;
 }
@@ -114,8 +158,14 @@
   --accent-subtle: #35211D;
   --accent-subtle-hover: #432A25;
 
-  /* 边框 */
+  /* 印章：深色下用**更深**的那档朱砂，白字才有 4.5:1
+     （直接拿 --accent #E0705C 的话只有 3.2:1）。 */
+  --seal-bg: #C4523E;
+  --seal-fg: #FFFFFF;
+
+  /* 线：与浅色同一套分工——强档画交界，弱档画区域内部 */
   --border-color: #2C2823;
+  --rule-soft: #241F1C;
   --border-hover: #3E3833;
   --border-strong: #6B655D;
 
@@ -126,6 +176,7 @@
   /* 阴影 */
   --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
   --shadow-md: 0 4px 12px -2px rgba(0, 0, 0, 0.5), 0 2px 4px -1px rgba(0, 0, 0, 0.4);
+  --shadow-pop: 0 10px 24px -4px rgba(0, 0, 0, 0.55), 0 3px 8px -2px rgba(0, 0, 0, 0.4);
 
   color-scheme: dark;
 }
@@ -454,12 +505,18 @@ span.cm-md-bullet {
   margin-right: 0.5em;
 }
 span.cm-md-strike { text-decoration: line-through; color: var(--content-muted); }
-span.cm-md-image {
+/* ⚠️ 选择器必须是 `img.`，不是 `span.`。
+   markdownLivePreview 建出来的是 `<img class="cm-md-image">`（外面套一层
+   `span.cm-md-image-wrap`），而这里原来写的是 `span.cm-md-image`——类型
+   选择器对不上，**这条规则从来没生效过**：编辑器里的图片一直没有圆角、
+   也没有那圈边框。 */
+img.cm-md-image {
   display: inline-block;
   max-width: 100%;
   height: auto;
   margin: 0.3em 0;
-  border-radius: var(--radius-sm);
+  /* 围起来的一整块面 → 最大那一档，与代码块同类 */
+  border-radius: var(--radius-lg);
   border: 1px solid var(--border-color);
 }
 span.cm-md-image-wrap {
@@ -493,8 +550,8 @@ span.cm-md-image-fallback {
      看起来就是"没对齐"（问题 5）。 */
   margin: 0.4em -2px 0 -6px;
   padding: 0.25em 0.75em;
-  border: 1px solid var(--border-color);
-  border-bottom: none;
+  /* 不画边框：代码块整块的 --surface-tertiary 底色已经把"这是另一块面"
+     说清楚了，再描一圈只是多一根线。 */
   border-radius: var(--radius-lg) var(--radius-lg) 0 0;
   background: var(--surface-tertiary);
   font-size: 0.75em;
@@ -535,8 +592,6 @@ span.cm-md-image-fallback {
 }
 
 .cm-codeblock-line {
-  border-left: 1px solid var(--border-color);
-  border-right: 1px solid var(--border-color);
   background: var(--surface-tertiary);
   font-family: 'Cascadia Code', Consolas, 'SF Mono', Menlo, Monaco, monospace;
   font-size: 1em;
@@ -544,7 +599,6 @@ span.cm-md-image-fallback {
   padding: 0 0.75em;
 }
 .cm-codeblock-last {
-  border-bottom: 1px solid var(--border-color);
   border-radius: 0 0 var(--radius-lg) var(--radius-lg);
   padding-bottom: 0.5em;
   margin-bottom: 0.4em;
@@ -611,17 +665,37 @@ span.cm-md-checkbox.is-checked {
   line-height: 1.6;
   min-width: 60%;
 }
+/* 印刷表格：只要横线，不要竖线。
+   原来每个单元格四面封边（`border: 1px solid`），密一点的表格就成了一格
+   一格的小方框——那是**表单**的样子，不是表格的样子。真实的表格靠行距和
+   一条表头线分栏，竖线交给留白。 */
 .cm-md-table th,
 .cm-md-table td {
-  border: 1px solid var(--border-color);
-  padding: 0.5em 0.8em;
+  border: 0;
+  padding: 0.45em 0.9em;
   text-align: left;
   white-space: nowrap;
 }
+/* 表头线是整张表最重的一条：它是"这是表头"的唯一信号（原来靠底色，
+   现在底色去掉了），所以用强档；行线用弱档。 */
 .cm-md-table th {
-  background: var(--surface-tertiary);
+  border-bottom: 1px solid var(--border-color);
   font-weight: 600;
   color: var(--content-primary);
+}
+.cm-md-table tbody tr + tr td {
+  border-top: 1px solid var(--rule-soft);
+}
+/* 首列不缩进、末列不留白——表格的左边缘与正文对齐。
+   有边框的时候内边距是必须的（不然文字贴着线），线去掉之后它就只是
+   把表格往里推了 0.9em，看起来像没对齐。 */
+.cm-md-table th:first-child,
+.cm-md-table td:first-child {
+  padding-left: 0;
+}
+.cm-md-table th:last-child,
+.cm-md-table td:last-child {
+  padding-right: 0;
 }
 .cm-md-table tr:hover td {
   background: var(--surface-hover);

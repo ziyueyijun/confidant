@@ -57,21 +57,21 @@ export function SavePrompt({ title, onSave, onDiscard, onCancel }: Props) {
         <div className="mt-4 flex justify-end gap-2">
           <button
             onClick={onCancel}
-            className="rounded px-3 py-1.5 text-xs transition-colors hover:bg-[var(--surface-hover)]"
+            className="rounded-md px-3 py-1.5 text-xs transition-colors hover:bg-[var(--surface-hover)]"
             style={{ color: 'var(--content-secondary)' }}
           >
             取消
           </button>
           <button
             onClick={onDiscard}
-            className="rounded px-3 py-1.5 text-xs transition-colors hover:bg-[var(--surface-hover)]"
+            className="rounded-md px-3 py-1.5 text-xs transition-colors hover:bg-[var(--surface-hover)]"
             style={{ color: 'var(--accent)' }}
           >
             不保存
           </button>
           <button
             onClick={onSave}
-            className="rounded px-3 py-1.5 text-xs font-medium transition-colors"
+            className="rounded-md px-3 py-1.5 text-xs font-medium transition-colors"
             style={{ backgroundColor: 'var(--accent)', color: 'white' }}
           >
             保存

@@ -32,7 +32,7 @@ export function SyncCenterDialog({
   return (
     <div className="fixed inset-0 z-40 flex items-center justify-center p-6" style={{ backgroundColor: 'rgba(26,23,20,0.15)' }}>
       <div className="flex h-[640px] max-h-[85vh] w-full max-w-3xl flex-col overflow-hidden shadow-2xl" style={{ borderRadius: 'var(--radius-lg)', backgroundColor: 'var(--surface-primary)', border: '1px solid var(--border-color)' }}>
-        <div className="flex shrink-0 items-center px-4 py-2.5" style={{ borderBottom: '1px solid var(--border-color)' }}>
+        <div className="flex shrink-0 items-center px-4 py-2.5" style={{ borderBottom: '1px solid var(--rule-soft)' }}>
           <span className="text-sm font-medium" style={{ color: 'var(--content-primary)' }}>同步中心</span>
           <button
             onClick={onClose}
@@ -44,7 +44,7 @@ export function SyncCenterDialog({
         </div>
 
         <div className="flex min-h-0 flex-1 flex-col">
-          <div className="flex shrink-0 items-center gap-1 px-4" style={{ borderBottom: '1px solid var(--border-color)', backgroundColor: 'var(--surface-secondary)' }}>
+          <div className="flex shrink-0 items-center gap-1 px-4" style={{ borderBottom: '1px solid var(--rule-soft)', backgroundColor: 'var(--surface-secondary)' }}>
             {(['overview', 'conflicts'] as const).map((t) => (
               <button
                 key={t}
@@ -58,7 +58,7 @@ export function SyncCenterDialog({
               >
                 {{ overview: '概览', conflicts: '冲突' }[t]}
                 {t === 'conflicts' && hasConflicts && (
-                  <span className="ml-1.5 rounded px-1 text-[10pxpx]" style={{ backgroundColor: 'var(--accent)', color: 'white' }}>
+                  <span className="ml-1.5 rounded px-1 text-[10px]" style={{ backgroundColor: 'var(--accent)', color: 'white' }}>
                     {mock.conflicts.length}
                   </span>
                 )}
@@ -118,14 +118,14 @@ function StatusCard({
         {s.phase === 'never' && (
           <button
             onClick={() => onOverlay('first')}
-            className="rounded px-3 py-1.5 text-xs text-white transition-colors"
+            className="rounded-md px-3 py-1.5 text-xs text-white transition-colors"
             style={{ backgroundColor: 'var(--accent)' }}
           >
             开始首次同步
           </button>
         )}
         {s.phase === 'failed' && (
-          <button className="rounded border px-3 py-1.5 text-xs transition-colors hover:bg-[var(--surface-hover)]" style={{ borderColor: 'var(--border-color)', backgroundColor: 'var(--surface-primary)', color: 'var(--content-secondary)' }}>
+          <button className="rounded-md border px-3 py-1.5 text-xs transition-colors hover:bg-[var(--surface-hover)]" style={{ borderColor: 'var(--border-color)', backgroundColor: 'var(--surface-primary)', color: 'var(--content-secondary)' }}>
             立即重试
           </button>
         )}
@@ -149,7 +149,7 @@ function StatusCard({
       )}
 
       {s.phase === 'failed' && s.error && (
-        <div className="mt-3 rounded border px-3 py-2 text-[11px] leading-relaxed" style={{ borderColor: 'var(--accent)', backgroundColor: 'var(--accent-subtle)', color: 'var(--accent-hover)' }}>
+        <div className="mt-3 rounded-md border px-3 py-2 text-[11px] leading-relaxed" style={{ borderColor: 'var(--accent)', backgroundColor: 'var(--accent-subtle)', color: 'var(--accent-hover)' }}>
           {s.error}
         </div>
       )}
@@ -172,7 +172,7 @@ function DeleteWarning({
       </div>
       <button
         onClick={() => onOverlay('delete')}
-        className="mt-2 rounded px-3 py-1.5 text-xs text-white transition-colors"
+        className="mt-2 rounded-md px-3 py-1.5 text-xs text-white transition-colors"
         style={{ backgroundColor: 'var(--accent-hover)' }}
       >
         查看并确认
@@ -221,8 +221,8 @@ function Operations({
 }) {
   const byKind = (k: string) => mock.changes.filter((c) => c.kind === k).length
   return (
-    <section className="rounded-lg border" style={{ borderColor: 'var(--border-color)', backgroundColor: 'var(--surface-primary)' }}>
-      <div className="border-b px-4 py-2.5 text-xs font-medium" style={{ borderColor: 'var(--border-color)', color: 'var(--content-primary)' }}>
+    <section className="overflow-hidden rounded-lg border" style={{ borderColor: 'var(--border-color)', backgroundColor: 'var(--surface-primary)' }}>
+      <div className="border-b px-4 py-2.5 text-xs font-medium" style={{ borderColor: 'var(--rule-soft)', color: 'var(--content-primary)' }}>
         操作
       </div>
 
@@ -232,7 +232,7 @@ function Operations({
         consequence="不覆盖任何一侧；两边都改过的走冲突处理"
         tone="safe"
         action={
-          <button className="rounded px-3 py-1.5 text-xs transition-colors" style={{ backgroundColor: 'var(--solid-bg)', color: 'var(--solid-fg)' }}>
+          <button className="rounded-md px-3 py-1.5 text-xs transition-colors" style={{ backgroundColor: 'var(--solid-bg)', color: 'var(--solid-fg)' }}>
             执行
           </button>
         }
@@ -253,7 +253,7 @@ function Operations({
           ) : (
             <button
               onClick={() => setArmed('上传')}
-              className="rounded border px-3 py-1.5 text-xs transition-colors hover:bg-red-50"
+              className="rounded-md border px-3 py-1.5 text-xs transition-colors hover:bg-red-50"
               style={{ borderColor: '#dc2626', color: '#dc2626' }}
             >
               上传…
@@ -277,7 +277,7 @@ function Operations({
           ) : (
             <button
               onClick={() => setArmed('下载')}
-              className="rounded border px-3 py-1.5 text-xs transition-colors hover:bg-red-50"
+              className="rounded-md border px-3 py-1.5 text-xs transition-colors hover:bg-red-50"
               style={{ borderColor: '#dc2626', color: '#dc2626' }}
             >
               下载…
@@ -304,7 +304,7 @@ function Stat({
   return (
     <Comp
       onClick={onClick}
-      className="rounded border px-2.5 py-2 text-left"
+      className="rounded-md border px-2.5 py-2 text-left"
       style={{
         borderColor: tone === 'accent' && value > 0 ? 'var(--accent)' : 'var(--border-color)',
         backgroundColor: tone === 'accent' && value > 0 ? 'var(--accent-subtle)' : 'var(--surface-secondary)',
@@ -383,12 +383,12 @@ function ConfirmInline({
         autoFocus
         value={typed}
         onChange={(e) => setTyped(e.target.value)}
-        className="w-16 rounded border px-1.5 py-0.5 text-xs outline-none"
+        className="w-16 rounded-md border px-1.5 py-0.5 text-xs outline-none"
         style={{ borderColor: 'var(--border-color)', backgroundColor: 'var(--surface-primary)' }}
       />
       <button
         disabled={!ok}
-        className="rounded px-2 py-1 text-xs"
+        className="rounded-md px-2 py-1 text-xs"
         style={{
           backgroundColor: ok ? '#dc2626' : 'var(--surface-tertiary)',
           color: ok ? 'white' : 'var(--content-muted)',
@@ -398,7 +398,7 @@ function ConfirmInline({
       </button>
       <button
         onClick={onCancel}
-        className="rounded px-1.5 py-1 text-xs transition-colors hover:bg-[var(--surface-hover)]"
+        className="rounded-md px-1.5 py-1 text-xs transition-colors hover:bg-[var(--surface-hover)]"
         style={{ color: 'var(--content-muted)' }}
       >
         取消
@@ -442,7 +442,7 @@ function ConflictList({
 
       <div className="mt-3 space-y-2">
         {conflicts.map((c) => (
-          <div key={c.id} className="rounded border p-3" style={{ borderColor: 'var(--accent)', backgroundColor: 'var(--accent-subtle)' }}>
+          <div key={c.id} className="rounded-lg border p-3" style={{ borderColor: 'var(--accent)', backgroundColor: 'var(--accent-subtle)' }}>
             <div className="flex items-baseline gap-2">
               <span className="text-sm font-medium" style={{ color: 'var(--content-primary)' }}>{c.path}</span>
               <span className="ml-auto text-[10px]" style={{ color: 'var(--content-muted)' }}>
@@ -451,15 +451,15 @@ function ConflictList({
             </div>
             <div className="mt-1 truncate font-mono text-[10px]" style={{ color: 'var(--content-muted)' }}>{c.copyName}</div>
             <div className="mt-2.5 flex items-center gap-2">
-              <button className="rounded px-3 py-1.5 text-xs transition-colors" style={{ backgroundColor: 'var(--solid-bg)', color: 'var(--solid-fg)' }}>
+              <button className="rounded-md px-3 py-1.5 text-xs transition-colors" style={{ backgroundColor: 'var(--solid-bg)', color: 'var(--solid-fg)' }}>
                 保留我的
               </button>
-              <button className="rounded border px-3 py-1.5 text-xs transition-colors hover:bg-[var(--surface-hover)]" style={{ borderColor: 'var(--border-color)', backgroundColor: 'var(--surface-primary)', color: 'var(--content-secondary)' }}>
+              <button className="rounded-md border px-3 py-1.5 text-xs transition-colors hover:bg-[var(--surface-hover)]" style={{ borderColor: 'var(--border-color)', backgroundColor: 'var(--surface-primary)', color: 'var(--content-secondary)' }}>
                 保留远端的
               </button>
               <button
                 onClick={() => onOpen(c)}
-                className="rounded border px-3 py-1.5 text-xs transition-colors hover:bg-[var(--surface-hover)]" style={{ borderColor: 'var(--border-color)', backgroundColor: 'var(--surface-primary)', color: 'var(--content-secondary)' }}>
+                className="rounded-md border px-3 py-1.5 text-xs transition-colors hover:bg-[var(--surface-hover)]" style={{ borderColor: 'var(--border-color)', backgroundColor: 'var(--surface-primary)', color: 'var(--content-secondary)' }}>
                 手工合并…
               </button>
             </div>
@@ -481,7 +481,7 @@ export function ConflictCompare({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-6" style={{ backgroundColor: 'rgba(26,23,20,0.2)' }}>
       <div className="w-full max-w-4xl overflow-hidden shadow-2xl" style={{ borderRadius: 'var(--radius-lg)', backgroundColor: 'var(--surface-primary)', border: '1px solid var(--border-color)' }}>
-        <div className="flex items-baseline justify-between px-5 py-3" style={{ borderBottom: '1px solid var(--border-color)' }}>
+        <div className="flex items-baseline justify-between px-5 py-3" style={{ borderBottom: '1px solid var(--rule-soft)' }}>
           <div>
             <h3 className="text-sm font-semibold" style={{ color: 'var(--content-primary)' }}>{conflict.path}</h3>
             <div className="font-mono text-[10px]" style={{ color: 'var(--content-muted)' }}>{conflict.copyName}</div>
@@ -501,13 +501,13 @@ export function ConflictCompare({
             <button
               key={key}
               onClick={() => setPick(key)}
-              className="rounded border-2 text-left transition"
+              className="rounded-lg border-2 text-left transition"
               style={{
                 borderColor: pick === key ? 'var(--accent)' : 'var(--border-color)',
                 backgroundColor: pick === key ? 'var(--accent-subtle)' : 'var(--surface-primary)',
               }}
             >
-              <div className="border-b px-3 py-2" style={{ borderColor: 'var(--border-color)' }}>
+              <div className="border-b px-3 py-2" style={{ borderColor: 'var(--rule-soft)' }}>
                 <div className="text-xs font-medium" style={{ color: 'var(--content-primary)' }}>{title}</div>
                 <div className="text-[10px]" style={{ color: 'var(--content-muted)' }}>{sub}</div>
               </div>
@@ -518,13 +518,13 @@ export function ConflictCompare({
           ))}
         </div>
 
-        <div className="flex items-center gap-2 px-5 py-3" style={{ borderTop: '1px solid var(--border-color)', backgroundColor: 'var(--surface-secondary)' }}>
+        <div className="flex items-center gap-2 px-5 py-3" style={{ borderTop: '1px solid var(--rule-soft)', backgroundColor: 'var(--surface-secondary)' }}>
           <span className="text-[11px]" style={{ color: 'var(--content-muted)' }}>
             {pick ? '点「采用」后，另一份会保留为副本。' : '点一边把它选为最终版本。'}
           </span>
           <button
             disabled={!pick}
-            className="ml-auto rounded px-3 py-1.5 text-xs"
+            className="ml-auto rounded-md px-3 py-1.5 text-xs"
             style={{
               backgroundColor: pick ? 'var(--content-primary)' : 'var(--surface-tertiary)',
               color: pick ? 'white' : 'var(--content-muted)',

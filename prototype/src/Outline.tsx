@@ -116,13 +116,14 @@ export function Outline({ body, open, onToggle, onJump, width, resizeHandle }: P
       {/* 顶栏：展开时「大纲」，收起时「己」。
           收起后的两个字合起来是「知己」——应用名的前两个字，两侧各占一个，
           比左边「知」右边「纲」更像一对。
-          字体 / 字号 / 颜色**与左上的「知己笔记」完全一致**（text-sm font-semibold
-          + content-primary）——两边是同一层级的标识，不该一个粗一个细。
-          文字居中，宽度自适应所在的那一段。 */}
-      <div
-        className="flex h-10 shrink-0 items-center justify-center border-b px-2"
-        style={{ borderColor: 'var(--border-color)' }}
-      >
+
+          **但只有文件树那一侧盖印**（见 Seal.tsx）。印是**应用的标识**，
+          而这一侧展开时写的是「大纲」——一个面板标签，不是标识；给它也盖
+          一枚印，等于说"这里也是知己笔记"，两枚一样的印反而把那个朱砂的点
+          冲淡了。所以这一侧收起后仍是字，只是收成一个「己」。
+          字体 / 字号 / 颜色与展开时完全一致——它是同一个标签的缩写，
+          不该一个粗一个细。 */}
+      <div className="flex h-10 shrink-0 items-center justify-center px-2">
         <span className="truncate text-sm font-semibold" style={{ color: 'var(--content-primary)' }}>
           {open ? '大纲' : '己'}
         </span>
@@ -153,10 +154,7 @@ export function Outline({ body, open, onToggle, onJump, width, resizeHandle }: P
       </SidebarBar>
 
       {open && searchOpen && (
-        <div
-          className="flex shrink-0 items-center gap-1 border-b px-2 py-1"
-          style={{ borderColor: 'var(--border-color)' }}
-        >
+        <div className="flex shrink-0 items-center gap-1 px-2 py-1">
           <input
             autoFocus
             value={query}
@@ -169,7 +167,7 @@ export function Outline({ body, open, onToggle, onJump, width, resizeHandle }: P
             }}
             placeholder="搜索标题"
             aria-label="搜索标题"
-            className="min-w-0 flex-1 rounded border px-1.5 py-0.5 text-xs outline-none"
+            className="min-w-0 flex-1 rounded-md border px-1.5 py-0.5 text-xs outline-none"
             style={{
               borderColor: 'var(--border-color)',
               backgroundColor: 'var(--surface-primary)',

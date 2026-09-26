@@ -93,7 +93,7 @@ export function SearchDialog({
         onMouseDown={(e) => e.stopPropagation()}
       >
         {/* 输入行 */}
-        <div className="flex shrink-0 items-center gap-2.5 px-4 py-3" style={{ borderBottom: '1px solid var(--border-color)' }}>
+        <div className="flex shrink-0 items-center gap-2.5 px-4 py-3" style={{ borderBottom: '1px solid var(--rule-soft)' }}>
           <IconSearch className="shrink-0" style={{ color: 'var(--content-muted)' }} />
           <input
             autoFocus
@@ -146,7 +146,7 @@ export function SearchDialog({
         {/* 脚注：键盘操作与操作符——**操作符得让人看见**，藏起来的语法等于没有 */}
         <div
           className="flex shrink-0 items-center gap-3 px-4 py-2 text-[11px]"
-          style={{ borderTop: '1px solid var(--border-color)', backgroundColor: 'var(--surface-secondary)', color: 'var(--content-muted)' }}
+          style={{ borderTop: '1px solid var(--rule-soft)', backgroundColor: 'var(--surface-secondary)', color: 'var(--content-muted)' }}
         >
           <span>↑↓ 选择 · Enter 打开 · Esc 关闭</span>
           {hits.length > 0 && <span className="ml-auto">{hits.length} 篇</span>}

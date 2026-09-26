@@ -48,9 +48,11 @@ export function FindBar({ getApi, onClose }: { getApi: () => EditorApi | null; o
   return (
     <div
       /* 30px 高，与它上面那条编辑器工具栏同一个数——两条紧挨着的横栏
-         不一样高的话，看起来像谁没对齐。 */
-      className="flex min-h-[30px] shrink-0 items-center gap-2 border-b px-3"
-      style={{ backgroundColor: 'var(--surface-center)', borderColor: 'var(--border-color)' }}
+         不一样高的话，看起来像谁没对齐。
+         **不画下边框**：它和工具栏、正文都是同一个面色（--surface-center），
+         三者连成一片；查找条属于这一页，不属于"框"。 */
+      className="flex min-h-[30px] shrink-0 items-center gap-2 px-3"
+      style={{ backgroundColor: 'var(--surface-center)' }}
     >
       <IconSearch
         size={14}

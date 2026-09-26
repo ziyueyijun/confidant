@@ -45,9 +45,16 @@ export function EditorToolbar({
          拿它当选择器太脆。 */
       data-editor-toolbar
       /* **整条居中**：按钮组在编辑区里居中，宽窄都跟着走——工具栏不该老是
-         贴着左边。换行时每一行各自居中（justify-center 对每一行都生效）。 */
-      className="flex min-h-[30px] shrink-0 flex-wrap items-center justify-center gap-1 border-b px-3"
-      style={{ backgroundColor: 'var(--surface-center)', borderColor: 'var(--border-color)' }}
+         贴着左边。换行时每一行各自居中（justify-center 对每一行都生效）。
+
+         **不画下边框**：它和正文是同一个面色（--surface-center），本来就
+         连成一片——工具栏属于这一页，不属于"框"。原来那条 1px 线是界面里
+         离正文最近的一根线，撤掉之后正文上面就没有东西压着了。
+         它和上面的标签栏之间的分界，靠的是**面色的变化**：标签栏是
+         --surface-secondary（框），这里是纸；而选中的那个标签也是纸色，
+         从标签栏一路连下来，读作"这一页正摊开在桌上"。 */
+      className="flex min-h-[30px] shrink-0 flex-wrap items-center justify-center gap-1 px-3"
+      style={{ backgroundColor: 'var(--surface-center)' }}
     >
       {/* 查找单独摆在最前，与后面隔着一条竖线：它不属于任何一组格式操作——
           那一串按钮改的是正文**长什么样**，它只是在正文里找几个字。
@@ -204,7 +211,12 @@ function HeadingMenu({ level, onPick }: { level: number; onPick: (level: 0 | 1 |
         title="标题"
         aria-haspopup="menu"
         aria-expanded={open}
-        className="flex h-6 w-9 items-center justify-center gap-1 rounded-md text-xs font-medium transition-all"
+        /* w-14 = 56px：要装得下最宽的那个标签。「正文」是两个全角汉字
+           （12px × 2 = 24px）+ gap-1（4px）+ 12px 的箭头 = 40px，再留
+           左右各 8px。固定宽度是必要的——宽度跟着标签走的话，切换标题
+           级别会让整条工具栏左右跳一下。
+           原来是 w-9（36px），装不下 40px 的内容，「正文」被挤扁了。 */
+        className="flex h-6 w-14 items-center justify-center gap-1 rounded-md text-xs font-medium transition-all"
         style={{
           backgroundColor: open ? 'var(--solid-bg)' : 'transparent',
           color: open ? 'var(--solid-fg)' : 'var(--content-secondary)',
@@ -219,8 +231,13 @@ function HeadingMenu({ level, onPick }: { level: number; onPick: (level: 0 | 1 |
       {open && (
         <div
           role="menu"
-          className="absolute left-0 top-full z-50 mt-1 w-36 overflow-hidden rounded-lg border py-1 shadow-lg"
-          style={{ backgroundColor: 'var(--surface-primary)', borderColor: 'var(--border-color)' }}
+          className="absolute left-0 top-full z-50 mt-1 w-36 overflow-hidden rounded-lg border py-1"
+          style={{
+            backgroundColor: 'var(--surface-primary)',
+            borderColor: 'var(--border-color)',
+            // 与标签菜单、表格菜单同一枚浮层阴影（见 index.css 的 --shadow-pop）
+            boxShadow: 'var(--shadow-pop)',
+          }}
         >
           {HEADING_ITEMS.map((item) => (
             <button
@@ -247,7 +264,8 @@ function HeadingMenu({ level, onPick }: { level: number; onPick: (level: 0 | 1 |
   )
 }
 
+/** 工具条里的分组线。用**弱档**——它是区域内部的细线，不该跟"框与纸的交界"一样重。 */
 function Sep() {
-  return <span className="mx-1 h-4 w-px" style={{ backgroundColor: 'var(--border-color)' }} />
+  return <span className="mx-1 h-4 w-px" style={{ backgroundColor: 'var(--rule-soft)' }} />
 }
 

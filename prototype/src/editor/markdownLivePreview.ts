@@ -168,7 +168,7 @@ const ICON_PATHS: Record<IconName, string> = {
   trash: 'M3.5 5h9M6.5 5V3.5h3V5M5 5l.5 8h5l.5-8',
 }
 
-function icon(name: IconName, cls = 'text-slate-400 dark:text-neutral-400'): SVGSVGElement {
+function icon(name: IconName, cls = 'text-[var(--content-secondary)]'): SVGSVGElement {
   const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg')
   svg.setAttribute('viewBox', '0 0 16 16')
   svg.setAttribute('width', '14')
@@ -350,20 +350,27 @@ function openTableMenu(clientX: number, clientY: number, target: TableTarget) {
   // 宽度要装得下「添加多行 [3] 行 添加」这一行，窄了它会折成三行
   // cm-table-menu 是给测试用的稳定钩子——Tailwind 的 z-[100] 类名在 CSS 选择器里
   // 要转义，测试写起来又长又容易错。
+  //
+  // ⚠️ 颜色**全部走主题变量**。原来这里是 Tailwind 的 slate / neutral / blue
+  // 写死的一套（冷灰底、蓝色悬停），而全应用是墨与纸的暖色——这个菜单浮在
+  // 暖色正文上像另一个产品，深色模式下尤其明显（neutral-800 是冷灰，
+  // 主题的浮面是暖的 #262220）。现在它和弹窗、其余两个菜单同一套面与线。
   menu.className =
-    'cm-table-menu fixed z-[100] w-56 select-none overflow-hidden rounded-lg border border-slate-200 bg-white py-1 shadow-2xl ring-1 ring-black/5 dark:border-neutral-700 dark:bg-neutral-800 dark:ring-white/10'
+    'cm-table-menu fixed z-[100] w-56 select-none overflow-hidden rounded-lg border border-[var(--border-color)] bg-[var(--surface-primary)] py-1'
+  menu.style.boxShadow = 'var(--shadow-pop)'
 
   // 顶部标注「右键的是哪一格」——没有它，用户点「删除本行」前得自己数一遍。
   // 用浅底把标题和菜单项分开：它是一句说明，不是可点的项。
   const header = document.createElement('div')
-  header.className = 'mb-1 border-b border-slate-100 bg-slate-50/70 px-3 py-1.5 text-xs text-slate-500 dark:border-neutral-700 dark:bg-neutral-900/60 dark:text-neutral-400'
+  header.className =
+    'mb-1 border-b border-[var(--rule-soft)] bg-[var(--surface-secondary)] px-3 py-1.5 text-xs text-[var(--content-muted)]'
   header.textContent = `${onHeader ? '表头' : `第 ${target.visualRow} 行`} · 第 ${target.col + 1} 列`
   menu.appendChild(header)
 
   for (const item of items) {
     if (item === 'sep') {
       const hr = document.createElement('div')
-      hr.className = 'mx-2 my-1 h-px bg-slate-100 dark:bg-neutral-700'
+      hr.className = 'mx-2 my-1 h-px bg-[var(--rule-soft)]'
       menu.appendChild(hr)
       continue
     }
@@ -372,21 +379,23 @@ function openTableMenu(clientX: number, clientY: number, target: TableTarget) {
       continue
     }
     const btn = document.createElement('button')
-    // 悬停色分两档：插入类是蓝的，删除类是红的。删除不该和插入长得一样——
-    // 两者在这个菜单里挨着，视觉上区分开才不至于点错。
+    // 悬停色分两档：插入类是墨色的一层淡洗，删除类是红的。删除不该和插入
+    // 长得一样——两者在这个菜单里挨着，视觉上区分开才不至于点错。
+    // 红用 #dc2626：与同步中心、删除确认框的"破坏性"是同一个红，
+    // 不是主题的朱砂（朱砂留给"活着的东西"）。
     const hover = item.danger
-      ? 'hover:bg-red-50 hover:text-red-700 dark:hover:bg-red-950/40 dark:hover:text-red-400'
-      : 'hover:bg-blue-50 hover:text-blue-900 dark:hover:bg-blue-950/40 dark:hover:text-blue-300'
+      ? 'hover:bg-[rgba(220,38,38,0.08)] hover:text-[#dc2626]'
+      : 'hover:bg-[var(--surface-hover)]'
     btn.className = `flex w-full items-center gap-2 px-3 py-1.5 text-left text-xs transition ${
-      item.disabled ? 'cursor-default text-slate-300 dark:text-neutral-600' : `text-slate-700 dark:text-neutral-200 ${hover}`
+      item.disabled ? 'cursor-default text-[var(--content-muted)]' : `text-[var(--content-primary)] ${hover}`
     }`
-    if (item.icon) btn.appendChild(icon(item.icon, item.disabled ? 'text-slate-200 dark:text-neutral-700' : 'text-slate-400 dark:text-neutral-400'))
+    if (item.icon) btn.appendChild(icon(item.icon, item.disabled ? 'text-[var(--content-muted)]' : 'text-[var(--content-secondary)]'))
     const text = document.createElement('span')
     text.textContent = item.label
     btn.appendChild(text)
     if (item.hint) {
       const h = document.createElement('span')
-      h.className = 'ml-auto text-[10px] text-slate-300 dark:text-neutral-600'
+      h.className = 'ml-auto text-[10px] text-[var(--content-muted)]'
       h.textContent = item.hint
       btn.appendChild(h)
     }
@@ -452,7 +461,8 @@ function openTableMenu(clientX: number, clientY: number, target: TableTarget) {
 function makeCountRow(item: { label: string; icon?: IconName; unit: string; run: (n: number) => void }): HTMLElement {
   const row = document.createElement('div')
   // nowrap：这一行是「图标 + 标签 + 输入框 + 单位 + 按钮」五件，折行会散成一团
-  row.className = 'flex items-center gap-2 whitespace-nowrap px-3 py-1.5 text-xs text-slate-700 dark:text-neutral-200'
+  row.className =
+    'flex items-center gap-2 whitespace-nowrap px-3 py-1.5 text-xs text-[var(--content-primary)]'
 
   if (item.icon) row.appendChild(icon(item.icon))
 
@@ -467,18 +477,18 @@ function makeCountRow(item: { label: string; icon?: IconName; unit: string; run:
   input.value = '1'
   // 数字输入框默认带上下箭头（spinner），在这里挤且没用——键盘就能改
   input.className =
-    'ml-auto w-10 shrink-0 rounded border border-slate-200 bg-slate-50 px-1 py-0.5 text-right text-xs text-slate-700 outline-none transition [appearance:textfield] focus:border-blue-400 focus:bg-white dark:border-neutral-600 dark:bg-neutral-900 dark:text-neutral-200 dark:focus:border-blue-500 dark:focus:bg-neutral-900 [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none'
+    'ml-auto w-10 shrink-0 rounded-md border border-[var(--border-color)] bg-[var(--surface-primary)] px-1 py-0.5 text-right text-xs text-[var(--content-primary)] outline-none transition focus:border-[var(--border-hover)] [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none'
   input.setAttribute('aria-label', `${item.label}的数量（${item.unit}）`)
   row.appendChild(input)
 
   const unit = document.createElement('span')
-  unit.className = 'shrink-0 text-slate-400 dark:text-neutral-500'
+  unit.className = 'shrink-0 text-[var(--content-muted)]'
   unit.textContent = item.unit
   row.appendChild(unit)
 
   const go = document.createElement('button')
   go.className =
-    'shrink-0 rounded bg-slate-700 px-2 py-0.5 text-[10px] font-medium text-white transition hover:bg-slate-800 dark:bg-neutral-200 dark:text-neutral-900 dark:hover:bg-white'
+    'shrink-0 rounded-md bg-[var(--solid-bg)] px-2 py-0.5 text-[10px] font-medium text-[var(--solid-fg)] transition'
   go.textContent = '添加'
   go.setAttribute('aria-label', `确认${item.label}`)
 

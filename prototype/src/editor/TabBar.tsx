@@ -83,7 +83,9 @@ export function TabBar({
            cm-tab-bar 是给测试用的稳定钩子：Tailwind 类名组合到处都是，
            拿它当选择器太脆（侧栏工具条也曾用过 items-stretch，一撞就选错）。 */
         className="cm-tab-bar flex h-10 shrink-0 items-stretch overflow-x-auto"
-        style={{ backgroundColor: 'var(--surface-secondary)', borderBottom: '1px solid var(--border-color)' }}
+        /* 不画下边框：下面那条编辑器工具栏是同一个面色（--surface-secondary），
+           两个连成一条"框"，中间不该有东西。 */
+        style={{ backgroundColor: 'var(--surface-secondary)' }}
       >
         {tabs.map((t) => {
           const isActive = t.path === active
@@ -97,12 +99,26 @@ export function TabBar({
                 setMenu({ x: e.clientX, y: e.clientY, path: t.path })
               }}
               title={t.path}
-              className="group flex shrink-0 cursor-default items-center gap-2 border-r px-3 text-sm transition-colors"
+              className="group flex shrink-0 cursor-default items-center gap-2 rounded-t-md px-3 text-sm transition-colors"
               style={{
-                borderColor: 'var(--border-color)',
-                // 选中的标签用**正文那一块的面色**（surface-center）：它跟下面
-                // 的工具栏、编辑区连成一片，读起来是"这一页正摊开在桌上"，
-                // 而不是"另一个被选中的按钮"。未选中的透出标签栏底色。
+                // 标签之间不画竖线：选中的那个是**纸色**，它自己就分开了
+                // 左右——原来每个标签右边一根线，标签栏读起来像一排格子。
+                //
+                // **只圆上边两角，底边保持通高**。这一条是有约束的：标签栏是
+                // 框色，而它下面的工具栏、正文都是纸色——选中标签的纸色是
+                // **一路通到正文**的，它的底边其实不存在。收底角（哪怕只收
+                // 一点）会把这条纸带切断，标签就变成"浮在框上的一枚片"，那是
+                // 另一个东西（试过，否了）。所以圆角只能开在上边。
+                //
+                // **形状靠一根线才读得出来**：纸（#F9F7F2）与框（#F1EEE7）
+                // 只差 1.08，光收角几乎看不见（试过，用户说"没变化"）。这根
+                // 线本来就是该画的——它是"框与纸的交界"，与侧栏竖边、底栏
+                // 上边同属强档线。用内阴影而不是 border：border 会撑大 2px、
+                // 让活动标签的文字挪 1px，内阴影不占布局，一个像素都不动。
+                // 底边不画——纸要连着下面的正文。
+                boxShadow: isActive
+                  ? 'inset 0 1px 0 0 var(--border-color), inset 1px 0 0 0 var(--border-color), inset -1px 0 0 0 var(--border-color)'
+                  : undefined,
                 backgroundColor: isActive ? 'var(--surface-center)' : 'transparent',
                 color: isActive ? 'var(--content-primary)' : 'var(--content-secondary)',
               }}
@@ -144,8 +160,12 @@ export function TabBar({
               backgroundColor: 'var(--surface-primary)',
               borderColor: 'var(--border-color)',
               color: 'var(--content-primary)',
+              // 浮起来的阴影用主题那一枚（暖的），不用 Tailwind 的 shadow-lg
+              // ——后者是冷黑的。菜单这一档用 --shadow-pop：纸→浮只差 1.07，
+              // 浮起来几乎全靠阴影，用弹窗那枚（--shadow-md）会显得透明。
+              boxShadow: 'var(--shadow-pop)',
             }}
-            className="fixed z-50 min-w-[9rem] overflow-hidden rounded-lg border py-1 shadow-lg"
+            className="fixed z-50 min-w-[9rem] overflow-hidden rounded-lg border py-1"
           >
             {items.map((it) => (
               <button
@@ -156,7 +176,9 @@ export function TabBar({
                   it.run()
                   setMenu(null)
                 }}
-                className="block w-full px-3 py-1.5 text-left text-sm transition-colors disabled:cursor-default disabled:opacity-50"
+                /* 悬停要有一层墨：原来没有任何反馈，菜单项读起来像一行行文字。
+                   enabled: 是必须的——禁用项也能被悬停，不给它底色才对。 */
+                className="block w-full px-3 py-1.5 text-left text-sm transition-colors enabled:hover:bg-[var(--surface-hover)] disabled:cursor-default disabled:opacity-50"
                 style={{ color: it.disabled ? 'var(--content-muted)' : 'var(--content-primary)' }}
               >
                 {it.label}

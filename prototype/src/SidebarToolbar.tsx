@@ -26,21 +26,22 @@ import { IconChevronLeft, IconChevronRight } from './icons'
  * 宽度不写死——aside 是 flex-col，子元素默认 stretch，侧栏变宽变窄它都跟着。
  * 里面的按钮用 `flex-1` 均分这条宽度，整条工具条因此是"填满"的。
  *
- * **高度 30px**（含 1px 下边框），和编辑器工具栏、底部栏一个数：
- * 24px 的按钮 + 上下各 2.5px。三列的横栏因此一样高，横着看过去是一条线。
+ * **高度 30px**，和编辑器工具栏、底部栏一个数：24px 的按钮 + 上下各 3px。
+ * 三列的横栏因此一样高，横着看过去是一条线。
  * 用 `min-h` 而不是 `h`：窗口窄到放不下时宁可长高，也不要切掉按钮。
  *
- * **边框在下**（它上面是顶栏）——顶栏已经有自己的 border-b，两条线挨着，
- * 所以这里只画自己下面那条。
+ * **不画边框**：它上面是顶栏、下面是文件树，三者是同一个面色
+ * （--surface-secondary），本来就是一条连续的"框"——中间画线等于把一列
+ * 切成三段。原来上下各一条（顶栏自己的 border-b + 这里的 border-b）还
+ * 挨在一起，等于画了两遍。
  */
 export function SidebarBar({ side, children }: { side: 'left' | 'right'; children: ReactNode }) {
   return (
     <div
-      className={`flex min-h-[30px] shrink-0 items-center gap-0.5 border-b px-1.5 ${
+      className={`flex min-h-[30px] shrink-0 items-center gap-0.5 px-1.5 ${
         // 按钮组贴屏幕边缘那一侧
         side === 'left' ? 'justify-start' : 'justify-end'
       }`}
-      style={{ borderColor: 'var(--border-color)' }}
     >
       {children}
     </div>

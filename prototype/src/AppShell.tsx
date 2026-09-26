@@ -15,6 +15,7 @@ import {
   SidebarToggleButton,
 } from './SidebarToolbar'
 import { IconChevronRight, IconCollapseAll, IconExpandAll, IconFile, IconFolder, IconSearch } from './icons'
+import { Seal } from './Seal'
 import { ResizeHandle, usePanelWidth, type WidthRange } from './ResizeHandle'
 import type { SyntaxReveal } from './editor/markdownLivePreview'
 import type { SyncMock } from './sync/data'
@@ -298,14 +299,19 @@ export function AppShell({
           >
             {/* h-10 与中间标签栏、右侧大纲头部同高——三条横栏的下边缘对齐。
                 文字居中：这一行只有标识，居中才跟右侧的「大纲」对称——
-                操作都搬到下面那条工具条去了。 */}
-            <div
-              className="flex h-10 shrink-0 items-center justify-center border-b px-2"
-              style={{ borderColor: 'var(--border-color)' }}
-            >
-              <span className="truncate text-sm font-semibold" style={{ color: 'var(--content-primary)' }}>
-                {treeOpen ? '知己笔记' : '知'}
-              </span>
+                操作都搬到下面那条工具条去了。
+                **不画下边框**：它和下面的工具条、文件树是同一个面色，是
+                一条连续的"框"。 */}
+            <div className="flex h-10 shrink-0 items-center justify-center px-2">
+              {treeOpen ? (
+                <span className="truncate text-sm font-semibold" style={{ color: 'var(--content-primary)' }}>
+                  知己笔记
+                </span>
+              ) : (
+                /* 收起后不是"标题被截断了"，而是**同一枚印**——一个字本来就
+                   是一个印。它跟展开时那四个字是同一个标识的两种写法。 */
+                <Seal size={24} />
+              )}
             </div>
 
             {/* 工具条：顶栏下面、和编辑器工具栏同一行。
@@ -436,9 +442,9 @@ export function AppShell({
                 ) : (
                   <div className="flex flex-1 items-center justify-center">
                     <div className="text-center">
-                      {/* 空状态用同一支笔，只是画得大。描边宽度按尺寸反算，
-                          所以 44px 的它和 16px 的树图标是同一种线，不会变粗。 */}
-                      <IconFile size={44} className="mx-auto mb-3" style={{ color: 'var(--content-muted)' }} />
+                      {/* 不放图形：这句话本身已经把事说清楚了，上面再加一枚印
+                          或一个图标都只是装饰。朱砂只留给**标识**那一个点
+                          （收起后的文件树），这里多一枚就把它冲淡了。 */}
                       <p className="text-sm" style={{ color: 'var(--content-muted)' }}>从左侧选择一篇笔记</p>
                     </div>
                   </div>

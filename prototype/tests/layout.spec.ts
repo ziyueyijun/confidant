@@ -1,5 +1,5 @@
 import { test, expect } from './fixtures'
-import { contrastRatio } from './utils'
+import { contrastRatio, hexToRgb } from './utils'
 
 /**
  * 顶栏与工具栏的布局约定。
@@ -40,7 +40,7 @@ async function topBarBottoms(page: any) {
   })
 }
 
-/** 取某一列顶栏里那行字的样式——用来验证「知」「纲」跟展开时是同一套字体 */
+/** 取某一列顶栏里那行字的样式——用来验证展开时的标识是不是同一套字体 */
 async function headerTextStyle(page: any, side: 'left' | 'right') {
   return page.evaluate((s: string) => {
     const asides = Array.from(document.querySelectorAll('aside'))
@@ -53,6 +53,29 @@ async function headerTextStyle(page: any, side: 'left' | 'right') {
       fontSize: cs.fontSize,
       fontWeight: cs.fontWeight,
       color: cs.color,
+    }
+  }, side)
+}
+
+/**
+ * 取某一列顶栏里那枚**印**的样式。
+ *
+ * 收起之后标识不再是文字，是一个朱砂方块（见 Seal.tsx）——所以这里盯的
+ * 是底色、字色、方角，而不是字号字重。
+ */
+async function headerSealStyle(page: any, side: 'left' | 'right') {
+  return page.evaluate((s: string) => {
+    const asides = Array.from(document.querySelectorAll('aside'))
+    const aside = s === 'left' ? asides[0] : asides[asides.length - 1]
+    const el = aside?.firstElementChild?.querySelector('span[aria-hidden="true"]') as HTMLElement | null
+    if (!el) return null
+    const cs = getComputedStyle(el)
+    return {
+      text: el.textContent,
+      background: cs.backgroundColor,
+      color: cs.color,
+      borderRadius: cs.borderRadius,
+      期望底色: getComputedStyle(document.documentElement).getPropertyValue('--seal-bg').trim(),
     }
   }, side)
 }
@@ -161,7 +184,11 @@ test.describe('布局 @layout', () => {
         // aside 的第 2 个孩子就是工具条（第 1 个是顶栏）
         left: 边(asides[0]?.children[1]),
         right: 边(asides[asides.length - 1]?.children[1]),
-        toolbar: 边(document.querySelector('div.flex.shrink-0.items-center.gap-1.border-b')),
+        // 用 data-editor-toolbar 这个稳定钩子，别拿类名组合当选择器。
+        // 原来写的是 `div.flex.shrink-0.items-center.gap-1.border-b`——而
+        // 「框沉下去、撤掉内部横线」那一轮把 border-b 去掉了，选择器当场失效。
+        // 组件里早就写明「类名组合到处都是，拿它当选择器太脆」，这里照做。
+        toolbar: 边(document.querySelector('[data-editor-toolbar]')),
       }
     })
 
@@ -173,7 +200,9 @@ test.describe('布局 @layout', () => {
       expect(r.top, `${名}侧工具条的上边缘与编辑器工具栏不齐`).toBe(rows.toolbar!.top)
       expect(r.bottom, `${名}侧工具条的下边缘与编辑器工具栏不齐`).toBe(rows.toolbar!.bottom)
     }
-    // 高度是定死的 30px（含 1px 下边框）——三条横栏一个数
+    // 高度是定死的 30px——三条横栏一个数。
+    // （原来是「30px 含 1px 下边框」；内部横线撤掉之后是 30px 整，
+    //  box-sizing: border-box + min-height 让去掉边框也不改高度。）
     expect(rows.toolbar!.h, '编辑器工具栏不是 30px 高').toBe(30)
     expect(rows.left!.h, '文件树工具条不是 30px 高').toBe(30)
     expect(rows.right!.h, '大纲工具条不是 30px 高').toBe(30)
@@ -382,7 +411,7 @@ test.describe('侧栏工具条 @sidebar', () => {
   })
 })
 
-test('收起文件树后顶栏显示「知」，样式与「知己笔记」一致', async ({ open, page }) => {
+test('收起文件树后顶栏盖一枚朱砂印，展开时仍是「知己笔记」四个字', async ({ open, page }) => {
   await open()
 
   const expanded = await headerTextStyle(page, 'left')
@@ -391,11 +420,18 @@ test('收起文件树后顶栏显示「知」，样式与「知己笔记」一�
   await page.getByRole('button', { name: '隐藏文件树' }).click()
   await page.waitForTimeout(200)
 
-  const collapsed = await headerTextStyle(page, 'left')
-  expect(collapsed?.text, '收起后顶栏没有显示「知」').toBe('知')
-  expect(collapsed!.fontSize, '「知」的字号与「知己笔记」不一致').toBe(expanded!.fontSize)
-  expect(collapsed!.fontWeight, '「知」的字重与「知己笔记」不一致').toBe(expanded!.fontWeight)
-  expect(collapsed!.color, '「知」的颜色与「知己笔记」不一致').toBe(expanded!.color)
+  /* 收起后不是"标题被截断了"，而是**同一枚印**——一个字本来就是一个印。
+     所以这里盯的不再是字号字重，是底色、字色、方角（见 Seal.tsx）。 */
+  const 印 = await headerSealStyle(page, 'left')
+  expect(印, '收起后顶栏没有出现印').not.toBeNull()
+  expect(印!.text, '印上的字不是「知」').toBe('知')
+
+  const [r, g, b] = hexToRgb(印!.期望底色)
+  expect(印!.background, '印的底色不是朱砂').toBe(`rgb(${r}, ${g}, ${b})`)
+  // 印泥上的字是刻掉的、露出纸色——永远是白字，不跟着主题反色
+  expect(印!.color, '印上的字不是白色').toBe('rgb(255, 255, 255)')
+  // 印章是方的，只收一点点角，不是圆角胶囊
+  expect(parseFloat(印!.borderRadius), '印收角太多，不像印章').toBeLessThanOrEqual(6)
 
   // 整条侧栏收窄了，文件列表消失
   const width = await page.locator('aside').first().evaluate((el) => Math.round(el.getBoundingClientRect().width))
@@ -475,30 +511,41 @@ test('栏拉窄了，「知己笔记」跟着收窄而不是溢出', async ({ op
   expect(fits, '「知己笔记」溢出了顶栏').toBe(true)
 })
 
-test('收起大纲后顶栏显示「己」，样式仍与「知己笔记」一致', async ({ open, page }) => {
+test('收起大纲后顶栏仍是「己」字，不盖印', async ({ open, page }) => {
   await open()
 
-  const left = await headerTextStyle(page, 'left')
+  const 展开 = await headerTextStyle(page, 'right')
+  expect(展开?.text, '展开时右侧顶栏不是「大纲」').toBe('大纲')
+
   await page.getByRole('button', { name: '隐藏大纲' }).click()
   await page.waitForTimeout(200)
 
-  const collapsed = await headerTextStyle(page, 'right')
-  expect(collapsed?.text, '收起后顶栏没有显示「己」').toBe('己')
-  expect(collapsed!.fontSize, '「己」的字号与「知己笔记」不一致').toBe(left!.fontSize)
-  expect(collapsed!.fontWeight, '「己」的字重与「知己笔记」不一致').toBe(left!.fontWeight)
-  expect(collapsed!.color, '「己」的颜色与「知己笔记」不一致').toBe(left!.color)
+  const 收起 = await headerTextStyle(page, 'right')
+  expect(收起?.text, '收起后顶栏没有显示「己」').toBe('己')
+  // 与**它自己展开时**一致：同一个标签的缩写，不该一个粗一个细
+  expect(收起!.fontSize, '「己」的字号与「大纲」不一致').toBe(展开!.fontSize)
+  expect(收起!.fontWeight, '「己」的字重与「大纲」不一致').toBe(展开!.fontWeight)
+  expect(收起!.color, '「己」的颜色与「大纲」不一致').toBe(展开!.color)
+
+  /* **不盖印**：印是应用的标识，只属于文件树那一侧。
+     这一侧展开时写的是「大纲」——一个面板标签，不是标识。 */
+  expect(await headerSealStyle(page, 'right'), '大纲那侧不该盖印').toBeNull()
 
   const width = await page.locator('aside').last().evaluate((el) => Math.round(el.getBoundingClientRect().width))
   expect(width, '收起后大纲没变窄').toBeLessThan(50)
 })
 
-test('两侧都收起后，两个顶栏字合起来是「知己」', async ({ open, page }) => {
+test('收起后只有文件树那侧盖印；两侧的字合起来仍是「知己」', async ({ open, page }) => {
   await open()
   await page.getByRole('button', { name: '隐藏文件树' }).click()
   await page.getByRole('button', { name: '隐藏大纲' }).click()
   await page.waitForTimeout(200)
 
-  const left = await headerTextStyle(page, 'left')
-  const right = await headerTextStyle(page, 'right')
-  expect(`${left?.text}${right?.text}`, '两侧收起后的字合起来不是「知己」').toBe('知己')
+  const 左印 = await headerSealStyle(page, 'left')
+  const 右字 = await headerTextStyle(page, 'right')
+
+  expect(左印?.text, '左侧收起后不是印').toBe('知')
+  expect(右字?.text, '右侧收起后不是「己」').toBe('己')
+  // 两边合起来还是应用名的前两个字——这个配对没变，变的是左边盖了印
+  expect(`${左印?.text}${右字?.text}`, '两侧收起后的字合起来不是「知己」').toBe('知己')
 })

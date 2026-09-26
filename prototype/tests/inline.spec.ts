@@ -98,9 +98,15 @@ test.describe('行内语法 @syntax', () => {
     const img = wrap.locator('img.cm-md-image')
     await expect(img).toHaveCount(1)
 
-    const loaded = await img.first().evaluate(
-      (el) => (el as HTMLImageElement).complete && (el as HTMLImageElement).naturalWidth > 0,
-    )
-    expect(loaded).toBe(true)
+    // 图片是**异步**加载的。`evaluate` 只读一次，读的那一刻可能还没加载完
+    // （complete=false、naturalWidth=0），断言就假红——实测全套满载下大约
+    // 每八次挂一次，且与代码改动无关（单跑永远过）。所以这里必须**重试到
+    // 加载完成**：expect.poll 会一直轮询，真加载不出来时以超时收场，不会把
+    // 真问题放过去。
+    await expect
+      .poll(() => img.first().evaluate((el) => (el as HTMLImageElement).naturalWidth), {
+        message: '示例图始终没加载出来（naturalWidth 一直是 0）',
+      })
+      .toBeGreaterThan(0)
   })
 })
