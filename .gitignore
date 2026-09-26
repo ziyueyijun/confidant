@@ -7,6 +7,11 @@ out/
 build/Release/
 *.tsbuildinfo
 
+# 字体产物与中间缓存（体积大：产物约 8MB、缓存约 190MB；是第三方字体，OFL-1.1）
+# 两者都由 prototype/scripts/build-fonts.mjs 重建，产物与缓存都不入库
+prototype/public/fonts/
+prototype/.font-cache/
+
 # Vite 依赖预打包缓存（可自动重建）
 .vite/
 
@@ -38,6 +43,8 @@ $RECYCLE.BIN/
 # 测试与实验产物
 coverage/
 *.lcov
+playwright-report/
+test-results/
 
 # 调研用的语料与依赖（体积大、含第三方版权内容；脚本保留以便重抓）
 docs/research/spikes/*.jsonl
