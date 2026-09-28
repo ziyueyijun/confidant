@@ -97,6 +97,7 @@ body {
 }
 
 #editor-host {
+  position: relative;
   font-size: 16px;
   line-height: 1.8;
 }
@@ -212,4 +213,75 @@ body {
 
 #editor-host .cf-syntax-visible {
   color: var(--text-secondary);
+}
+
+/* Ticket #23: find-in-document. Match highlights are plain CM6 marks
+   (see editor/searchPanel.ts), styled here like the rest of the WYSIWYG
+   classes above. The floating panel itself is native DOM anchored inside
+   #editor-host (which is `position: relative`, see above), positioned in
+   its top-right corner per acceptance criterion #1. */
+#editor-host .cf-search-match {
+  background: #ffe066;
+  color: #1a1a1a;
+  border-radius: 2px;
+}
+
+#editor-host .cf-search-match-current {
+  background: #ff9f40;
+  color: #1a1a1a;
+  border-radius: 2px;
+}
+
+.cf-search-panel {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 8px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+}
+
+.cf-search-input {
+  width: 160px;
+  padding: 4px 6px;
+  font-size: 13px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--bg-primary);
+  color: var(--text-primary);
+}
+
+.cf-search-count {
+  min-width: 44px;
+  font-size: 12px;
+  color: var(--text-secondary);
+  text-align: center;
+  white-space: nowrap;
+}
+
+.cf-search-btn {
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  cursor: pointer;
+  font-size: 13px;
+  line-height: 1;
+}
+
+.cf-search-btn:hover {
+  background: var(--bg-tertiary);
+}
+
+.cf-search-close {
+  font-size: 16px;
 }

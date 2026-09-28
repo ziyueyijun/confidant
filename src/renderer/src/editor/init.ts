@@ -6,6 +6,7 @@ import { languages } from '@codemirror/language-data'
 import { buildWysiwygDecorations, frontmatterLineDecoration } from './decorations'
 import { splitFrontmatter } from '../lib/markdown'
 import { createAutosaveController, type AutosaveController } from './autosave'
+import { attachSearchPanel, findKeymapExtension, searchExtensions, type SearchPanelHandle } from './searchPanel'
 
 /**
  * Ticket #15: the editor is now live.
@@ -150,6 +151,13 @@ export function createMarkdownEditor(
   lineSeparator: '\r\n' | '\n' = '\n'
 ): MarkdownEditorHandle {
   let viewRef: EditorView
+  // Ticket #23: the Ctrl+F keymap must be part of the extensions passed
+  // to `EditorState.create` below, but the find panel it opens needs a
+  // live `EditorView` + a DOM node to anchor to, both of which only
+  // exist *after* the view is constructed. This ref lets the keymap
+  // (registered up front) call into the panel (attached afterwards)
+  // without restructuring the state/view creation order.
+  let searchPanelRef: SearchPanelHandle | null = null
 
   const { extension: autosaveExtension, controller } = autosavePlugin(
     () => viewRef,
@@ -165,6 +173,8 @@ export function createMarkdownEditor(
       EditorView.lineWrapping,
       frontmatterPlugin(content),
       wysiwygPlugin(),
+      searchExtensions(),
+      findKeymapExtension(() => searchPanelRef),
       autosaveExtension,
       EditorView.theme({
         '&': { height: '100%' },
@@ -174,6 +184,12 @@ export function createMarkdownEditor(
   })
 
   viewRef = new EditorView({ state, parent })
+
+  // Anchor the floating find panel to `parent` (the same host CM6 mounts
+  // into, `#editor-host` per main.ts) so it's positioned relative to the
+  // editor's own top-right corner (acceptance criterion #1), not the
+  // whole window.
+  searchPanelRef = attachSearchPanel(parent, viewRef)
 
   const handleBlur = (): void => {
     void controller.flush()
@@ -185,6 +201,7 @@ export function createMarkdownEditor(
     flushSave: () => controller.flush(),
     destroy: () => {
       viewRef.contentDOM.removeEventListener('blur', handleBlur)
+      searchPanelRef?.destroy()
       controller.dispose()
       viewRef.destroy()
     }
