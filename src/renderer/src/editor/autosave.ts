@@ -33,6 +33,13 @@ export interface AutosaveController {
   markDirty(): void
   /** True if there are edits not yet persisted to disk. */
   isDirty(): boolean
+  /**
+   * Clears the dirty flag and cancels any pending debounce timer without
+   * saving (ticket #20: after discarding local edits in favor of an
+   * externally-changed version, there is nothing left to autosave - the
+   * in-memory content now matches disk exactly).
+   */
+  clearDirty(): void
   /** Cancels pending timers without saving. Call on teardown. */
   dispose(): void
 }
@@ -106,6 +113,11 @@ export function createAutosaveController(options: AutosaveOptions): AutosaveCont
 
     isDirty() {
       return dirty
+    },
+
+    clearDirty() {
+      clearTimer()
+      dirty = false
     },
 
     scheduleSave() {

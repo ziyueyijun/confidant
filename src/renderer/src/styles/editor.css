@@ -298,6 +298,19 @@ body {
   background: var(--bg-tertiary);
 }
 
+/* Ticket #20 acceptance criterion #5: file deleted externally while its
+   tab is still open - the tab turns red so the user notices before
+   their next edit tries (and fails) to autosave back to a path that no
+   longer exists. */
+.cf-tab-deleted,
+.cf-tab-deleted .cf-tab-label {
+  color: #d64545;
+}
+
+.cf-tab-deleted.cf-tab-active {
+  background: color-mix(in srgb, #d64545 12%, var(--bg-primary));
+}
+
 #editor-area {
   flex: 1;
   overflow: auto;
@@ -505,4 +518,99 @@ body {
 
 .cf-search-close {
   font-size: 16px;
+}
+
+/* Ticket #20 acceptance criterion #5: status bar showing "changes can't
+   be saved" for a tab whose backing file was deleted externally, with a
+   Save As affordance. Sits below the editor area, above nothing (bottom
+   of #main-column). */
+#status-bar {
+  display: none;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 6px 12px;
+  font-size: 12px;
+  background: #d64545;
+  color: #ffffff;
+}
+
+#status-bar.cf-status-bar-visible {
+  display: flex;
+}
+
+#status-bar-save-as {
+  border: 1px solid rgba(255, 255, 255, 0.6);
+  border-radius: 4px;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  padding: 3px 10px;
+  font-size: 12px;
+}
+
+#status-bar-save-as:hover {
+  background: rgba(255, 255, 255, 0.15);
+}
+
+/* Ticket #20 acceptance criterion #6: three-way conflict dialog (local
+   unsaved changes + an external change both present). Native DOM modal,
+   consistent with #14/#18/#23's "no framework" convention. */
+.cf-conflict-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+}
+
+.cf-conflict-dialog {
+  width: 420px;
+  max-width: 90vw;
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  border-radius: 8px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.35);
+  padding: 20px;
+}
+
+.cf-conflict-title {
+  font-size: 15px;
+  font-weight: 600;
+  margin: 0 0 8px;
+}
+
+.cf-conflict-message {
+  font-size: 13px;
+  color: var(--text-secondary);
+  margin: 0 0 16px;
+  word-break: break-all;
+}
+
+.cf-conflict-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.cf-conflict-btn {
+  padding: 8px 12px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+  cursor: pointer;
+  font-size: 13px;
+  text-align: left;
+}
+
+.cf-conflict-btn:hover {
+  background: var(--bg-tertiary);
+}
+
+.cf-conflict-btn-primary {
+  border-color: var(--accent);
 }

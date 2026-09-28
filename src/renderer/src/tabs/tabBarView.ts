@@ -11,10 +11,17 @@ import type { TabState } from './tabState'
 export interface TabBarOptions {
   onSelectTab: (path: string) => void
   onCloseTab: (path: string) => void
+  /**
+   * Ticket #20 acceptance criterion #5: true if `path`'s backing file
+   * was deleted externally. Deleted tabs render in red with a "(已删除)"
+   * suffix so the user notices before trying to keep editing a document
+   * that can no longer autosave back to its original path.
+   */
+  isDeleted?: (path: string) => boolean
 }
 
 /** Shortens an absolute path to its basename for the tab label. */
-function basename(path: string): string {
+export function basename(path: string): string {
   const normalized = path.replace(/\\/g, '/')
   const lastSlash = normalized.lastIndexOf('/')
   return lastSlash === -1 ? path : normalized.slice(lastSlash + 1)
@@ -27,6 +34,8 @@ export function renderTabBar(container: HTMLElement, state: TabState, options: T
     const tab = document.createElement('div')
     tab.className = 'cf-tab'
     if (path === state.activePath) tab.classList.add('cf-tab-active')
+    const deleted = options.isDeleted?.(path) ?? false
+    if (deleted) tab.classList.add('cf-tab-deleted')
     tab.dataset.path = path
     tab.setAttribute('role', 'tab')
     tab.setAttribute('aria-selected', String(path === state.activePath))
@@ -34,7 +43,7 @@ export function renderTabBar(container: HTMLElement, state: TabState, options: T
 
     const label = document.createElement('span')
     label.className = 'cf-tab-label'
-    label.textContent = basename(path)
+    label.textContent = deleted ? `${basename(path)} (已删除)` : basename(path)
     label.title = path
 
     const closeButton = document.createElement('button')

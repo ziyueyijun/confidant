@@ -3,8 +3,10 @@ import type { ThemeConfig } from '../shared/theme'
 import type { LibraryConfig } from '../shared/library'
 import type { FileTreeNode } from '../shared/fileTree'
 import type { RenameResult } from '../main/fileSystem'
+import type { CoalescedEvent } from '../shared/externalWatch'
 export type { FileTreeNode } from '../shared/fileTree'
 export type { RenameResult } from '../main/fileSystem'
+export type { CoalescedEvent } from '../shared/externalWatch'
 
 /**
  * Result of `file:read`. `warning` is set when the main process detects
@@ -45,6 +47,14 @@ const api = {
    */
   writeFile: (filePath: string, content: string, encoding: Pick<FileEncodingInfo, 'hasBOM'>): Promise<void> =>
     ipcRenderer.invoke('file:write', filePath, content, encoding),
+  /**
+   * Opens a native "Save As" dialog pre-filled with `defaultPath`
+   * (ticket #20: the only path forward for a tab whose file was deleted
+   * externally, and one of the three conflict-dialog choices). Resolves
+   * with the chosen absolute path, or `null` if cancelled.
+   */
+  saveAsDialog: (defaultPath: string): Promise<string | null> =>
+    ipcRenderer.invoke('file:saveAsDialog', defaultPath),
   /** Absolute path of the file passed on the command line, if any. */
   getInitialFilePath: (): Promise<string | null> => ipcRenderer.invoke('app:initialFilePath'),
   /** Reads the persisted theme config, or defaults if none was saved yet. */
@@ -78,7 +88,19 @@ const api = {
   renameEntry: (oldPath: string, newName: string): Promise<RenameResult> =>
     ipcRenderer.invoke('fs:rename', oldPath, newName),
   /** Moves `path` to the OS trash/recycle bin (ticket #19 - never a permanent delete). */
-  deleteToTrash: (path: string): Promise<void> => ipcRenderer.invoke('fs:deleteToTrash', path)
+  deleteToTrash: (path: string): Promise<void> => ipcRenderer.invoke('fs:deleteToTrash', path),
+  /**
+   * Subscribes to external file-change events pushed by the main
+   * process's chokidar watcher (ticket #20). This is a main-process-
+   * initiated push (`ipcRenderer.on`), not a renderer-initiated request,
+   * since the renderer has no way to know in advance when an external
+   * edit will happen. Returns an unsubscribe function.
+   */
+  onExternalChange: (callback: (event: CoalescedEvent) => void): (() => void) => {
+    const listener = (_event: unknown, payload: CoalescedEvent): void => callback(payload)
+    ipcRenderer.on('watch:externalChange', listener)
+    return () => ipcRenderer.removeListener('watch:externalChange', listener)
+  }
 }
 
 contextBridge.exposeInMainWorld('api', api)

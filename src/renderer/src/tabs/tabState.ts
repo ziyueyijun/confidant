@@ -73,17 +73,24 @@ export function isTabOpen(state: TabState, path: string): boolean {
 }
 
 /**
- * Ticket #19 acceptance criterion #2: when a file is renamed on disk, its
- * open tab (if any) must keep pointing at the same tab slot/order and
- * stay active if it was active - only the path (and thus the displayed
- * title, computed from the path's basename) changes. Does not mutate
- * `state`. No-op if `oldPath` isn't open, or if `newPath` is already
- * open under a different slot (shouldn't happen in practice since
- * renameEntry refuses to rename onto an existing file).
+ * Renames `oldPath`'s tab to `newPath` in place (same position in the
+ * tab order; stays active if it was active). Does not mutate `state`.
+ * No-op if `oldPath` isn't open, or if `newPath` is already open under a
+ * different slot (shouldn't happen in practice since renameEntry
+ * refuses to rename onto an existing file).
+ *
+ * Two call sites rely on this: ticket #19 acceptance criterion #2 (a
+ * file renamed on disk via the file tree) and ticket #20's "Save As"
+ * flow (re-targeting an already-open tab - e.g. one marked deleted, or
+ * the conflict dialog's "save a copy" choice - to a new file path
+ * without closing/reopening it).
  */
 export function renameTabPath(state: TabState, oldPath: string, newPath: string): TabState {
-  if (!state.tabs.includes(oldPath)) return state
-  const tabs = state.tabs.map((p) => (p === oldPath ? newPath : p))
+  const index = state.tabs.indexOf(oldPath)
+  if (index === -1) return state
+
+  const tabs = [...state.tabs]
+  tabs[index] = newPath
   const activePath = state.activePath === oldPath ? newPath : state.activePath
   return { tabs, activePath }
 }

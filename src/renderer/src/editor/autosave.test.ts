@@ -149,6 +149,19 @@ describe('createAutosaveController', () => {
     expect(save).not.toHaveBeenCalled()
   })
 
+  it('clearDirty() clears the dirty flag and cancels the pending debounce timer without saving (ticket #20 "use external version")', async () => {
+    const save = vi.fn().mockResolvedValue(undefined)
+    const controller = createAutosaveController({ save, getContent: () => 'content' })
+
+    controller.markDirty()
+    controller.scheduleSave()
+    controller.clearDirty()
+
+    expect(controller.isDirty()).toBe(false)
+    await vi.advanceTimersByTimeAsync(1000)
+    expect(save).not.toHaveBeenCalled()
+  })
+
   it('supports a custom delayMs (for tests/tuning), still debouncing correctly', async () => {
     const save = vi.fn().mockResolvedValue(undefined)
     const controller = createAutosaveController({ save, getContent: () => 'x', delayMs: 100 })

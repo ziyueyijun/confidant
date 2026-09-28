@@ -1,4 +1,4 @@
-import { EditorState, type Extension } from '@codemirror/state'
+import { Annotation, EditorState, type Extension } from '@codemirror/state'
 import { EditorView, ViewPlugin, type DecorationSet, type ViewUpdate } from '@codemirror/view'
 import { markdown } from '@codemirror/lang-markdown'
 import { Table } from '@lezer/markdown'
@@ -86,6 +86,16 @@ function frontmatterPlugin(source: string): Extension {
  * (acceptance criterion #6) work for CRLF files - which on Windows are
  * the common case, not an edge case.
  */
+/**
+ * Ticket #20: tags a transaction as "external reload" so the
+ * `updateListener` below (which drives autosave dirty-tracking) can tell
+ * it apart from a real user edit. Without this, `reloadContent`'s
+ * programmatic doc replacement (silent reload / "use external version")
+ * would itself mark the document dirty and schedule a pointless
+ * autosave write of content that already matches disk.
+ */
+export const externalReloadAnnotation = Annotation.define<boolean>()
+
 function autosavePlugin(
   view: () => EditorView,
   onSave: (content: string) => Promise<void>,
@@ -100,7 +110,7 @@ function autosavePlugin(
   })
 
   const extension = EditorView.updateListener.of((update) => {
-    if (update.docChanged) {
+    if (update.docChanged && !update.transactions.some((tr) => tr.annotation(externalReloadAnnotation))) {
       controller.markDirty()
       controller.scheduleSave()
     }
@@ -118,6 +128,21 @@ export interface MarkdownEditorHandle {
    * so ticket #17's per-tab lifecycle can call it directly too.
    */
   flushSave: () => Promise<void>
+  /**
+   * True if there are edits not yet persisted to disk (ticket #20:
+   * queried when an external-change event arrives to decide silent
+   * reload vs. conflict dialog - acceptance criteria #4/#6).
+   */
+  isDirty: () => boolean
+  /**
+   * Replaces the document content in place, preserving cursor position
+   * and scroll offset as closely as possible (ticket #20 acceptance
+   * criterion #4: silent reload on a no-conflict external change).
+   * Selection offsets are clamped to the new document length in case the
+   * external edit shortened the file. Does not mark the document dirty
+   * or trigger autosave - this reflects what's already on disk.
+   */
+  reloadContent: (content: string) => void
   /** Tears down autosave timers. Call when the editor is being discarded. */
   destroy: () => void
 }
@@ -199,6 +224,40 @@ export function createMarkdownEditor(
   return {
     view: viewRef,
     flushSave: () => controller.flush(),
+    isDirty: () => controller.isDirty(),
+    reloadContent: (content: string) => {
+      const view = viewRef
+      const previousSelection = view.state.selection
+      const previousScrollTop = view.scrollDOM.scrollTop
+      const previousScrollLeft = view.scrollDOM.scrollLeft
+
+      view.dispatch({
+        changes: { from: 0, to: view.state.doc.length, insert: content },
+        // Clamp the old selection into the new document length (the
+        // external edit may have shortened the file) rather than
+        // resetting to 0 - this is what "preserve cursor position" means
+        // when the doc itself changed underneath the cursor.
+        selection: {
+          anchor: Math.min(previousSelection.main.anchor, content.length),
+          head: Math.min(previousSelection.main.head, content.length)
+        },
+        annotations: externalReloadAnnotation.of(true)
+      })
+
+      // CM6 can adjust scroll position as a side effect of the content
+      // change (e.g. if the new doc is shorter); restore it explicitly
+      // on the next frame so the user doesn't see a jump.
+      requestAnimationFrame(() => {
+        view.scrollDOM.scrollTop = previousScrollTop
+        view.scrollDOM.scrollLeft = previousScrollLeft
+      })
+
+      // The reloaded content now matches disk exactly - clear any dirty
+      // flag left over from local edits that this reload is discarding
+      // (ticket #20 "use external version" conflict resolution), so a
+      // later autosave doesn't rewrite identical content back to disk.
+      controller.clearDirty()
+    },
     destroy: () => {
       viewRef.contentDOM.removeEventListener('blur', handleBlur)
       searchPanelRef?.destroy()
