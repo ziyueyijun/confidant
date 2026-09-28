@@ -160,4 +160,53 @@ describe('createAutosaveController', () => {
     await vi.advanceTimersByTimeAsync(1)
     expect(save).toHaveBeenCalledTimes(1)
   })
+
+  /**
+   * Regression test for a real bug caught during ticket #19 review:
+   * `main.ts`'s `createDocumentForTab` passes a `save` callback to
+   * `createMarkdownEditor` that closes over the file's path. Neither
+   * `AutosaveController` nor `MarkdownEditorHandle` expose any way to
+   * update that path after the fact - it's baked into the closure at
+   * creation time. When ticket #19's rename feature renamed an
+   * already-open file, the fix updated `documents`' Map key and the
+   * tab's path, but the *running editor's* save callback still closed
+   * over the pre-rename path, so the next autosave would resurrect a
+   * file at the old (renamed-away) location instead of writing to the
+   * new one - silent data misplacement, not a crash, and invisible to
+   * both typecheck and the full existing test suite (193 tests) since
+   * nothing here is a type error, just a stale captured value.
+   *
+   * The fix (in main.ts, not in this module) wraps the target in a
+   * mutable box (`{ current: path }`) that the `save` callback reads
+   * from on every call, and reassigns `.current` on rename. This test
+   * verifies that pattern works: a callback reading through a mutable
+   * box picks up a value change made *after* the controller was
+   * created, without needing any "update the path" API on the
+   * controller itself.
+   */
+  it('a save callback reading through a mutable box picks up path changes made after creation (documents the fix for the rename-autosave-target bug)', async () => {
+    const writes: Array<{ path: string; content: string }> = []
+    const target = { current: '/vault/old-name.md' }
+
+    const save = vi.fn(async (content: string) => {
+      writes.push({ path: target.current, content })
+    })
+    const controller = createAutosaveController({ save, getContent: () => 'first edit' })
+
+    controller.markDirty()
+    await controller.flush()
+    expect(writes).toEqual([{ path: '/vault/old-name.md', content: 'first edit' }])
+
+    // Simulate what main.ts's renameFile does: mutate the box in place,
+    // NOT create a new controller/editor instance.
+    target.current = '/vault/new-name.md'
+
+    controller.markDirty()
+    await controller.flush()
+
+    expect(writes).toEqual([
+      { path: '/vault/old-name.md', content: 'first edit' },
+      { path: '/vault/new-name.md', content: 'first edit' }
+    ])
+  })
 })

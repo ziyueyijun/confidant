@@ -46,6 +46,8 @@ interface OpenDocument {
   handle: MarkdownEditorHandle
   hostElement: HTMLDivElement
   encoding: FileEncodingInfo
+  /** Mutable box holding the path autosave currently writes to (see createDocumentForTab). */
+  savePath: { current: string }
 }
 
 async function bootstrap(): Promise<void> {
@@ -142,6 +144,7 @@ async function bootstrap(): Promise<void> {
     const { newPath } = result
     const doc = documents.get(path)
     if (doc) {
+      doc.savePath.current = newPath // keep the live editor's autosave pointed at the new path
       documents.delete(path)
       documents.set(newPath, doc)
     }
@@ -271,17 +274,31 @@ async function bootstrap(): Promise<void> {
       encoding = { hasBOM: false, lineEnding: 'CRLF' }
     }
 
+    // `savePath` is a mutable box, not the `path` parameter directly:
+    // `createMarkdownEditor`'s `onSave` callback captures this closure
+    // once at creation time and there's no API to swap it out (see
+    // MarkdownEditorHandle). Ticket #19 renames a file without
+    // destroying/recreating its editor instance (to preserve undo
+    // history/cursor/scroll), so the save target must be reassignable
+    // in place. `renameFile` below calls `.set(newPath)` on the same
+    // object returned here rather than mutating a plain closed-over
+    // variable, so the update is visible to this callback immediately -
+    // a caught bug where autosave kept writing to the pre-rename path
+    // (resurrecting a "deleted" file on disk) would otherwise have
+    // gone unnoticed by typecheck/tests, since nothing here is a type
+    // error, just a stale value.
+    const savePath = { current: path }
     const lineSeparator = encoding.lineEnding === 'CRLF' ? '\r\n' : '\n'
     const handle = createMarkdownEditor(
       inner,
       content,
       async (docContent) => {
-        await window.api.writeFile(path, docContent, { hasBOM: encoding.hasBOM })
+        await window.api.writeFile(savePath.current, docContent, { hasBOM: encoding.hasBOM })
       },
       lineSeparator
     )
 
-    documents.set(path, { handle, hostElement, encoding })
+    documents.set(path, { handle, hostElement, encoding, savePath })
   }
 
   // --- Library open flow (acceptance criterion #1) ---
@@ -341,7 +358,8 @@ async function bootstrap(): Promise<void> {
     documents.set(samplePath, {
       handle,
       hostElement,
-      encoding: { hasBOM: false, lineEnding: 'CRLF' }
+      encoding: { hasBOM: false, lineEnding: 'CRLF' },
+      savePath: { current: samplePath } // never actually written: onSave above is a no-op
     })
     tabState = { tabs: [samplePath], activePath: samplePath }
   }
