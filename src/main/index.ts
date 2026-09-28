@@ -11,9 +11,11 @@ import {
 import { findMarkdownPathInArgv } from './cli'
 import { readThemeConfig, writeThemeConfig } from './themeStore'
 import { readLibraryConfig, writeLibraryConfig } from './libraryStore'
+import { runLibrarySearch, type SearchQuery } from './search'
 import type { ThemeConfig } from '../shared/theme'
 import { addRecentLibrary, type LibraryConfig } from '../shared/library'
 import type { FileTreeNode } from '../shared/fileTree'
+import type { GroupedFileResult } from '../shared/search'
 
 function createWindow(): void {
   const mainWindow = new BrowserWindow({
@@ -127,6 +129,59 @@ app.whenReady().then(() => {
       return listDirectoryTree(rootPath)
     }
   )
+
+  /**
+   * Ticket #22: full-text search, streamed. `search:start` kicks off a
+   * scan identified by `sessionId` (minted by the renderer, one per
+   * debounced query) and returns immediately - results/completion/errors
+   * arrive later via `search:result`/`search:done`/`search:error` pushed
+   * to the same webContents, all tagged with `sessionId` so the renderer
+   * can drop anything that isn't its latest session (superseded by a
+   * newer query, or already cancelled).
+   *
+   * One `AbortController` per in-flight session, keyed by sessionId, is
+   * how `search:cancel` stops the walk: aborting the controller makes
+   * `runLibrarySearch`'s per-file loop check `signal.aborted` and stop
+   * picking up new files (see search.ts doc comment - cancellation is
+   * checked between files, not mid-read, which is precise enough since
+   * individual file reads are small and fast).
+   */
+  const activeSearchControllers = new Map<string, AbortController>()
+
+  ipcMain.on(
+    'search:start',
+    (event, sessionId: string, libraryPath: string, query: SearchQuery): void => {
+      const controller = new AbortController()
+      activeSearchControllers.set(sessionId, controller)
+
+      void runLibrarySearch(libraryPath, query, controller.signal, (result: GroupedFileResult) => {
+        if (controller.signal.aborted) return
+        event.sender.send('search:result', sessionId, result)
+      })
+        .then(({ error }) => {
+          activeSearchControllers.delete(sessionId)
+          if (controller.signal.aborted) return
+          if (error) {
+            event.sender.send('search:error', sessionId, error)
+          } else {
+            event.sender.send('search:done', sessionId)
+          }
+        })
+        .catch((err) => {
+          activeSearchControllers.delete(sessionId)
+          if (controller.signal.aborted) return
+          event.sender.send('search:error', sessionId, {
+            type: 'invalid-regex',
+            message: err instanceof Error ? err.message : String(err)
+          })
+        })
+    }
+  )
+
+  ipcMain.on('search:cancel', (_event, sessionId: string): void => {
+    activeSearchControllers.get(sessionId)?.abort()
+    activeSearchControllers.delete(sessionId)
+  })
 
   createWindow()
 

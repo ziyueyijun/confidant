@@ -6,6 +6,7 @@ import type { FileEncodingInfo, FileTreeNode } from '../../preload/index'
 import { openTab, focusTab, closeTab, EMPTY_TAB_STATE, type TabState } from './tabs/tabState'
 import { renderTabBar } from './tabs/tabBarView'
 import { renderFileTree } from './sidebar/fileTreeView'
+import { createSearchPanel, type SearchPanelHandle } from './sidebar/searchPanelView'
 
 /**
  * Ticket #14 scope: open a single file (via command-line arg passed
@@ -36,9 +37,17 @@ async function bootstrap(): Promise<void> {
   const editorHostsContainer = document.getElementById('editor-hosts')
   const tabBarContainer = document.getElementById('tab-bar')
   const fileTreeContainer = document.getElementById('file-tree')
+  const searchPanelContainer = document.getElementById('search-panel')
   const sidebar = document.getElementById('sidebar')
   const libraryNameLabel = document.getElementById('library-name')
-  if (!editorHostsContainer || !tabBarContainer || !fileTreeContainer || !sidebar || !libraryNameLabel) {
+  if (
+    !editorHostsContainer ||
+    !tabBarContainer ||
+    !fileTreeContainer ||
+    !searchPanelContainer ||
+    !sidebar ||
+    !libraryNameLabel
+  ) {
     throw new Error('Missing required layout mount points')
   }
 
@@ -51,6 +60,7 @@ async function bootstrap(): Promise<void> {
 
   let tabState: TabState = EMPTY_TAB_STATE
   const documents = new Map<string, OpenDocument>()
+  let currentLibraryPath: string | null = null
 
   function rerenderTabBar(): void {
     renderTabBar(tabBarContainer!, tabState, {
@@ -170,6 +180,7 @@ async function bootstrap(): Promise<void> {
   async function openLibrary(libraryPath: string, recordAsOpened: boolean): Promise<void> {
     libraryNameLabel!.textContent = libraryPath
     libraryNameLabel!.title = libraryPath
+    currentLibraryPath = libraryPath
     if (recordAsOpened) {
       await window.api.recordLibraryOpened(libraryPath)
     }
@@ -182,6 +193,44 @@ async function bootstrap(): Promise<void> {
       const chosen = await window.api.openLibraryDialog()
       if (chosen) await openLibrary(chosen, false) // dialog handler already recorded it
     })()
+  })
+
+  // --- Full-text search sidebar panel (ticket #22) ---
+
+  const searchPanel: SearchPanelHandle = createSearchPanel(searchPanelContainer, fileTreeContainer, {
+    getLibraryPath: () => currentLibraryPath,
+    onResultClick: (path, lineNumber) => {
+      void openFileAtLine(path, lineNumber)
+    }
+  })
+
+  /**
+   * Opens `path` (reusing the normal tab-open flow) and, once its editor
+   * exists, scrolls to and highlights `lineNumber` (acceptance criterion
+   * #5). Awaits `openFileInTab` first so this works whether the file was
+   * already open (existing `MarkdownEditorHandle`) or needs to be created
+   * fresh.
+   */
+  async function openFileAtLine(path: string, lineNumber: number): Promise<void> {
+    await openFileInTab(path)
+    const doc = documents.get(path)
+    doc?.handle.revealLine(lineNumber)
+  }
+
+  document.getElementById('sidebar-search-toggle')?.addEventListener('click', () => {
+    searchPanel.toggle()
+  })
+
+  window.addEventListener('keydown', (event) => {
+    const isToggleShortcut =
+      (event.ctrlKey || event.metaKey) && event.shiftKey && event.key.toLowerCase() === 'f'
+    if (isToggleShortcut) {
+      event.preventDefault()
+      if (sidebar!.classList.contains('cf-sidebar-collapsed')) {
+        sidebar!.classList.remove('cf-sidebar-collapsed')
+      }
+      searchPanel.toggle()
+    }
   })
 
   // --- Startup: command-line file (opened as a tab), and/or most recent library ---
