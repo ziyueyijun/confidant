@@ -3,7 +3,14 @@ import { createMarkdownEditor, type MarkdownEditorHandle } from './editor/init'
 import { applyEditorWidth, applyTheme } from './theme/applyTheme'
 import { EDITOR_WIDTH_OPTIONS, type EditorWidth, type ThemeName } from '@shared/theme'
 import type { FileEncodingInfo, FileTreeNode } from '../../preload/index'
-import { openTab, focusTab, closeTab, EMPTY_TAB_STATE, type TabState } from './tabs/tabState'
+import {
+  openTab,
+  focusTab,
+  closeTab,
+  renameTabPath,
+  EMPTY_TAB_STATE,
+  type TabState
+} from './tabs/tabState'
 import { renderTabBar } from './tabs/tabBarView'
 import { renderFileTree } from './sidebar/fileTreeView'
 
@@ -23,6 +30,15 @@ import { renderFileTree } from './sidebar/fileTreeView'
  * requirement). A file passed on the command line is still supported -
  * it's opened as the first tab rather than being the only thing the app
  * can show.
+ *
+ * Ticket #19 scope: file tree CRUD (new/rename/delete). Mutations go
+ * through the main process (`window.api.createFile`/`renameEntry`/
+ * `deleteToTrash`), then the tree is reloaded from disk so the sidebar
+ * always reflects ground truth rather than an optimistic client-side
+ * patch. Renaming a file that's currently open in a tab also updates
+ * that tab's key (and the `documents` map's key) in place, so the tab
+ * keeps pointing at the same open editor instead of looking like the
+ * file disappeared.
  */
 
 /** One open document: its editor instance, DOM host, and save-relevant metadata. */
@@ -52,6 +68,14 @@ async function bootstrap(): Promise<void> {
   let tabState: TabState = EMPTY_TAB_STATE
   const documents = new Map<string, OpenDocument>()
 
+  // Ticket #19: tracks the open library root (for "new file" on empty
+  // space) and the most recently created file (so it can auto-enter
+  // rename mode on its next render), and caches the last-loaded tree so
+  // mutation handlers can trigger a reload+rerender without threading
+  // the tree through every call site.
+  let currentLibraryPath: string | null = null
+  let pendingAutoRenamePath: string | null = null
+
   function rerenderTabBar(): void {
     renderTabBar(tabBarContainer!, tabState, {
       onSelectTab: (path) => void switchToTab(path),
@@ -65,8 +89,103 @@ async function bootstrap(): Promise<void> {
   function rerenderFileTree(nodes: FileTreeNode[]): void {
     renderFileTree(fileTreeContainer!, nodes, {
       onOpenFile: (path) => void openFileInTab(path),
-      isActive: (path) => path === tabState.activePath
+      isActive: (path) => path === tabState.activePath,
+      onNewFile: (dirPath) => void createNewFile(dirPath),
+      onRename: (path, newName) => void renameFile(path, newName),
+      onDelete: (path) => void deleteFile(path),
+      rootPath: currentLibraryPath ?? '',
+      autoRenamePath: pendingAutoRenamePath
     })
+    pendingAutoRenamePath = null
+  }
+
+  /** Reloads the tree from disk and re-renders (ticket #19 acceptance criterion #4). */
+  async function refreshFileTree(): Promise<void> {
+    if (!currentLibraryPath) return
+    const tree = await window.api.listDirectoryTree(currentLibraryPath)
+    rerenderFileTree(tree)
+  }
+
+  async function createNewFile(dirPath: string): Promise<void> {
+    try {
+      const newPath = await window.api.createFile(dirPath)
+      pendingAutoRenamePath = newPath
+      await refreshFileTree()
+      await openFileInTab(newPath)
+    } catch (err) {
+      console.error('Failed to create file', err)
+      window.alert(`Could not create a new file: ${String(err)}`)
+    }
+  }
+
+  /**
+   * Renames `path` to `newName`. On success: refuses silently is not an
+   * option per the tree's own retry UX (the input just reverts and the
+   * user can try again), but here we've already gotten a definitive
+   * answer from the main process, so on `target-exists`/`error` we show
+   * an alert and leave the file tree/tabs untouched. On success, syncs
+   * the open tab (if any) and warns that other files' links aren't
+   * updated (acceptance criterion #2).
+   */
+  async function renameFile(path: string, newName: string): Promise<void> {
+    const result = await window.api.renameEntry(path, newName)
+    if (!result.ok) {
+      const reasonText =
+        result.reason === 'target-exists'
+          ? `A file named "${newName}" already exists in this folder.`
+          : `Rename failed: ${result.message}`
+      window.alert(reasonText)
+      await refreshFileTree()
+      return
+    }
+
+    const { newPath } = result
+    const doc = documents.get(path)
+    if (doc) {
+      documents.delete(path)
+      documents.set(newPath, doc)
+    }
+    tabState = renameTabPath(tabState, path, newPath)
+
+    await refreshFileTree()
+    rerenderTabBar()
+
+    // Acceptance criterion #2: renaming does not scan/update links in
+    // other files, so warn the user those links may now be stale.
+    window.alert(
+      `Renamed to "${newName}". Links to the old filename in other files were not updated automatically.`
+    )
+  }
+
+  async function deleteFile(path: string): Promise<void> {
+    const confirmed = window.confirm(`Move "${basenameOf(path)}" to the trash?`)
+    if (!confirmed) return
+
+    try {
+      await window.api.deleteToTrash(path)
+    } catch (err) {
+      console.error('Failed to delete file', err)
+      window.alert(`Could not delete file: ${String(err)}`)
+      return
+    }
+
+    const doc = documents.get(path)
+    if (doc) {
+      doc.handle.destroy()
+      doc.hostElement.remove()
+      documents.delete(path)
+    }
+    tabState = closeTab(tabState, path)
+
+    await refreshFileTree()
+    rerenderTabBar()
+    rerenderFileTreeActiveHighlight()
+  }
+
+  function basenameOf(path: string): string {
+    const normalized = path.replace(/\\/g, '/')
+    const lastSlash = normalized.lastIndexOf('/')
+    return lastSlash === -1 ? path : normalized.slice(lastSlash + 1)
   }
 
   /**
@@ -168,6 +287,7 @@ async function bootstrap(): Promise<void> {
   // --- Library open flow (acceptance criterion #1) ---
 
   async function openLibrary(libraryPath: string, recordAsOpened: boolean): Promise<void> {
+    currentLibraryPath = libraryPath
     libraryNameLabel!.textContent = libraryPath
     libraryNameLabel!.title = libraryPath
     if (recordAsOpened) {

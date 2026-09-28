@@ -9,8 +9,19 @@ import {
   readFile,
   writeFileAtomic,
   writeMarkdownFile,
+  createFile,
+  renameEntry,
+  deleteToTrash,
+  generateUniqueFileName,
+  DEFAULT_NEW_FILE_NAME,
   LARGE_DOCUMENT_CHAR_THRESHOLD
 } from './fileSystem'
+
+vi.mock('electron', () => ({
+  shell: {
+    trashItem: vi.fn().mockResolvedValue(undefined)
+  }
+}))
 
 describe('detectLargeDocumentWarning', () => {
   it('returns undefined for a normal-sized document', () => {
@@ -344,5 +355,141 @@ describe('listDirectoryTree (ticket #17)', () => {
     expect(tree).toHaveLength(1)
     expect(tree[0].name).toBe('empty-folder')
     expect(tree[0].children).toEqual([])
+  })
+})
+
+describe('generateUniqueFileName (ticket #19)', () => {
+  it('returns the base name unchanged when there is no collision', () => {
+    expect(generateUniqueFileName([], '未命名.md')).toBe('未命名.md')
+    expect(generateUniqueFileName(['other.md'], '未命名.md')).toBe('未命名.md')
+  })
+
+  it('appends " 2" when the base name already exists', () => {
+    expect(generateUniqueFileName(['未命名.md'], '未命名.md')).toBe('未命名 2.md')
+  })
+
+  it('keeps incrementing until it finds a free slot', () => {
+    const existing = ['未命名.md', '未命名 2.md', '未命名 3.md']
+    expect(generateUniqueFileName(existing, '未命名.md')).toBe('未命名 4.md')
+  })
+
+  it('handles gaps in the numbering by still finding the first free slot', () => {
+    // "未命名 2.md" is free even though "未命名.md" and "未命名 3.md" are taken.
+    const existing = ['未命名.md', '未命名 3.md']
+    expect(generateUniqueFileName(existing, '未命名.md')).toBe('未命名 2.md')
+  })
+
+  it('preserves the extension when deduplicating', () => {
+    expect(generateUniqueFileName(['notes.txt'], 'notes.txt')).toBe('notes 2.txt')
+  })
+
+  it('handles a base name with no extension', () => {
+    expect(generateUniqueFileName(['README'], 'README')).toBe('README 2')
+  })
+})
+
+describe('createFile (ticket #19)', () => {
+  let dir: string
+
+  beforeEach(async () => {
+    dir = await fs.mkdtemp(join(tmpdir(), 'confidant-create-'))
+  })
+
+  afterEach(async () => {
+    await fs.rm(dir, { recursive: true, force: true })
+  })
+
+  it('creates a new empty file with the default name', async () => {
+    const filePath = await createFile(dir)
+
+    expect(filePath).toBe(join(dir, DEFAULT_NEW_FILE_NAME))
+    expect(await fs.readFile(filePath, 'utf-8')).toBe('')
+  })
+
+  it('auto-numbers the name when the default already exists', async () => {
+    await fs.writeFile(join(dir, DEFAULT_NEW_FILE_NAME), 'existing', 'utf-8')
+
+    const filePath = await createFile(dir)
+
+    expect(filePath).toBe(join(dir, '未命名 2.md'))
+  })
+
+  it('accepts a custom base name', async () => {
+    const filePath = await createFile(dir, 'custom.md')
+    expect(filePath).toBe(join(dir, 'custom.md'))
+  })
+
+  it('does not touch other files already in the directory', async () => {
+    await fs.writeFile(join(dir, 'existing.md'), 'keep me', 'utf-8')
+
+    await createFile(dir)
+
+    expect(await fs.readFile(join(dir, 'existing.md'), 'utf-8')).toBe('keep me')
+  })
+})
+
+describe('renameEntry (ticket #19)', () => {
+  let dir: string
+
+  beforeEach(async () => {
+    dir = await fs.mkdtemp(join(tmpdir(), 'confidant-rename-'))
+  })
+
+  afterEach(async () => {
+    await fs.rm(dir, { recursive: true, force: true })
+  })
+
+  it('renames a file successfully when the target does not exist', async () => {
+    const oldPath = join(dir, 'old.md')
+    await fs.writeFile(oldPath, 'content', 'utf-8')
+
+    const result = await renameEntry(oldPath, 'new.md')
+
+    expect(result).toEqual({ ok: true, newPath: join(dir, 'new.md') })
+    expect(await fs.readFile(join(dir, 'new.md'), 'utf-8')).toBe('content')
+    await expect(fs.access(oldPath)).rejects.toThrow()
+  })
+
+  it('refuses to overwrite an existing target file', async () => {
+    const oldPath = join(dir, 'old.md')
+    const targetPath = join(dir, 'taken.md')
+    await fs.writeFile(oldPath, 'old content', 'utf-8')
+    await fs.writeFile(targetPath, 'do not touch', 'utf-8')
+
+    const result = await renameEntry(oldPath, 'taken.md')
+
+    expect(result.ok).toBe(false)
+    if (!result.ok) expect(result.reason).toBe('target-exists')
+    // Neither file should have been modified.
+    expect(await fs.readFile(oldPath, 'utf-8')).toBe('old content')
+    expect(await fs.readFile(targetPath, 'utf-8')).toBe('do not touch')
+  })
+
+  it('is a no-op success when renaming to the same name', async () => {
+    const oldPath = join(dir, 'same.md')
+    await fs.writeFile(oldPath, 'content', 'utf-8')
+
+    const result = await renameEntry(oldPath, 'same.md')
+
+    expect(result).toEqual({ ok: true, newPath: oldPath })
+  })
+
+  it('reports an error result if the underlying rename fails', async () => {
+    const oldPath = join(dir, 'does-not-exist.md')
+
+    const result = await renameEntry(oldPath, 'new.md')
+
+    expect(result.ok).toBe(false)
+    if (!result.ok) expect(result.reason).toBe('error')
+  })
+})
+
+describe('deleteToTrash (ticket #19)', () => {
+  it('delegates to Electron shell.trashItem rather than deleting permanently', async () => {
+    const { shell } = await import('electron')
+
+    await deleteToTrash('/some/path/note.md')
+
+    expect(shell.trashItem).toHaveBeenCalledWith('/some/path/note.md')
   })
 })

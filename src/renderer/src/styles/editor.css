@@ -201,6 +201,47 @@ body {
   display: none;
 }
 
+/* Ticket #19: right-click context menu (new file / rename / delete). */
+.cf-context-menu {
+  position: fixed;
+  z-index: 1000;
+  min-width: 140px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+  padding: 4px;
+  display: flex;
+  flex-direction: column;
+}
+
+.cf-context-menu-item {
+  border: none;
+  background: transparent;
+  color: var(--text-primary);
+  text-align: left;
+  font-size: 13px;
+  padding: 6px 10px;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.cf-context-menu-item:hover {
+  background: var(--bg-tertiary);
+}
+
+/* Ticket #19: inline rename input replaces the tree label's text. */
+.cf-tree-rename-input {
+  width: 100%;
+  font-size: 13px;
+  font-family: inherit;
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  border: 1px solid var(--accent);
+  border-radius: 3px;
+  padding: 1px 4px;
+}
+
 #main-column {
   flex: 1;
   display: flex;

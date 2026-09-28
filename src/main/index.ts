@@ -5,8 +5,12 @@ import {
   readFile,
   writeMarkdownFile,
   listDirectoryTree,
+  createFile,
+  renameEntry,
+  deleteToTrash,
   type ReadFileResult,
-  type FileEncodingInfo
+  type FileEncodingInfo,
+  type RenameResult
 } from './fileSystem'
 import { findMarkdownPathInArgv } from './cli'
 import { readThemeConfig, writeThemeConfig } from './themeStore'
@@ -127,6 +131,24 @@ app.whenReady().then(() => {
       return listDirectoryTree(rootPath)
     }
   )
+
+  /** Ticket #19 acceptance criterion #1: create a new file in `dirPath`. */
+  ipcMain.handle('fs:createFile', async (_event, dirPath: string): Promise<string> => {
+    return createFile(dirPath)
+  })
+
+  /** Ticket #19 acceptance criterion #2: rename, refusing to overwrite an existing target. */
+  ipcMain.handle(
+    'fs:rename',
+    async (_event, oldPath: string, newName: string): Promise<RenameResult> => {
+      return renameEntry(oldPath, newName)
+    }
+  )
+
+  /** Ticket #19 acceptance criterion #3: delete to the OS trash, not permanently. */
+  ipcMain.handle('fs:deleteToTrash', async (_event, path: string): Promise<void> => {
+    return deleteToTrash(path)
+  })
 
   createWindow()
 

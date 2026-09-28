@@ -1,5 +1,13 @@
 import { describe, expect, it } from 'vitest'
-import { closeTab, EMPTY_TAB_STATE, focusTab, isTabOpen, openTab, type TabState } from './tabState'
+import {
+  closeTab,
+  EMPTY_TAB_STATE,
+  focusTab,
+  isTabOpen,
+  openTab,
+  renameTabPath,
+  type TabState
+} from './tabState'
 
 describe('openTab', () => {
   it('opens a brand-new tab and focuses it', () => {
@@ -95,6 +103,38 @@ describe('isTabOpen', () => {
     const state: TabState = { tabs: ['/a.md'], activePath: '/a.md' }
     expect(isTabOpen(state, '/a.md')).toBe(true)
     expect(isTabOpen(state, '/b.md')).toBe(false)
+  })
+})
+
+describe('renameTabPath (ticket #19)', () => {
+  it('updates the path in place, preserving tab order', () => {
+    const state: TabState = { tabs: ['/a.md', '/b.md', '/c.md'], activePath: '/a.md' }
+    const result = renameTabPath(state, '/b.md', '/renamed.md')
+    expect(result.tabs).toEqual(['/a.md', '/renamed.md', '/c.md'])
+  })
+
+  it('updates activePath when the renamed tab was active', () => {
+    const state: TabState = { tabs: ['/a.md', '/b.md'], activePath: '/b.md' }
+    const result = renameTabPath(state, '/b.md', '/renamed.md')
+    expect(result.activePath).toBe('/renamed.md')
+  })
+
+  it('leaves activePath untouched when a different (inactive) tab was renamed', () => {
+    const state: TabState = { tabs: ['/a.md', '/b.md'], activePath: '/a.md' }
+    const result = renameTabPath(state, '/b.md', '/renamed.md')
+    expect(result.activePath).toBe('/a.md')
+  })
+
+  it('is a no-op if the old path is not open', () => {
+    const state: TabState = { tabs: ['/a.md'], activePath: '/a.md' }
+    expect(renameTabPath(state, '/not-open.md', '/renamed.md')).toEqual(state)
+  })
+
+  it('does not mutate the input state', () => {
+    const state: TabState = { tabs: ['/a.md', '/b.md'], activePath: '/b.md' }
+    const snapshot = JSON.parse(JSON.stringify(state))
+    renameTabPath(state, '/b.md', '/renamed.md')
+    expect(state).toEqual(snapshot)
   })
 })
 

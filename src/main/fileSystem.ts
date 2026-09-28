@@ -1,5 +1,6 @@
 import { promises as fs } from 'fs'
-import { join } from 'path'
+import { join, extname, basename as pathBasename } from 'path'
+import { shell } from 'electron'
 import { shouldIncludeEntry, sortFileTreeNodes, type FileTreeNode } from '../shared/fileTree'
 
 /**
@@ -189,4 +190,122 @@ export async function listDirectoryTree(rootPath: string): Promise<FileTreeNode[
   }
 
   return sortFileTreeNodes(nodes)
+}
+
+/**
+ * Ticket #19: default filename for a newly-created note, matching the
+ * spec's example ("未命名.md" / "Untitled.md"). We use the Chinese name
+ * since the app's UI copy and this project are Chinese-first; the
+ * dedup logic below is what actually matters for correctness.
+ */
+export const DEFAULT_NEW_FILE_NAME = '未命名.md'
+
+/**
+ * Picks a filename that doesn't collide with anything in `existingNames`
+ * (a flat set of sibling basenames in the target directory). Pure
+ * function - no fs access - so the numbering scheme is unit-testable in
+ * isolation from disk I/O.
+ *
+ * Numbering scheme: "未命名.md", then "未命名 2.md", "未命名 3.md", ...
+ * (matches Windows/Finder-style "keep both" numbering rather than
+ * "未命名(1).md", which is arbitrary either way but this one reads
+ * naturally in both Chinese and English).
+ */
+export function generateUniqueFileName(existingNames: readonly string[], baseName: string): string {
+  const existing = new Set(existingNames)
+  if (!existing.has(baseName)) return baseName
+
+  const ext = extname(baseName)
+  const stem = ext ? baseName.slice(0, -ext.length) : baseName
+
+  let counter = 2
+  let candidate = `${stem} ${counter}${ext}`
+  while (existing.has(candidate)) {
+    counter++
+    candidate = `${stem} ${counter}${ext}`
+  }
+  return candidate
+}
+
+/**
+ * Creates a new empty markdown file inside `dirPath`, auto-deduplicating
+ * the name against whatever's already in that directory (acceptance
+ * criterion #1: "新建文件默认在当前文件夹"). Returns the created file's
+ * absolute path so the caller can open it in a tab / enter rename mode.
+ */
+export async function createFile(
+  dirPath: string,
+  baseName: string = DEFAULT_NEW_FILE_NAME
+): Promise<string> {
+  let entries: import('fs').Dirent[]
+  try {
+    entries = await fs.readdir(dirPath, { withFileTypes: true })
+  } catch {
+    entries = []
+  }
+  const existingNames = entries.map((e) => e.name)
+  const finalName = generateUniqueFileName(existingNames, baseName)
+  const filePath = join(dirPath, finalName)
+
+  await fs.writeFile(filePath, '', 'utf-8')
+  return filePath
+}
+
+export type RenameResult =
+  | { ok: true; newPath: string }
+  | { ok: false; reason: 'target-exists' | 'error'; message: string }
+
+/**
+ * Renames/moves `oldPath` to a sibling file named `newName`. Refuses
+ * (rather than silently overwriting) if the destination already exists
+ * (acceptance criterion #2's "重命名...如果 newPath 已存在应该拒绝并提
+ * 示"). Does not touch any other file's contents - links in other
+ * markdown files are intentionally left stale; the caller is
+ * responsible for warning the user about that (this function only
+ * reports success/failure of the rename itself).
+ */
+export async function renameEntry(oldPath: string, newName: string): Promise<RenameResult> {
+  const dir = oldPath.slice(0, oldPath.length - pathBasename(oldPath).length)
+  const newPath = join(dir, newName)
+
+  if (newPath === oldPath) {
+    return { ok: true, newPath }
+  }
+
+  const alreadyExists = await pathExists(newPath)
+  if (alreadyExists) {
+    return {
+      ok: false,
+      reason: 'target-exists',
+      message: `"${newName}" already exists in this folder.`
+    }
+  }
+
+  try {
+    await fs.rename(oldPath, newPath)
+    return { ok: true, newPath }
+  } catch (err) {
+    return { ok: false, reason: 'error', message: String(err) }
+  }
+}
+
+async function pathExists(path: string): Promise<boolean> {
+  try {
+    await fs.access(path)
+    return true
+  } catch {
+    return false
+  }
+}
+
+/**
+ * Moves `path` to the OS trash/recycle bin rather than permanently
+ * deleting it (acceptance criterion #3). Delegates to Electron's
+ * `shell.trashItem`, which uses the native trash APIs on each platform -
+ * deliberately not hand-rolled (no custom "move to a .trash folder"
+ * scheme), since the native trash integrates with the system's own
+ * restore UI.
+ */
+export async function deleteToTrash(path: string): Promise<void> {
+  await shell.trashItem(path)
 }

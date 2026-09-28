@@ -2,7 +2,9 @@ import { contextBridge, ipcRenderer } from 'electron'
 import type { ThemeConfig } from '../shared/theme'
 import type { LibraryConfig } from '../shared/library'
 import type { FileTreeNode } from '../shared/fileTree'
+import type { RenameResult } from '../main/fileSystem'
 export type { FileTreeNode } from '../shared/fileTree'
+export type { RenameResult } from '../main/fileSystem'
 
 /**
  * Result of `file:read`. `warning` is set when the main process detects
@@ -62,7 +64,21 @@ const api = {
     ipcRenderer.invoke('library:recordOpened', libraryPath),
   /** Recursively lists a library folder's visible file tree (ticket #17). */
   listDirectoryTree: (rootPath: string): Promise<FileTreeNode[]> =>
-    ipcRenderer.invoke('fs:listDirectoryTree', rootPath)
+    ipcRenderer.invoke('fs:listDirectoryTree', rootPath),
+  /**
+   * Creates a new empty markdown file inside `dirPath`, auto-numbering
+   * the default name if it collides with an existing file (ticket #19).
+   * Resolves with the created file's absolute path.
+   */
+  createFile: (dirPath: string): Promise<string> => ipcRenderer.invoke('fs:createFile', dirPath),
+  /**
+   * Renames `oldPath` to `newName` (sibling in the same directory).
+   * Refuses (does not overwrite) if the destination already exists.
+   */
+  renameEntry: (oldPath: string, newName: string): Promise<RenameResult> =>
+    ipcRenderer.invoke('fs:rename', oldPath, newName),
+  /** Moves `path` to the OS trash/recycle bin (ticket #19 - never a permanent delete). */
+  deleteToTrash: (path: string): Promise<void> => ipcRenderer.invoke('fs:deleteToTrash', path)
 }
 
 contextBridge.exposeInMainWorld('api', api)
