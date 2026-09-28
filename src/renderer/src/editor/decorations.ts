@@ -99,6 +99,44 @@ export function buildWysiwygDecorations(state: EditorState): DecorationSet {
           })
           break
 
+        case 'Link':
+          // Link children: LinkMark('['), <link text>, LinkMark(']'),
+          // LinkMark('('), URL, LinkMark(')'). Only the LinkMark/URL
+          // children are hidden below (via their own enter() calls); here
+          // we just mark the whole node so the visible text gets a
+          // clickable-looking style. Click behavior is out of scope (#14).
+          markDecosByPos.push({ from: node.from, to: node.to, deco: Decoration.mark({ class: 'cf-link' }) })
+          break
+
+        case 'LinkMark':
+        case 'URL':
+          markDecosByPos.push({
+            from: node.from,
+            to: node.to,
+            deco: Decoration.mark({ class: 'cf-syntax-hidden' })
+          })
+          break
+
+        case 'Table': {
+          // MVP scope (#14): read-only display distinct from raw source,
+          // not a real <table> layout (block-edit mode is #25). Tag every
+          // line of the table with one line class; header vs. body rows
+          // are distinguished by TableHeader below.
+          const startLine = state.doc.lineAt(node.from).number
+          const endLine = state.doc.lineAt(node.to).number
+          for (let ln = startLine; ln <= endLine; ln++) {
+            const line = state.doc.line(ln)
+            lineDecosByPos.push({ pos: line.from, deco: Decoration.line({ class: 'cf-table-row' }) })
+          }
+          break
+        }
+
+        case 'TableHeader': {
+          const line = state.doc.lineAt(node.from)
+          lineDecosByPos.push({ pos: line.from, deco: Decoration.line({ class: 'cf-table-header' }) })
+          break
+        }
+
         default:
           break
       }

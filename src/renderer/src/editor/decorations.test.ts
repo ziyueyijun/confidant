@@ -1,10 +1,11 @@
 import { describe, expect, it } from 'vitest'
 import { EditorState } from '@codemirror/state'
 import { markdown } from '@codemirror/lang-markdown'
+import { Table } from '@lezer/markdown'
 import { buildWysiwygDecorations } from './decorations'
 
 function decorationClasses(doc: string): string[] {
-  const state = EditorState.create({ doc, extensions: [markdown()] })
+  const state = EditorState.create({ doc, extensions: [markdown({ extensions: [Table] })] })
   const decos = buildWysiwygDecorations(state)
   const classes: string[] = []
   decos.between(0, doc.length, (_from, _to, deco) => {
@@ -45,5 +46,18 @@ describe('buildWysiwygDecorations', () => {
   it('marks fenced code block lines', () => {
     const classes = decorationClasses('```js\nconst x = 1\n```\n')
     expect(classes).toContain('cf-code-block')
+  })
+
+  it('marks link text and hides the [ ]( url ) syntax markers', () => {
+    const classes = decorationClasses('see [the docs](https://example.com) now\n')
+    expect(classes).toContain('cf-link')
+    // 4 LinkMark ('[', ']', '(', ')') + 1 URL node, all hidden.
+    expect(classes.filter((c) => c === 'cf-syntax-hidden').length).toBeGreaterThanOrEqual(5)
+  })
+
+  it('marks table rows and distinguishes the header row', () => {
+    const classes = decorationClasses('| a | b |\n| - | - |\n| 1 | 2 |\n')
+    expect(classes).toContain('cf-table-row')
+    expect(classes).toContain('cf-table-header')
   })
 })

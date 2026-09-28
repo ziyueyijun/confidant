@@ -1,6 +1,7 @@
 import { EditorState, type Extension } from '@codemirror/state'
 import { EditorView, ViewPlugin, type DecorationSet } from '@codemirror/view'
 import { markdown } from '@codemirror/lang-markdown'
+import { Table } from '@lezer/markdown'
 import { languages } from '@codemirror/language-data'
 import { buildWysiwygDecorations, frontmatterLineDecoration } from './decorations'
 import { splitFrontmatter } from '../lib/markdown'
@@ -58,7 +59,7 @@ export function createReadOnlyMarkdownEditor(parent: HTMLElement, content: strin
   const state = EditorState.create({
     doc: content,
     extensions: [
-      markdown({ codeLanguages: languages }),
+      markdown({ codeLanguages: languages, extensions: [Table] }),
       EditorState.readOnly.of(true),
       EditorView.editable.of(false),
       EditorView.lineWrapping,
