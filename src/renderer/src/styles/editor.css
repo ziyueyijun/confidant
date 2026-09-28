@@ -202,6 +202,25 @@ body {
   border-bottom: 2px solid var(--border);
 }
 
+/* Ticket #16: GFM task list items (`- [ ] ` / `- [x] `). The checkbox
+   itself is a widget decoration (editor/decorations.ts
+   `TaskCheckboxWidget`), not raw text - styling here only covers the
+   line and the checked-state strikethrough. */
+#editor-host .cf-task {
+  list-style: none;
+}
+
+#editor-host .cf-task-checked {
+  color: var(--text-secondary);
+  text-decoration: line-through;
+}
+
+#editor-host .cf-task-checkbox {
+  margin-right: 6px;
+  cursor: pointer;
+  vertical-align: middle;
+}
+
 /* Syntax markers: hidden while the cursor/selection is outside their
    node (Typora-style Live Preview), shown (dimmed, not deleted from the
    document) while the cursor/selection is inside - see decorations.ts

@@ -1,6 +1,13 @@
 import { syntaxTree } from '@codemirror/language'
-import { Decoration, type DecorationSet, type EditorView } from '@codemirror/view'
-import { RangeSetBuilder, type EditorState, type EditorSelection } from '@codemirror/state'
+import {
+  Decoration,
+  ViewPlugin,
+  WidgetType,
+  type DecorationSet,
+  type EditorView,
+  type ViewUpdate
+} from '@codemirror/view'
+import { RangeSetBuilder, type EditorState, type EditorSelection, type Extension } from '@codemirror/state'
 import type { SyntaxNode } from '@lezer/common'
 
 /**
@@ -53,6 +60,17 @@ const MARK_CONTAINER_NODES = new Set([
 
 /** Node names whose own range *is* a syntax marker (hidden unless active). */
 const MARKER_NODE_NAMES = new Set(['HeaderMark', 'EmphasisMark', 'CodeMark', 'QuoteMark', 'ListMark', 'LinkMark', 'URL'])
+
+/**
+ * Ticket #16 acceptance criterion #2 (task lists `- [ ] ` / `- [x] `).
+ * `TaskMarker` (the `[ ]`/`[x]` itself, produced by `@lezer/markdown`'s
+ * `TaskList` GFM extension - enabled in init.ts) is NOT put in
+ * `MARKER_NODE_NAMES`: unlike `#`/`**`/`` ` ``, the checkbox glyph is
+ * useful to see even when the cursor isn't there (that's the whole point
+ * of a checkbox), so it's handled by its own always-on widget decoration
+ * in `taskCheckboxDecorations` below instead of the hide-unless-active
+ * marker mechanism used for the other syntaxes.
+ */
 
 /**
  * The Lezer markdown grammar (`@lezer/markdown`) parses *any* `[...]`
@@ -210,6 +228,21 @@ export function buildWysiwygDecorations(
           break
         }
 
+        case 'Task': {
+          // Ticket #16 acceptance criterion #2: `- [ ] ` / `- [x] ` task
+          // list items. The checked state is read straight from the
+          // source text (`[x]` vs `[ ]`/`[X]`), not tracked separately,
+          // so there is no risk of the visual state and the on-disk
+          // bytes disagreeing.
+          const checked = /\[[xX]\]/.test(state.doc.sliceString(node.from, node.to))
+          const line = state.doc.lineAt(node.from)
+          lineDecosByPos.push({
+            pos: line.from,
+            deco: Decoration.line({ class: checked ? 'cf-task cf-task-checked' : 'cf-task' })
+          })
+          break
+        }
+
         case 'FencedCode':
         case 'CodeBlock': {
           const startLine = state.doc.lineAt(node.from).number
@@ -300,6 +333,127 @@ export function frontmatterLineDecoration(fromLine: number, toLine: number, stat
     builder.add(line.from, line.from, Decoration.line({ class: 'cf-frontmatter' }))
   }
   return builder.finish()
+}
+
+/**
+ * Ticket #16: renders a `- [ ] ` / `- [x] ` task marker as a clickable
+ * checkbox instead of raw `[ ]`/`[x]` text. This is the one acceptance
+ * criterion (#2, task list checkbox UI) that the spec explicitly calls
+ * out as a pure view-layer concern, not a markdown-structure change -
+ * see the ticket brief. Implemented as `Decoration.replace` (hides the
+ * 3-character `TaskMarker` range, shows a `<input type="checkbox">` in
+ * its place) rather than deleting/rewriting anything in the document.
+ *
+ * Clicking the checkbox dispatches a single minimal-diff transaction
+ * that replaces only those same 3 characters (`[ ]` <-> `[x]`) - never
+ * a wider rewrite - keeping the "on-disk bytes match what the user
+ * typed" invariant intact (the click itself counts as the user's edit,
+ * same as if they'd retyped the character by hand).
+ */
+export class TaskCheckboxWidget extends WidgetType {
+  constructor(readonly checked: boolean) {
+    super()
+  }
+
+  eq(other: TaskCheckboxWidget): boolean {
+    return other.checked === this.checked
+  }
+
+  toDOM(): HTMLElement {
+    const box = document.createElement('input')
+    box.type = 'checkbox'
+    box.checked = this.checked
+    box.className = 'cf-task-checkbox'
+    return box
+  }
+
+  ignoreEvent(event: Event): boolean {
+    // Only handle direct clicks on the checkbox itself; let CM6 handle
+    // everything else (e.g. selection changes from other mouse events)
+    // normally.
+    return event.type !== 'mousedown' && event.type !== 'click'
+  }
+}
+
+/**
+ * Pure helper for the click handler: given the current `[ ]`/`[x]` (or
+ * `[X]`) text of a TaskMarker, returns the 3-character replacement text
+ * that flips its checked state. Kept separate from the event handler so
+ * the toggle logic itself is unit-testable without a live EditorView/DOM.
+ */
+export function toggledTaskMarkerText(currentMarkerText: string): string {
+  return /\[[xX]\]/.test(currentMarkerText) ? '[ ]' : '[x]'
+}
+
+export function taskCheckboxDecorations(state: EditorState): DecorationSet {
+  const builder = new RangeSetBuilder<Decoration>()
+  const tree = syntaxTree(state)
+  const items: Array<{ from: number; to: number; checked: boolean }> = []
+
+  tree.iterate({
+    enter(node) {
+      if (node.name !== 'TaskMarker') return
+      const text = state.doc.sliceString(node.from, node.to)
+      items.push({ from: node.from, to: node.to, checked: /\[[xX]\]/.test(text) })
+    }
+  })
+
+  items.sort((a, b) => a.from - b.from)
+  for (const item of items) {
+    builder.add(
+      item.from,
+      item.to,
+      Decoration.replace({ widget: new TaskCheckboxWidget(item.checked) })
+    )
+  }
+
+  return builder.finish()
+}
+
+/**
+ * The view plugin wrapper: rebuilds the checkbox decorations on doc
+ * changes and wires the click handler that flips `[ ]` <-> `[x]` in the
+ * document (see `TaskCheckboxWidget` doc comment above for why this is
+ * safe under the minimal-diff invariant).
+ */
+export function taskCheckboxPlugin(): Extension {
+  return ViewPlugin.fromClass(
+    class {
+      decorations: DecorationSet
+
+      constructor(view: EditorView) {
+        this.decorations = taskCheckboxDecorations(view.state)
+      }
+
+      update(update: ViewUpdate): void {
+        if (update.docChanged) {
+          this.decorations = taskCheckboxDecorations(update.view.state)
+        }
+      }
+    },
+    {
+      decorations: (v) => v.decorations,
+      eventHandlers: {
+        mousedown(event, view) {
+          const target = event.target as HTMLElement | null
+          if (!target || !target.classList.contains('cf-task-checkbox')) return false
+
+          const pos = view.posAtDOM(target)
+          const tree = syntaxTree(view.state)
+          const node = tree.resolveInner(pos, 1)
+          const marker = node.name === 'TaskMarker' ? node : null
+          if (!marker) return false
+
+          const text = view.state.doc.sliceString(marker.from, marker.to)
+          view.dispatch({
+            changes: { from: marker.from, to: marker.to, insert: toggledTaskMarkerText(text) }
+          })
+          event.preventDefault()
+          return true
+        }
+      }
+    }
+  )
 }
 
 export type { EditorView }
