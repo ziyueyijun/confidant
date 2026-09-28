@@ -1,12 +1,16 @@
 import './styles/editor.css'
-import { createReadOnlyMarkdownEditor } from './editor/init'
+import { createMarkdownEditor, type MarkdownEditorHandle } from './editor/init'
 import { applyEditorWidth, applyTheme } from './theme/applyTheme'
 import { EDITOR_WIDTH_OPTIONS, type EditorWidth, type ThemeName } from '@shared/theme'
+import type { FileEncodingInfo } from '../../preload/index'
 
 /**
  * Ticket #14 scope: open a single file (via command-line arg passed
- * through preload, falling back to a bundled sample doc) and render it
- * read-only. No file tree, tabs, editing, or autosave yet.
+ * through preload, falling back to a bundled sample doc) and render it.
+ *
+ * Ticket #15 scope: render it with live Typora-style editing and
+ * autosave it back to disk. Still no file tree or tabs (#17) -
+ * single-document only.
  *
  * Ticket #18 scope: load/apply/persist the light/dark theme and editor
  * width. No settings panel UI yet (deferred, per ticket) beyond the
@@ -24,11 +28,18 @@ async function bootstrap(): Promise<void> {
 
   const filePath = await window.api.getInitialFilePath()
   let content: string
+  // Files opened from disk carry whatever BOM/line-ending they already
+  // have; the sample doc (no file on disk yet) defaults to "no BOM" -
+  // the spec's "新建文件用 CRLF" default is handled by
+  // `detectLineEnding()` in the main process the first time a brand new
+  // file is saved, so nothing extra is needed on the renderer side here.
+  let encoding: FileEncodingInfo = { hasBOM: false, lineEnding: 'CRLF' }
 
   if (filePath) {
     try {
       const result = await window.api.readFile(filePath)
       content = result.content
+      encoding = result.encoding
       if (result.warning) {
         // UI treatment (e.g. a visible banner) lands in a later ticket;
         // for #14 we only need the main process to detect and surface this.
@@ -41,7 +52,37 @@ async function bootstrap(): Promise<void> {
     content = SAMPLE_DOC
   }
 
-  createReadOnlyMarkdownEditor(host, content)
+  const lineSeparator = encoding.lineEnding === 'CRLF' ? '\r\n' : '\n'
+  const handle = createMarkdownEditor(
+    host,
+    content,
+    async (docContent) => {
+      if (!filePath) return // Nothing to save back to when there's no file on disk (sample doc).
+      await window.api.writeFile(filePath, docContent, { hasBOM: encoding.hasBOM })
+    },
+    lineSeparator
+  )
+
+  wireLifecycleFlush(handle)
+}
+
+/**
+ * Ticket #15 acceptance criterion #3: save on blur (handled inside
+ * createMarkdownEditor via the contentDOM blur listener) and on
+ * tab/window close. `visibilitychange`+`beforeunload` cover both "user
+ * switches away from this window/tab" and "window is being closed" -
+ * the same hook point ticket #17 will reuse per-tab.
+ */
+function wireLifecycleFlush(handle: MarkdownEditorHandle): void {
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'hidden') {
+      void handle.flushSave()
+    }
+  })
+
+  window.addEventListener('beforeunload', () => {
+    void handle.flushSave()
+  })
 }
 
 /**
@@ -102,15 +143,17 @@ tags: [demo]
 
 # Confidant
 
-This is a **read-only** WYSIWYG preview rendered by *CodeMirror 6*.
+This is an editable **WYSIWYG** preview rendered by *CodeMirror 6*. Move
+your cursor into this bold text, or into a \`code span\`, to see the
+markdown syntax markers appear.
 
-> Open a file from the command line to render your own markdown.
+> Open a file from the command line to load and autosave your own markdown.
 
-- input rules
-- autosave
-- editing
+- click into a list item to see its marker
+- edits autosave 500ms after you stop typing
+- no file tree or tabs yet - those land in ticket #17
 
-Those land in later tickets. This ticket only proves the render pipeline works: \`main -> preload -> renderer -> CodeMirror\`.
+This sample document isn't backed by a file on disk, so edits here aren't persisted; open a real \`.md\` file to see autosave write to disk.
 `
 
 bootstrap().catch((err) => {

@@ -181,10 +181,6 @@ body {
   font-size: 13px;
 }
 
-#editor-host .cf-list-mark {
-  color: var(--text-secondary);
-}
-
 #editor-host .cf-link {
   color: var(--accent);
   text-decoration: underline;
@@ -206,8 +202,14 @@ body {
   border-bottom: 2px solid var(--border);
 }
 
-/* Syntax markers hidden in WYSIWYG mode (read-only: always hidden,
-   since there is no cursor-driven show/hide yet — that's #15/#16). */
+/* Syntax markers: hidden while the cursor/selection is outside their
+   node (Typora-style Live Preview), shown (dimmed, not deleted from the
+   document) while the cursor/selection is inside - see decorations.ts
+   `computeActiveNodeRanges`/`buildWysiwygDecorations` (#15). */
 #editor-host .cf-syntax-hidden {
   display: none;
+}
+
+#editor-host .cf-syntax-visible {
+  color: var(--text-secondary);
 }

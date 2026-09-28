@@ -1,7 +1,7 @@
 import { app, shell, BrowserWindow, ipcMain } from 'electron'
 import { join } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
-import { readFile, type ReadFileResult } from './fileSystem'
+import { readFile, writeMarkdownFile, type ReadFileResult, type FileEncodingInfo } from './fileSystem'
 import { findMarkdownPathInArgv } from './cli'
 import { readThemeConfig, writeThemeConfig } from './themeStore'
 import type { ThemeConfig } from '../shared/theme'
@@ -46,6 +46,18 @@ app.whenReady().then(() => {
   ipcMain.handle('file:read', async (_event, filePath: string): Promise<ReadFileResult> => {
     return readFile(filePath)
   })
+
+  ipcMain.handle(
+    'file:write',
+    async (
+      _event,
+      filePath: string,
+      content: string,
+      encoding: Pick<FileEncodingInfo, 'hasBOM'>
+    ): Promise<void> => {
+      return writeMarkdownFile(filePath, content, encoding)
+    }
+  )
 
   const initialFilePath = findMarkdownPathInArgv(process.argv)
   ipcMain.handle('app:initialFilePath', () => initialFilePath)
