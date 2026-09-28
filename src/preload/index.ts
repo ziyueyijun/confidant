@@ -1,5 +1,8 @@
 import { contextBridge, ipcRenderer } from 'electron'
 import type { ThemeConfig } from '../shared/theme'
+import type { LibraryConfig } from '../shared/library'
+import type { FileTreeNode } from '../shared/fileTree'
+export type { FileTreeNode } from '../shared/fileTree'
 
 /**
  * Result of `file:read`. `warning` is set when the main process detects
@@ -45,7 +48,21 @@ const api = {
   /** Reads the persisted theme config, or defaults if none was saved yet. */
   getTheme: (): Promise<ThemeConfig> => ipcRenderer.invoke('theme:get'),
   /** Persists the theme config (ticket #18: light/dark + editor width). */
-  setTheme: (config: ThemeConfig): Promise<void> => ipcRenderer.invoke('theme:set', config)
+  setTheme: (config: ThemeConfig): Promise<void> => ipcRenderer.invoke('theme:set', config),
+  /** Reads the persisted "recently opened libraries" list (ticket #17, max 5). */
+  getRecentLibraries: (): Promise<LibraryConfig> => ipcRenderer.invoke('library:getRecent'),
+  /**
+   * Opens a native folder-picker dialog. Resolves with the chosen
+   * absolute path (and records it as most-recently-opened), or `null` if
+   * the user cancelled.
+   */
+  openLibraryDialog: (): Promise<string | null> => ipcRenderer.invoke('library:openDialog'),
+  /** Records `libraryPath` as most-recently-opened (used when reopening from the recents list). */
+  recordLibraryOpened: (libraryPath: string): Promise<void> =>
+    ipcRenderer.invoke('library:recordOpened', libraryPath),
+  /** Recursively lists a library folder's visible file tree (ticket #17). */
+  listDirectoryTree: (rootPath: string): Promise<FileTreeNode[]> =>
+    ipcRenderer.invoke('fs:listDirectoryTree', rootPath)
 }
 
 contextBridge.exposeInMainWorld('api', api)

@@ -21,9 +21,34 @@
       >
         &#8596;
       </button>
-      <div id="editor-area">
-        <div id="editor-container">
-          <div id="editor-host"></div>
+      <button
+        id="open-library-button"
+        type="button"
+        title="Open library folder"
+        aria-label="Open library folder"
+      >
+        &#128194;
+      </button>
+      <div id="workspace">
+        <aside id="sidebar">
+          <div id="sidebar-header">
+            <button
+              id="sidebar-collapse-toggle"
+              type="button"
+              title="Collapse/expand sidebar"
+              aria-label="Collapse/expand sidebar"
+            >
+              &#9776;
+            </button>
+            <span id="library-name"></span>
+          </div>
+          <div id="file-tree"></div>
+        </aside>
+        <div id="main-column">
+          <div id="tab-bar" role="tablist"></div>
+          <div id="editor-area">
+            <div id="editor-hosts"></div>
+          </div>
         </div>
       </div>
     </div>
