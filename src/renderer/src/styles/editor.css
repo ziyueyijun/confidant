@@ -140,11 +140,27 @@ body {
 }
 
 #library-name {
+  flex: 1;
   font-size: 13px;
   color: var(--text-secondary);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+#sidebar-search-toggle {
+  border: none;
+  background: transparent;
+  color: var(--text-primary);
+  cursor: pointer;
+  font-size: 14px;
+  padding: 4px 6px;
+  border-radius: 4px;
+  flex: 0 0 auto;
+}
+
+#sidebar-search-toggle:hover {
+  background: var(--bg-tertiary);
 }
 
 #file-tree {
@@ -240,6 +256,170 @@ body {
   border: 1px solid var(--accent);
   border-radius: 3px;
   padding: 1px 4px;
+}
+
+/* Ticket #22: full-text search sidebar panel. */
+.cf-search-sidebar {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  padding: 8px;
+  gap: 6px;
+  overflow: hidden;
+}
+
+.cf-search-sidebar-input-row {
+  display: flex;
+}
+
+.cf-search-sidebar-input {
+  flex: 1;
+  padding: 6px 8px;
+  font-size: 13px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--bg-primary);
+  color: var(--text-primary);
+}
+
+.cf-search-sidebar-options {
+  display: flex;
+  gap: 4px;
+}
+
+.cf-search-option-toggle {
+  flex: 0 0 auto;
+  width: 28px;
+  height: 24px;
+  padding: 0;
+  font-size: 12px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--bg-primary);
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+
+.cf-search-option-toggle:hover {
+  background: var(--bg-tertiary);
+}
+
+.cf-search-option-active {
+  background: var(--accent);
+  color: #fff;
+  border-color: var(--accent);
+}
+
+.cf-search-sidebar-status {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 12px;
+  color: var(--text-secondary);
+  gap: 6px;
+}
+
+.cf-search-sidebar-cancel {
+  flex: 0 0 auto;
+  padding: 2px 8px;
+  font-size: 12px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  cursor: pointer;
+}
+
+.cf-search-sidebar-cancel:hover {
+  background: var(--bg-tertiary);
+}
+
+.cf-search-sidebar-results {
+  flex: 1;
+  overflow: auto;
+}
+
+.cf-search-result-file {
+  margin-bottom: 4px;
+}
+
+.cf-search-result-file summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 4px 6px;
+  font-size: 13px;
+  cursor: pointer;
+  border-radius: 4px;
+  list-style: none;
+}
+
+.cf-search-result-file summary::-webkit-details-marker {
+  display: none;
+}
+
+.cf-search-result-file summary:hover {
+  background: var(--bg-tertiary);
+}
+
+.cf-search-result-filename {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 600;
+}
+
+.cf-search-result-count {
+  flex: 0 0 auto;
+  margin-left: 8px;
+  padding: 0 6px;
+  font-size: 11px;
+  border-radius: 8px;
+  background: var(--bg-tertiary);
+  color: var(--text-secondary);
+}
+
+.cf-search-result-matches {
+  list-style: none;
+  margin: 0;
+  padding-left: 8px;
+}
+
+.cf-search-result-match {
+  padding: 4px 6px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-family: 'Consolas', 'Monaco', monospace;
+  font-size: 12px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.cf-search-result-match:hover {
+  background: var(--bg-tertiary);
+}
+
+.cf-search-result-context {
+  color: var(--text-secondary);
+  opacity: 0.75;
+}
+
+.cf-search-result-match-line {
+  color: var(--text-primary);
+}
+
+.cf-search-result-highlight {
+  background: #ffe066;
+  color: #1a1a1a;
+  border-radius: 2px;
+}
+
+.cf-search-result-more {
+  padding: 4px 6px;
+  font-size: 12px;
+  color: var(--text-secondary);
 }
 
 #main-column {
@@ -719,4 +899,11 @@ body {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+/* Ticket #22 acceptance criterion #5: transient 3s line highlight when a
+   full-text search result is clicked (see editor/revealLine.ts). */
+.cf-editor-host .cf-line-highlight {
+  background: rgba(255, 224, 102, 0.35);
+  transition: background-color 0.3s ease;
 }

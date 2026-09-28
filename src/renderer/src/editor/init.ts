@@ -8,6 +8,7 @@ import { buildWysiwygDecorations, frontmatterLineDecoration, taskCheckboxPlugin 
 import { splitFrontmatter } from '../lib/markdown'
 import { createAutosaveController, type AutosaveController } from './autosave'
 import { attachSearchPanel, findKeymapExtension, searchExtensions, type SearchPanelHandle } from './searchPanel'
+import { revealAndHighlightLine, revealLineExtensions } from './revealLine'
 
 /**
  * Ticket #15: the editor is now live.
@@ -146,6 +147,12 @@ export interface MarkdownEditorHandle {
   reloadContent: (content: string) => void
   /** Tears down autosave timers. Call when the editor is being discarded. */
   destroy: () => void
+  /**
+   * Ticket #22 acceptance criterion #5: scrolls to `lineNumber` (1-based)
+   * and flashes a highlight on it for 3 seconds. Used when the user
+   * clicks a full-text search result.
+   */
+  revealLine: (lineNumber: number) => void
 }
 
 /**
@@ -215,6 +222,7 @@ export function createMarkdownEditor(
       taskCheckboxPlugin(),
       searchExtensions(),
       findKeymapExtension(() => searchPanelRef),
+      revealLineExtensions(),
       autosaveExtension,
       EditorView.theme({
         '&': { height: '100%' },
@@ -278,6 +286,7 @@ export function createMarkdownEditor(
       searchPanelRef?.destroy()
       controller.dispose()
       viewRef.destroy()
-    }
+    },
+    revealLine: (lineNumber: number) => revealAndHighlightLine(viewRef, lineNumber)
   }
 }
