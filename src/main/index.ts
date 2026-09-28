@@ -3,6 +3,8 @@ import { join } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import { readFile, type ReadFileResult } from './fileSystem'
 import { findMarkdownPathInArgv } from './cli'
+import { readThemeConfig, writeThemeConfig } from './themeStore'
+import type { ThemeConfig } from '../shared/theme'
 
 function createWindow(): void {
   const mainWindow = new BrowserWindow({
@@ -47,6 +49,14 @@ app.whenReady().then(() => {
 
   const initialFilePath = findMarkdownPathInArgv(process.argv)
   ipcMain.handle('app:initialFilePath', () => initialFilePath)
+
+  ipcMain.handle('theme:get', async (): Promise<ThemeConfig> => {
+    return readThemeConfig(app.getPath('userData'))
+  })
+
+  ipcMain.handle('theme:set', async (_event, config: ThemeConfig): Promise<void> => {
+    await writeThemeConfig(app.getPath('userData'), config)
+  })
 
   createWindow()
 

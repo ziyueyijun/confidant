@@ -10,7 +10,7 @@ function decorationClasses(doc: string): string[] {
   const classes: string[] = []
   decos.between(0, doc.length, (_from, _to, deco) => {
     const cls = (deco.spec as { class?: string }).class
-    if (cls) classes.push(cls)
+    if (cls) classes.push(...cls.split(' '))
   })
   return classes
 }
@@ -46,6 +46,15 @@ describe('buildWysiwygDecorations', () => {
   it('marks fenced code block lines', () => {
     const classes = decorationClasses('```js\nconst x = 1\n```\n')
     expect(classes).toContain('cf-code-block')
+  })
+
+  it('tags the first and last line of a fenced code block for the CSS border (#18)', () => {
+    const classes = decorationClasses('```js\nconst x = 1\nconst y = 2\n```\n')
+    expect(classes).toContain('cf-code-block-start')
+    expect(classes).toContain('cf-code-block-end')
+    // The middle line should carry the base class only, no start/end marker.
+    expect(classes.filter((c) => c === 'cf-code-block-start').length).toBe(1)
+    expect(classes.filter((c) => c === 'cf-code-block-end').length).toBe(1)
   })
 
   it('marks link text and hides the [ ]( url ) syntax markers', () => {

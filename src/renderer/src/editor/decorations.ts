@@ -86,7 +86,15 @@ export function buildWysiwygDecorations(state: EditorState): DecorationSet {
           const endLine = state.doc.lineAt(node.to).number
           for (let ln = startLine; ln <= endLine; ln++) {
             const line = state.doc.line(ln)
-            lineDecosByPos.push({ pos: line.from, deco: Decoration.line({ class: 'cf-code-block' }) })
+            // #18: tag the first/last line separately so CSS can draw a
+            // single 1px border around the whole block (top+sides on the
+            // first line, bottom+sides on the last) instead of a border
+            // on every line, while the detection logic (which lines
+            // belong to the code block) is unchanged from #14.
+            let cls = 'cf-code-block'
+            if (ln === startLine) cls += ' cf-code-block-start'
+            if (ln === endLine) cls += ' cf-code-block-end'
+            lineDecosByPos.push({ pos: line.from, deco: Decoration.line({ class: cls }) })
           }
           break
         }
