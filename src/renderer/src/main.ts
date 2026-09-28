@@ -6,6 +6,8 @@ import type { FileEncodingInfo, FileTreeNode } from '../../preload/index'
 import { openTab, focusTab, closeTab, EMPTY_TAB_STATE, type TabState } from './tabs/tabState'
 import { renderTabBar } from './tabs/tabBarView'
 import { renderFileTree } from './sidebar/fileTreeView'
+import { flattenMarkdownFiles } from '@shared/fileTree'
+import { createQuickSwitcher } from './quickSwitcher/quickSwitcherPanel'
 
 /**
  * Ticket #14 scope: open a single file (via command-line arg passed
@@ -52,6 +54,13 @@ async function bootstrap(): Promise<void> {
   let tabState: TabState = EMPTY_TAB_STATE
   const documents = new Map<string, OpenDocument>()
 
+  // Ticket #21: Ctrl+P quick switcher. Global overlay, independent of any
+  // editor instance - opening a result routes through `openFileInTab`
+  // below (same tab-open path the sidebar uses).
+  const quickSwitcher = createQuickSwitcher({
+    onOpenFile: (path) => void openFileInTab(path)
+  })
+
   function rerenderTabBar(): void {
     renderTabBar(tabBarContainer!, tabState, {
       onSelectTab: (path) => void switchToTab(path),
@@ -67,6 +76,11 @@ async function bootstrap(): Promise<void> {
       onOpenFile: (path) => void openFileInTab(path),
       isActive: (path) => path === tabState.activePath
     })
+    // Ticket #21: keep the quick switcher's candidate list in sync with
+    // whatever library is currently open.
+    quickSwitcher.setFiles(
+      flattenMarkdownFiles(nodes).map((node) => ({ path: node.path, name: node.name }))
+    )
   }
 
   /**
@@ -115,6 +129,8 @@ async function bootstrap(): Promise<void> {
     if (result.didOpen) {
       await createDocumentForTab(path)
     }
+
+    quickSwitcher.recordOpened(path) // ticket #21: track for the switcher's default recent view
 
     rerenderTabBar()
     rerenderFileTreeActiveHighlight()

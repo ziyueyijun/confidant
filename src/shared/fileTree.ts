@@ -79,3 +79,23 @@ export function isMarkdownFile(name: string): boolean {
   const ext = name.slice(name.lastIndexOf('.')).toLowerCase()
   return ext === '.md' || ext === '.markdown'
 }
+
+/**
+ * Ticket #21: flattens the recursive file tree into a flat list of
+ * markdown files, for the Ctrl+P quick switcher's fuzzy matching (which
+ * needs a flat "all files in the library" list, not a tree). Only
+ * markdown files are included - the quick switcher opens files into
+ * editor tabs, and (per #17) only markdown files are openable that way;
+ * images/PDFs/txt would just error out if selected.
+ */
+export function flattenMarkdownFiles(nodes: FileTreeNode[]): FileTreeNode[] {
+  const result: FileTreeNode[] = []
+  for (const node of nodes) {
+    if (node.kind === 'directory') {
+      if (node.children) result.push(...flattenMarkdownFiles(node.children))
+    } else if (isMarkdownFile(node.name)) {
+      result.push(node)
+    }
+  }
+  return result
+}
