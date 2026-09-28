@@ -70,7 +70,8 @@ describe('buildWysiwygDecorations (cursor outside every node)', () => {
   })
 
   it('tags the first and last line of a fenced code block for the CSS border (#18)', () => {
-    const classes = decorationClasses('```js\nconst x = 1\nconst y = 2\n```\n')
+    const doc = '```js\nconst x = 1\nconst y = 2\n```\n'
+    const classes = decorationClasses(doc, doc.length)
     expect(classes).toContain('cf-code-block-start')
     expect(classes).toContain('cf-code-block-end')
     // The middle line should carry the base class only, no start/end marker.
