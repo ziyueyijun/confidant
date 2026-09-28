@@ -1,9 +1,10 @@
 import { Annotation, EditorState, type Extension } from '@codemirror/state'
-import { EditorView, ViewPlugin, type DecorationSet, type ViewUpdate } from '@codemirror/view'
+import { EditorView, ViewPlugin, keymap, type DecorationSet, type ViewUpdate } from '@codemirror/view'
+import { defaultKeymap, history, historyKeymap } from '@codemirror/commands'
 import { markdown } from '@codemirror/lang-markdown'
-import { Table } from '@lezer/markdown'
+import { Table, TaskList } from '@lezer/markdown'
 import { languages } from '@codemirror/language-data'
-import { buildWysiwygDecorations, frontmatterLineDecoration } from './decorations'
+import { buildWysiwygDecorations, frontmatterLineDecoration, taskCheckboxPlugin } from './decorations'
 import { splitFrontmatter } from '../lib/markdown'
 import { createAutosaveController, type AutosaveController } from './autosave'
 import { attachSearchPanel, findKeymapExtension, searchExtensions, type SearchPanelHandle } from './searchPanel'
@@ -194,10 +195,24 @@ export function createMarkdownEditor(
     doc: content,
     extensions: [
       EditorState.lineSeparator.of(lineSeparator),
-      markdown({ codeLanguages: languages, extensions: [Table] }),
+      markdown({ codeLanguages: languages, extensions: [Table, TaskList] }),
       EditorView.lineWrapping,
+      // Ticket #16 acceptance criteria #6/#7: CM6's own undo/redo stack.
+      // `history()` groups consecutive edits into one undo unit when they
+      // land within `newGroupDelay` (defaults to 500ms, matching the
+      // acceptance criterion exactly) of each other, and splits them into
+      // separate units otherwise - this is stock CM6 behavior, not
+      // something built for this ticket. `historyKeymap` binds Ctrl/Cmd+Z
+      // and Ctrl/Cmd+Shift+Z (or Ctrl+Y) to it. `defaultKeymap` is also
+      // added here because without it basic editing commands (e.g.
+      // Backspace merging list items, Enter continuing indentation) fall
+      // back to raw contentEditable behavior instead of CM6's - this
+      // wasn't wired up by #14/#15 yet.
+      history(),
+      keymap.of([...defaultKeymap, ...historyKeymap]),
       frontmatterPlugin(content),
       wysiwygPlugin(),
+      taskCheckboxPlugin(),
       searchExtensions(),
       findKeymapExtension(() => searchPanelRef),
       autosaveExtension,
