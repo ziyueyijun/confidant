@@ -1,0 +1,491 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>界面布局原型 - Confidant</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Microsoft YaHei", sans-serif;
+      height: 100vh;
+      overflow: hidden;
+    }
+
+    /* 主题切换 */
+    body.light {
+      --bg-primary: #ffffff;
+      --bg-secondary: #f5f5f5;
+      --bg-tertiary: #e8e8e8;
+      --text-primary: #1a1a1a;
+      --text-secondary: #666666;
+      --border: #d0d0d0;
+      --accent: #0066cc;
+      --hover: #e8f2ff;
+    }
+
+    body.dark {
+      --bg-primary: #1e1e1e;
+      --bg-secondary: #252526;
+      --bg-tertiary: #2d2d2d;
+      --text-primary: #d4d4d4;
+      --text-secondary: #858585;
+      --border: #3e3e42;
+      --accent: #4a9eff;
+      --hover: #2a2d2e;
+    }
+
+    #app {
+      display: flex;
+      height: 100vh;
+      background: var(--bg-primary);
+      color: var(--text-primary);
+    }
+
+    /* 侧边栏 */
+    #sidebar {
+      width: 260px;
+      background: var(--bg-secondary);
+      border-right: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      transition: width 0.2s;
+    }
+
+    #sidebar.collapsed {
+      width: 0;
+      overflow: hidden;
+    }
+
+    #sidebar-header {
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    #sidebar-header h2 {
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--text-primary);
+    }
+
+    .icon-btn {
+      width: 24px;
+      height: 24px;
+      border: none;
+      background: transparent;
+      color: var(--text-secondary);
+      cursor: pointer;
+      border-radius: 4px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 16px;
+    }
+
+    .icon-btn:hover {
+      background: var(--hover);
+      color: var(--text-primary);
+    }
+
+    /* 文件树 */
+    #file-tree {
+      flex: 1;
+      overflow-y: auto;
+      padding: 8px 0;
+    }
+
+    .tree-item {
+      padding: 4px 16px;
+      cursor: pointer;
+      font-size: 13px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      color: var(--text-primary);
+    }
+
+    .tree-item:hover {
+      background: var(--hover);
+    }
+
+    .tree-item.active {
+      background: var(--accent);
+      color: #ffffff;
+    }
+
+    .tree-item.folder {
+      font-weight: 500;
+    }
+
+    .tree-item.file {
+      padding-left: 32px;
+    }
+
+    .tree-icon {
+      width: 16px;
+      text-align: center;
+    }
+
+    /* 主区域 */
+    #main {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    /* 标签页 */
+    #tabs {
+      display: flex;
+      background: var(--bg-secondary);
+      border-bottom: 1px solid var(--border);
+      overflow-x: auto;
+      padding: 0 8px;
+    }
+
+    .tab {
+      padding: 8px 16px;
+      border: none;
+      background: transparent;
+      color: var(--text-secondary);
+      cursor: pointer;
+      font-size: 13px;
+      border-bottom: 2px solid transparent;
+      white-space: nowrap;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .tab:hover {
+      background: var(--hover);
+      color: var(--text-primary);
+    }
+
+    .tab.active {
+      color: var(--text-primary);
+      border-bottom-color: var(--accent);
+    }
+
+    .tab-close {
+      font-size: 14px;
+      opacity: 0;
+    }
+
+    .tab:hover .tab-close {
+      opacity: 1;
+    }
+
+    /* 编辑区 */
+    #editor-area {
+      flex: 1;
+      overflow: auto;
+      background: var(--bg-primary);
+    }
+
+    #editor-container {
+      max-width: 800px;
+      margin: 0 auto;
+      padding: 40px 20px;
+    }
+
+    /* 编辑器样式 */
+    .editor-content h1 {
+      font-size: 32px;
+      font-weight: 700;
+      margin: 24px 0 16px 0;
+      color: var(--text-primary);
+    }
+
+    .editor-content h2 {
+      font-size: 24px;
+      font-weight: 600;
+      margin: 20px 0 12px 0;
+      color: var(--text-primary);
+    }
+
+    .editor-content h3 {
+      font-size: 20px;
+      font-weight: 600;
+      margin: 16px 0 10px 0;
+      color: var(--text-primary);
+    }
+
+    .editor-content p {
+      font-size: 16px;
+      line-height: 1.8;
+      margin: 12px 0;
+      color: var(--text-primary);
+    }
+
+    .editor-content strong {
+      font-weight: 600;
+      color: var(--text-primary);
+    }
+
+    .editor-content code {
+      background: var(--bg-tertiary);
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-family: 'Consolas', 'Monaco', monospace;
+      font-size: 14px;
+      color: var(--text-primary);
+    }
+
+    .editor-content pre {
+      background: var(--bg-secondary);
+      padding: 16px;
+      border-radius: 6px;
+      overflow-x: auto;
+      margin: 16px 0;
+      border: 1px solid var(--border);
+    }
+
+    .editor-content pre code {
+      background: none;
+      padding: 0;
+    }
+
+    .editor-content blockquote {
+      border-left: 4px solid var(--accent);
+      padding-left: 16px;
+      margin: 16px 0;
+      color: var(--text-secondary);
+      font-style: italic;
+    }
+
+    .editor-content ul, .editor-content ol {
+      padding-left: 24px;
+      margin: 12px 0;
+    }
+
+    .editor-content li {
+      margin: 6px 0;
+      line-height: 1.8;
+    }
+
+    /* Frontmatter */
+    .frontmatter {
+      background: var(--bg-tertiary);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 12px 16px;
+      margin-bottom: 24px;
+      font-family: 'Consolas', monospace;
+      font-size: 13px;
+      color: var(--text-secondary);
+    }
+
+    /* 控制面板 */
+    #controls {
+      position: fixed;
+      bottom: 20px;
+      right: 20px;
+      background: var(--bg-secondary);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 12px 16px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+      z-index: 1000;
+    }
+
+    #controls label {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 8px;
+      font-size: 13px;
+      cursor: pointer;
+    }
+
+    #controls input[type="checkbox"] {
+      width: 16px;
+      height: 16px;
+      cursor: pointer;
+    }
+
+    #controls select {
+      width: 100%;
+      padding: 6px 8px;
+      margin-top: 4px;
+      background: var(--bg-primary);
+      color: var(--text-primary);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      font-size: 13px;
+    }
+
+    .divider {
+      height: 1px;
+      background: var(--border);
+      margin: 8px 0;
+    }
+  </style>
+</head>
+<body class="light">
+  <div id="app">
+    <!-- 侧边栏 -->
+    <div id="sidebar">
+      <div id="sidebar-header">
+        <h2>📁 笔记库</h2>
+        <button class="icon-btn" onclick="toggleSidebar()">◀</button>
+      </div>
+      <div id="file-tree">
+        <div class="tree-item folder">
+          <span class="tree-icon">📂</span>
+          <span>工作笔记</span>
+        </div>
+        <div class="tree-item file active">
+          <span class="tree-icon">📄</span>
+          <span>项目规划.md</span>
+        </div>
+        <div class="tree-item file">
+          <span class="tree-icon">📄</span>
+          <span>会议记录.md</span>
+        </div>
+        <div class="tree-item folder">
+          <span class="tree-icon">📂</span>
+          <span>学习笔记</span>
+        </div>
+        <div class="tree-item file">
+          <span class="tree-icon">📄</span>
+          <span>技术调研.md</span>
+        </div>
+        <div class="tree-item file">
+          <span class="tree-icon">📄</span>
+          <span>读书笔记.md</span>
+        </div>
+        <div class="tree-item folder">
+          <span class="tree-icon">📂</span>
+          <span>个人</span>
+        </div>
+        <div class="tree-item file">
+          <span class="tree-icon">📄</span>
+          <span>日记.md</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- 主区域 -->
+    <div id="main">
+      <!-- 标签页 -->
+      <div id="tabs">
+        <button class="tab active">
+          <span>项目规划.md</span>
+          <span class="tab-close">×</span>
+        </button>
+        <button class="tab">
+          <span>会议记录.md</span>
+          <span class="tab-close">×</span>
+        </button>
+        <button class="tab">
+          <span>技术调研.md</span>
+          <span class="tab-close">×</span>
+        </button>
+      </div>
+
+      <!-- 编辑区 -->
+      <div id="editor-area">
+        <div id="editor-container">
+          <div class="frontmatter">
+---
+title: 项目规划
+date: 2026-09-28
+tags: [工作, 规划]
+---
+          </div>
+
+          <div class="editor-content">
+            <h1>项目规划文档</h1>
+
+            <p>这是一个使用 <strong>CodeMirror 6</strong> 构建的 <strong>所见即所得</strong> Markdown 编辑器原型。</p>
+
+            <h2>核心特性</h2>
+
+            <ul>
+              <li>Typora 式真 inline WYSIWYG 编辑体验</li>
+              <li>最小 diff 保真（未编辑区域字节级不变）</li>
+              <li>文件夹 + 文件树 + 标签页的库管理</li>
+              <li>磁盘上永远是纯 <code>.md</code> 文件</li>
+            </ul>
+
+            <h2>技术栈</h2>
+
+            <p>经过调研和原型验证，我们选定了以下技术栈：</p>
+
+            <pre><code>Electron + CodeMirror 6
+├── 主进程：文件 I/O、监听
+├── 渲染进程：编辑器 UI
+└── Preload：安全边界</code></pre>
+
+            <h3>为什么选择 CodeMirror 6？</h3>
+
+            <blockquote>
+              架构上保证往返零损：buffer 即原文，未编辑区域零字节改动。
+            </blockquote>
+
+            <p>虽然 CM6 有光标/widget 交互问题，但这是为了保持与 Typora/VS Code 工具链兼容而必须接受的工程代价。</p>
+
+            <h2>下一步</h2>
+
+            <ol>
+              <li>完成剩余设计决定（搜索、图片处理）</li>
+              <li>撰写实现规格</li>
+              <li>交给实现 agent</li>
+            </ol>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 控制面板 -->
+  <div id="controls">
+    <label>
+      <input type="checkbox" id="toggle-sidebar" checked onchange="toggleSidebar()">
+      显示侧边栏
+    </label>
+
+    <div class="divider"></div>
+
+    <label>
+      <input type="radio" name="theme" value="light" checked onchange="setTheme('light')">
+      亮色主题
+    </label>
+    <label>
+      <input type="radio" name="theme" value="dark" onchange="setTheme('dark')">
+      暗色主题
+    </label>
+
+    <div class="divider"></div>
+
+    <label for="editor-width">编辑区宽度：</label>
+    <select id="editor-width" onchange="setEditorWidth(this.value)">
+      <option value="800">居中排版（800px）</option>
+      <option value="1000">宽排版（1000px）</option>
+      <option value="100%">满宽</option>
+    </select>
+  </div>
+
+  <script>
+    function toggleSidebar() {
+      const sidebar = document.getElementById('sidebar')
+      const checkbox = document.getElementById('toggle-sidebar')
+      sidebar.classList.toggle('collapsed')
+      checkbox.checked = !sidebar.classList.contains('collapsed')
+    }
+
+    function setTheme(theme) {
+      document.body.className = theme
+    }
+
+    function setEditorWidth(width) {
+      document.getElementById('editor-container').style.maxWidth = width
+    }
+  </script>
+</body>
+</html>

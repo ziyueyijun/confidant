@@ -1,0 +1,23 @@
+{
+  "name": "cm6-feasibility-prototype",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "main": "main.js",
+  "description": "PROTOTYPE: 验证 CodeMirror 6 的 IME/表格/性能/diff 保真",
+  "scripts": {
+    "dev": "electron .",
+    "build": "echo 'Prototype - no build needed'"
+  },
+  "dependencies": {
+    "@codemirror/commands": "^6.11.1",
+    "@codemirror/lang-markdown": "^6.3.1",
+    "@codemirror/language": "^6.10.3",
+    "@codemirror/state": "^6.4.1",
+    "@codemirror/view": "^6.34.3",
+    "@lezer/highlight": "^1.2.1"
+  },
+  "devDependencies": {
+    "electron": "^33.2.1"
+  }
+}
