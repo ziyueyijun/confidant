@@ -1,0 +1,145 @@
+/* Visual spec source: spec.md 8.1/8.2/8.3 and prototypes/ui-layout/layout.html */
+
+:root {
+  --bg-primary: #ffffff;
+  --bg-secondary: #f5f5f5;
+  --bg-tertiary: #e8e8e8;
+  --text-primary: #1a1a1a;
+  --text-secondary: #666666;
+  --border: #d0d0d0;
+  --accent: #0066cc;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  height: 100%;
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Microsoft YaHei', sans-serif;
+}
+
+#app {
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+#editor-area {
+  flex: 1;
+  overflow: auto;
+}
+
+#editor-container {
+  max-width: 800px;
+  margin: 0 auto;
+  padding: 40px 20px;
+}
+
+#editor-host {
+  font-size: 16px;
+  line-height: 1.8;
+}
+
+#editor-host .cm-editor {
+  outline: none;
+}
+
+#editor-host .cm-content {
+  font-family: inherit;
+}
+
+/* WYSIWYG node styling, driven by decorations in editor/decorations.ts */
+
+#editor-host .cf-h1 {
+  font-size: 32px;
+  font-weight: 700;
+}
+
+#editor-host .cf-h2 {
+  font-size: 24px;
+  font-weight: 600;
+}
+
+#editor-host .cf-h3 {
+  font-size: 20px;
+  font-weight: 600;
+}
+
+#editor-host .cf-h4,
+#editor-host .cf-h5,
+#editor-host .cf-h6 {
+  font-size: 17px;
+  font-weight: 600;
+}
+
+#editor-host .cf-strong {
+  font-weight: 600;
+}
+
+#editor-host .cf-em {
+  font-style: italic;
+}
+
+#editor-host .cf-code-inline {
+  background: var(--bg-tertiary);
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-family: 'Consolas', 'Monaco', monospace;
+  font-size: 14px;
+}
+
+#editor-host .cf-code-block {
+  background: var(--bg-secondary);
+  font-family: 'Consolas', 'Monaco', monospace;
+  font-size: 14px;
+}
+
+#editor-host .cf-blockquote {
+  border-left: 4px solid var(--accent);
+  padding-left: 12px;
+  color: var(--text-secondary);
+  font-style: italic;
+}
+
+#editor-host .cf-frontmatter {
+  background: var(--bg-tertiary);
+  color: var(--text-secondary);
+  font-family: 'Consolas', 'Monaco', monospace;
+  font-size: 13px;
+}
+
+#editor-host .cf-list-mark {
+  color: var(--text-secondary);
+}
+
+#editor-host .cf-link {
+  color: var(--accent);
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+/* Tables: MVP read-only display (spec.md 5.4, superseded — full block-edit
+   mode is #25). We keep the raw "| a | b |" source text but style each row
+   so it reads as a table instead of bare pipe-delimited text. */
+#editor-host .cf-table-row {
+  background: var(--bg-secondary);
+  font-family: 'Consolas', 'Monaco', monospace;
+  font-size: 14px;
+  border-bottom: 1px solid var(--border);
+}
+
+#editor-host .cf-table-header {
+  font-weight: 600;
+  border-bottom: 2px solid var(--border);
+}
+
+/* Syntax markers hidden in WYSIWYG mode (read-only: always hidden,
+   since there is no cursor-driven show/hide yet — that's #15/#16). */
+#editor-host .cf-syntax-hidden {
+  display: none;
+}
