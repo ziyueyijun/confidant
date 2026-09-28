@@ -14,6 +14,8 @@ import {
 import { renderTabBar, basename } from './tabs/tabBarView'
 import { renderFileTree } from './sidebar/fileTreeView'
 import { handleExternalChangeEvent, type ExternalChangeHooks } from './watch/externalChangeHandler'
+import { flattenMarkdownFiles } from '@shared/fileTree'
+import { createQuickSwitcher } from './quickSwitcher/quickSwitcherPanel'
 
 /**
  * Ticket #14 scope: open a single file (via command-line arg passed
@@ -87,6 +89,13 @@ async function bootstrap(): Promise<void> {
   let currentLibraryPath: string | null = null
   let pendingAutoRenamePath: string | null = null
 
+  // Ticket #21: Ctrl+P quick switcher. Global overlay, independent of any
+  // editor instance - opening a result routes through `openFileInTab`
+  // below (same tab-open path the sidebar uses).
+  const quickSwitcher = createQuickSwitcher({
+    onOpenFile: (path) => void openFileInTab(path)
+  })
+
   function rerenderTabBar(): void {
     renderTabBar(tabBarContainer!, tabState, {
       onSelectTab: (path) => void switchToTab(path),
@@ -130,6 +139,12 @@ async function bootstrap(): Promise<void> {
       autoRenamePath: pendingAutoRenamePath
     })
     pendingAutoRenamePath = null
+
+    // Ticket #21: keep the quick switcher's candidate list in sync with
+    // whatever library is currently open.
+    quickSwitcher.setFiles(
+      flattenMarkdownFiles(nodes).map((node) => ({ path: node.path, name: node.name }))
+    )
   }
 
   /** Reloads the tree from disk and re-renders (ticket #19 acceptance criterion #4). */
@@ -272,6 +287,8 @@ async function bootstrap(): Promise<void> {
     if (result.didOpen) {
       await createDocumentForTab(path)
     }
+
+    quickSwitcher.recordOpened(path) // ticket #21: track for the switcher's default recent view
 
     rerenderTabBar()
     rerenderFileTreeActiveHighlight()

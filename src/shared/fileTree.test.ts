@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
+  flattenMarkdownFiles,
   isHiddenName,
   isMarkdownFile,
   isVisibleFileName,
@@ -103,5 +104,37 @@ describe('sortFileTreeNodes', () => {
     const inputCopy = [...input]
     sortFileTreeNodes(input)
     expect(input).toEqual(inputCopy)
+  })
+})
+
+describe('flattenMarkdownFiles (ticket #21)', () => {
+  function file(name: string, dirPath = '/lib'): FileTreeNode {
+    return { path: `${dirPath}/${name}`, name, kind: 'file' }
+  }
+  function dir(name: string, children: FileTreeNode[]): FileTreeNode {
+    return { path: `/lib/${name}`, name, kind: 'directory', children }
+  }
+
+  it('returns markdown files at the top level', () => {
+    const tree = [file('a.md'), file('b.markdown'), file('image.png')]
+    expect(flattenMarkdownFiles(tree).map((n) => n.name)).toEqual(['a.md', 'b.markdown'])
+  })
+
+  it('recurses into subdirectories and collects markdown files from every level', () => {
+    const tree = [
+      file('top.md'),
+      dir('sub', [file('nested.md', '/lib/sub'), file('photo.png', '/lib/sub')])
+    ]
+    const flat = flattenMarkdownFiles(tree)
+    expect(flat.map((n) => n.name).sort()).toEqual(['nested.md', 'top.md'])
+  })
+
+  it('handles an empty tree', () => {
+    expect(flattenMarkdownFiles([])).toEqual([])
+  })
+
+  it('skips a directory with no children array without throwing', () => {
+    const tree: FileTreeNode[] = [{ path: '/lib/empty', name: 'empty', kind: 'directory' }]
+    expect(flattenMarkdownFiles(tree)).toEqual([])
   })
 })
