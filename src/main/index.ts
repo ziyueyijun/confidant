@@ -1,10 +1,19 @@
-import { app, shell, BrowserWindow, ipcMain } from 'electron'
+import { app, shell, BrowserWindow, ipcMain, dialog } from 'electron'
 import { join } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
-import { readFile, writeMarkdownFile, type ReadFileResult, type FileEncodingInfo } from './fileSystem'
+import {
+  readFile,
+  writeMarkdownFile,
+  listDirectoryTree,
+  type ReadFileResult,
+  type FileEncodingInfo
+} from './fileSystem'
 import { findMarkdownPathInArgv } from './cli'
 import { readThemeConfig, writeThemeConfig } from './themeStore'
+import { readLibraryConfig, writeLibraryConfig } from './libraryStore'
 import type { ThemeConfig } from '../shared/theme'
+import { addRecentLibrary, type LibraryConfig } from '../shared/library'
+import type { FileTreeNode } from '../shared/fileTree'
 
 function createWindow(): void {
   const mainWindow = new BrowserWindow({
@@ -69,6 +78,55 @@ app.whenReady().then(() => {
   ipcMain.handle('theme:set', async (_event, config: ThemeConfig): Promise<void> => {
     await writeThemeConfig(app.getPath('userData'), config)
   })
+
+  ipcMain.handle('library:getRecent', async (): Promise<LibraryConfig> => {
+    return readLibraryConfig(app.getPath('userData'))
+  })
+
+  /**
+   * Opens a native "choose folder" dialog and, if the user picked one,
+   * records it as the most-recently-opened library (acceptance criterion
+   * #1: recent-5 list persisted in userData). Returns null if the user
+   * cancelled, so the renderer can no-op instead of trying to open an
+   * empty library path.
+   */
+  ipcMain.handle('library:openDialog', async (event): Promise<string | null> => {
+    const window = BrowserWindow.fromWebContents(event.sender)
+    const result = window
+      ? await dialog.showOpenDialog(window, { properties: ['openDirectory'] })
+      : await dialog.showOpenDialog({ properties: ['openDirectory'] })
+    if (result.canceled || result.filePaths.length === 0) return null
+
+    const libraryPath = result.filePaths[0]
+    const userDataDir = app.getPath('userData')
+    const current = await readLibraryConfig(userDataDir)
+    const updated: LibraryConfig = {
+      recentLibraryPaths: addRecentLibrary(current.recentLibraryPaths, libraryPath)
+    }
+    await writeLibraryConfig(userDataDir, updated)
+    return libraryPath
+  })
+
+  /**
+   * Records `libraryPath` as most-recently-opened without showing a
+   * dialog - used when a library is reopened from the "recent
+   * libraries" list rather than picked fresh.
+   */
+  ipcMain.handle('library:recordOpened', async (_event, libraryPath: string): Promise<void> => {
+    const userDataDir = app.getPath('userData')
+    const current = await readLibraryConfig(userDataDir)
+    const updated: LibraryConfig = {
+      recentLibraryPaths: addRecentLibrary(current.recentLibraryPaths, libraryPath)
+    }
+    await writeLibraryConfig(userDataDir, updated)
+  })
+
+  ipcMain.handle(
+    'fs:listDirectoryTree',
+    async (_event, rootPath: string): Promise<FileTreeNode[]> => {
+      return listDirectoryTree(rootPath)
+    }
+  )
 
   createWindow()
 

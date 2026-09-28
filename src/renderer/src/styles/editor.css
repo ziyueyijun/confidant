@@ -51,7 +51,8 @@ body {
 }
 
 #theme-toggle,
-#width-toggle {
+#width-toggle,
+#open-library-button {
   position: absolute;
   top: 12px;
   z-index: 10;
@@ -74,8 +75,13 @@ body {
   right: 56px;
 }
 
+#open-library-button {
+  right: 96px;
+}
+
 #theme-toggle:hover,
-#width-toggle:hover {
+#width-toggle:hover,
+#open-library-button:hover {
   background: var(--bg-tertiary);
 }
 
@@ -85,64 +91,236 @@ body {
   flex-direction: column;
 }
 
+/* Ticket #17: sidebar (file tree) + main column (tab bar + editor). */
+#workspace {
+  flex: 1;
+  display: flex;
+  min-height: 0;
+}
+
+#sidebar {
+  width: 260px;
+  flex: 0 0 260px;
+  border-right: 1px solid var(--border);
+  background: var(--bg-secondary);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  transition: width 0.15s ease, flex-basis 0.15s ease;
+}
+
+/* Acceptance criterion #6: sidebar collapses to 0 width, expanded width is 260px. */
+#sidebar.cf-sidebar-collapsed {
+  width: 0;
+  flex: 0 0 0;
+  border-right: none;
+}
+
+#sidebar-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px;
+  border-bottom: 1px solid var(--border);
+  flex: 0 0 auto;
+}
+
+#sidebar-collapse-toggle {
+  border: none;
+  background: transparent;
+  color: var(--text-primary);
+  cursor: pointer;
+  font-size: 16px;
+  padding: 4px 6px;
+  border-radius: 4px;
+}
+
+#sidebar-collapse-toggle:hover {
+  background: var(--bg-tertiary);
+}
+
+#library-name {
+  font-size: 13px;
+  color: var(--text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+#file-tree {
+  flex: 1;
+  overflow: auto;
+  padding: 4px;
+}
+
+.cf-tree-list {
+  list-style: none;
+  margin: 0;
+  padding-left: 14px;
+}
+
+#file-tree > .cf-tree-list {
+  padding-left: 0;
+}
+
+.cf-tree-folder,
+.cf-tree-file {
+  padding: 4px 6px;
+  border-radius: 4px;
+  font-size: 13px;
+  cursor: default;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.cf-tree-folder {
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.cf-tree-file-openable {
+  cursor: pointer;
+}
+
+.cf-tree-file-openable:hover,
+.cf-tree-folder:hover {
+  background: var(--bg-tertiary);
+}
+
+.cf-tree-file-active {
+  background: var(--accent);
+  color: #fff;
+}
+
+.cf-tree-file-inert {
+  color: var(--text-secondary);
+}
+
+.cf-tree-collapsed > .cf-tree-list {
+  display: none;
+}
+
+#main-column {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+/* Acceptance criterion #4: tab strip scrolls horizontally on overflow. */
+#tab-bar {
+  display: flex;
+  flex: 0 0 auto;
+  overflow-x: auto;
+  overflow-y: hidden;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-secondary);
+  scrollbar-width: thin;
+}
+
+.cf-tab {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 10px;
+  border-right: 1px solid var(--border);
+  font-size: 13px;
+  cursor: pointer;
+  white-space: nowrap;
+  flex: 0 0 auto;
+  color: var(--text-secondary);
+}
+
+.cf-tab-active {
+  background: var(--bg-primary);
+  color: var(--text-primary);
+}
+
+.cf-tab-close {
+  border: none;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  font-size: 14px;
+  line-height: 1;
+  padding: 0 2px;
+  border-radius: 3px;
+  visibility: hidden;
+}
+
+.cf-tab:hover .cf-tab-close {
+  visibility: visible;
+}
+
+.cf-tab-close:hover {
+  background: var(--bg-tertiary);
+}
+
 #editor-area {
   flex: 1;
   overflow: auto;
+  position: relative;
 }
 
-#editor-container {
+.cf-editor-pane {
+  display: none;
   max-width: var(--editor-max-width);
   margin: 0 auto;
   padding: 40px 20px;
 }
 
-#editor-host {
+.cf-editor-pane-active {
+  display: block;
+}
+
+.cf-editor-host {
   position: relative;
   font-size: 16px;
   line-height: 1.8;
 }
 
-#editor-host .cm-editor {
+.cf-editor-host .cm-editor {
   outline: none;
 }
 
-#editor-host .cm-content {
+.cf-editor-host .cm-content {
   font-family: inherit;
 }
 
 /* WYSIWYG node styling, driven by decorations in editor/decorations.ts */
 
-#editor-host .cf-h1 {
+.cf-editor-host .cf-h1 {
   font-size: 32px;
   font-weight: 700;
 }
 
-#editor-host .cf-h2 {
+.cf-editor-host .cf-h2 {
   font-size: 24px;
   font-weight: 600;
 }
 
-#editor-host .cf-h3 {
+.cf-editor-host .cf-h3 {
   font-size: 20px;
   font-weight: 600;
 }
 
-#editor-host .cf-h4,
-#editor-host .cf-h5,
-#editor-host .cf-h6 {
+.cf-editor-host .cf-h4,
+.cf-editor-host .cf-h5,
+.cf-editor-host .cf-h6 {
   font-size: 17px;
   font-weight: 600;
 }
 
-#editor-host .cf-strong {
+.cf-editor-host .cf-strong {
   font-weight: 600;
 }
 
-#editor-host .cf-em {
+.cf-editor-host .cf-em {
   font-style: italic;
 }
 
-#editor-host .cf-code-inline {
+.cf-editor-host .cf-code-inline {
   background: var(--bg-tertiary);
   padding: 2px 6px;
   border-radius: 4px;
@@ -150,7 +328,7 @@ body {
   font-size: 14px;
 }
 
-#editor-host .cf-code-block {
+.cf-editor-host .cf-code-block {
   background: var(--bg-secondary);
   border-left: 1px solid var(--border);
   border-right: 1px solid var(--border);
@@ -158,31 +336,31 @@ body {
   font-size: 14px;
 }
 
-#editor-host .cf-code-block-start {
+.cf-editor-host .cf-code-block-start {
   border-top: 1px solid var(--border);
   padding-top: 4px;
 }
 
-#editor-host .cf-code-block-end {
+.cf-editor-host .cf-code-block-end {
   border-bottom: 1px solid var(--border);
   padding-bottom: 4px;
 }
 
-#editor-host .cf-blockquote {
+.cf-editor-host .cf-blockquote {
   border-left: 4px solid var(--accent);
   padding-left: 12px;
   color: var(--text-secondary);
   font-style: italic;
 }
 
-#editor-host .cf-frontmatter {
+.cf-editor-host .cf-frontmatter {
   background: var(--bg-tertiary);
   color: var(--text-secondary);
   font-family: 'Consolas', 'Monaco', monospace;
   font-size: 13px;
 }
 
-#editor-host .cf-link {
+.cf-editor-host .cf-link {
   color: var(--accent);
   text-decoration: underline;
   cursor: pointer;
@@ -191,14 +369,14 @@ body {
 /* Tables: MVP read-only display (spec.md 5.4, superseded — full block-edit
    mode is #25). We keep the raw "| a | b |" source text but style each row
    so it reads as a table instead of bare pipe-delimited text. */
-#editor-host .cf-table-row {
+.cf-editor-host .cf-table-row {
   background: var(--bg-secondary);
   font-family: 'Consolas', 'Monaco', monospace;
   font-size: 14px;
   border-bottom: 1px solid var(--border);
 }
 
-#editor-host .cf-table-header {
+.cf-editor-host .cf-table-header {
   font-weight: 600;
   border-bottom: 2px solid var(--border);
 }
@@ -207,26 +385,28 @@ body {
    node (Typora-style Live Preview), shown (dimmed, not deleted from the
    document) while the cursor/selection is inside - see decorations.ts
    `computeActiveNodeRanges`/`buildWysiwygDecorations` (#15). */
-#editor-host .cf-syntax-hidden {
+.cf-editor-host .cf-syntax-hidden {
   display: none;
 }
 
-#editor-host .cf-syntax-visible {
+.cf-editor-host .cf-syntax-visible {
   color: var(--text-secondary);
 }
 
 /* Ticket #23: find-in-document. Match highlights are plain CM6 marks
    (see editor/searchPanel.ts), styled here like the rest of the WYSIWYG
    classes above. The floating panel itself is native DOM anchored inside
-   #editor-host (which is `position: relative`, see above), positioned in
-   its top-right corner per acceptance criterion #1. */
-#editor-host .cf-search-match {
+   .cf-editor-host (which is `position: relative`, see above; renamed from
+   the #editor-host id by ticket #17's multi-tab rewrite - each tab now has
+   its own host element), positioned in its top-right corner per acceptance
+   criterion #1. */
+.cf-editor-host .cf-search-match {
   background: #ffe066;
   color: #1a1a1a;
   border-radius: 2px;
 }
 
-#editor-host .cf-search-match-current {
+.cf-editor-host .cf-search-match-current {
   background: #ff9f40;
   color: #1a1a1a;
   border-radius: 2px;

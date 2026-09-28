@@ -5,6 +5,7 @@ import { join } from 'path'
 import {
   detectLargeDocumentWarning,
   detectLineEnding,
+  listDirectoryTree,
   readFile,
   writeFileAtomic,
   writeMarkdownFile,
@@ -248,5 +249,100 @@ describe('minimal-diff save (acceptance criterion #6)', () => {
 
     const after = await fs.readFile(filePath, 'utf-8')
     expect(after).toContain('A line with a hard break at the end.  \r')
+  })
+})
+
+describe('listDirectoryTree (ticket #17)', () => {
+  let dir: string
+
+  beforeEach(async () => {
+    dir = await fs.mkdtemp(join(tmpdir(), 'confidant-tree-'))
+  })
+
+  afterEach(async () => {
+    await fs.rm(dir, { recursive: true, force: true })
+  })
+
+  it('returns an empty array for an empty directory', async () => {
+    expect(await listDirectoryTree(dir)).toEqual([])
+  })
+
+  it('returns an empty array for a nonexistent directory instead of throwing', async () => {
+    expect(await listDirectoryTree(join(dir, 'does-not-exist'))).toEqual([])
+  })
+
+  it('lists visible files with folders sorted before files', async () => {
+    await fs.writeFile(join(dir, 'b.md'), '# B', 'utf-8')
+    await fs.writeFile(join(dir, 'a.md'), '# A', 'utf-8')
+    await fs.mkdir(join(dir, 'zeta'))
+    await fs.mkdir(join(dir, 'alpha'))
+
+    const tree = await listDirectoryTree(dir)
+
+    expect(tree.map((n) => n.name)).toEqual(['alpha', 'zeta', 'a.md', 'b.md'])
+    expect(tree.map((n) => n.kind)).toEqual(['directory', 'directory', 'file', 'file'])
+  })
+
+  it('filters out hidden files and folders', async () => {
+    await fs.writeFile(join(dir, 'visible.md'), 'x', 'utf-8')
+    await fs.writeFile(join(dir, '.hidden.md'), 'x', 'utf-8')
+    await fs.mkdir(join(dir, '.git'))
+    await fs.writeFile(join(dir, '.git', 'config'), 'x', 'utf-8')
+
+    const tree = await listDirectoryTree(dir)
+
+    expect(tree.map((n) => n.name)).toEqual(['visible.md'])
+  })
+
+  it('filters out files with non-whitelisted extensions', async () => {
+    await fs.writeFile(join(dir, 'notes.md'), 'x', 'utf-8')
+    await fs.writeFile(join(dir, 'archive.zip'), 'x', 'utf-8')
+    await fs.writeFile(join(dir, 'photo.png'), 'x', 'utf-8')
+    await fs.writeFile(join(dir, 'scan.pdf'), 'x', 'utf-8')
+
+    const tree = await listDirectoryTree(dir)
+
+    expect(tree.map((n) => n.name).sort()).toEqual(['notes.md', 'photo.png', 'scan.pdf'])
+  })
+
+  it('recurses into subdirectories and sorts each level independently', async () => {
+    await fs.mkdir(join(dir, 'sub'))
+    await fs.writeFile(join(dir, 'sub', 'z.md'), 'x', 'utf-8')
+    await fs.writeFile(join(dir, 'sub', 'a.md'), 'x', 'utf-8')
+    await fs.mkdir(join(dir, 'sub', 'nested'))
+    await fs.writeFile(join(dir, 'sub', 'nested', 'deep.md'), 'x', 'utf-8')
+
+    const tree = await listDirectoryTree(dir)
+
+    expect(tree).toHaveLength(1)
+    const sub = tree[0]
+    expect(sub.name).toBe('sub')
+    expect(sub.kind).toBe('directory')
+    expect(sub.children?.map((n) => n.name)).toEqual(['nested', 'a.md', 'z.md'])
+
+    const nested = sub.children?.find((n) => n.name === 'nested')
+    expect(nested?.children?.map((n) => n.name)).toEqual(['deep.md'])
+  })
+
+  it('returns absolute paths for every node', async () => {
+    await fs.mkdir(join(dir, 'sub'))
+    await fs.writeFile(join(dir, 'sub', 'note.md'), 'x', 'utf-8')
+
+    const tree = await listDirectoryTree(dir)
+    const sub = tree[0]
+    const note = sub.children?.[0]
+
+    expect(sub.path).toBe(join(dir, 'sub'))
+    expect(note?.path).toBe(join(dir, 'sub', 'note.md'))
+  })
+
+  it('keeps an empty subdirectory as a childless-but-present node', async () => {
+    await fs.mkdir(join(dir, 'empty-folder'))
+
+    const tree = await listDirectoryTree(dir)
+
+    expect(tree).toHaveLength(1)
+    expect(tree[0].name).toBe('empty-folder')
+    expect(tree[0].children).toEqual([])
   })
 })

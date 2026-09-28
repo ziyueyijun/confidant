@@ -1,4 +1,6 @@
 import { promises as fs } from 'fs'
+import { join } from 'path'
+import { shouldIncludeEntry, sortFileTreeNodes, type FileTreeNode } from '../shared/fileTree'
 
 /**
  * Ticket #14 perf acceptance criterion: documents around 100k characters
@@ -139,4 +141,52 @@ export async function writeMarkdownFile(
 ): Promise<void> {
   const withBOM = encoding.hasBOM ? BOM + content : content
   await writeFileAtomic(filePath, withBOM)
+}
+
+/**
+ * Ticket #17: recursively walks `rootPath` and builds the sidebar's file
+ * tree in one pass.
+ *
+ * Eager/full-load vs. lazy per-directory IPC: this ticket picks eager.
+ * A single recursive `fs.readdir` walk, serialized once over IPC, is far
+ * simpler to implement and test than a lazy "expand this folder" protocol
+ * (no per-node loading state in the renderer, no race between "user
+ * double-clicks a folder while its children are still loading", no
+ * partial-tree cache invalidation). For a personal notes library
+ * (hundreds to low thousands of files, per the ticket's own sizing
+ * guidance) a full walk is a handful of milliseconds to a couple hundred
+ * ms at the top end, well within "open a folder" latency budgets, and it
+ * lets the sidebar render the complete tree in one shot with no
+ * loading-spinner UI to build. If a library ever grows into the tens of
+ * thousands of files, this would need revisiting (lazy expansion, or at
+ * least streaming/chunking the walk) - that's out of scope here.
+ *
+ * Directories that fail to read (permission errors, broken symlinks,
+ * etc.) are skipped rather than aborting the whole walk, so one bad
+ * subfolder doesn't prevent the rest of the library from opening.
+ */
+export async function listDirectoryTree(rootPath: string): Promise<FileTreeNode[]> {
+  let entries: import('fs').Dirent[]
+  try {
+    entries = await fs.readdir(rootPath, { withFileTypes: true })
+  } catch {
+    return []
+  }
+
+  const nodes: FileTreeNode[] = []
+  for (const entry of entries) {
+    const kind = entry.isDirectory() ? 'directory' : entry.isFile() ? 'file' : null
+    if (kind === null) continue // skip symlinks/sockets/etc.
+    if (!shouldIncludeEntry(entry.name, kind)) continue
+
+    const entryPath = join(rootPath, entry.name)
+    if (kind === 'directory') {
+      const children = await listDirectoryTree(entryPath)
+      nodes.push({ path: entryPath, name: entry.name, kind, children })
+    } else {
+      nodes.push({ path: entryPath, name: entry.name, kind })
+    }
+  }
+
+  return sortFileTreeNodes(nodes)
 }
