@@ -24,6 +24,7 @@
     "@codemirror/view": "^6.34.3",
     "@electron-toolkit/utils": "^3.0.0",
     "@lezer/markdown": "^1.7.2",
+    "chokidar": "4.0.3",
     "markdown-it": "^14.1.0"
   },
   "devDependencies": {

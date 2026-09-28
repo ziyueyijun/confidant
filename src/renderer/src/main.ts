@@ -3,9 +3,10 @@ import { createMarkdownEditor, type MarkdownEditorHandle } from './editor/init'
 import { applyEditorWidth, applyTheme } from './theme/applyTheme'
 import { EDITOR_WIDTH_OPTIONS, type EditorWidth, type ThemeName } from '@shared/theme'
 import type { FileEncodingInfo, FileTreeNode } from '../../preload/index'
-import { openTab, focusTab, closeTab, EMPTY_TAB_STATE, type TabState } from './tabs/tabState'
-import { renderTabBar } from './tabs/tabBarView'
+import { openTab, focusTab, closeTab, renameTab, EMPTY_TAB_STATE, type TabState } from './tabs/tabState'
+import { renderTabBar, basename } from './tabs/tabBarView'
 import { renderFileTree } from './sidebar/fileTreeView'
+import { handleExternalChangeEvent, type ExternalChangeHooks } from './watch/externalChangeHandler'
 
 /**
  * Ticket #14 scope: open a single file (via command-line arg passed
@@ -30,6 +31,15 @@ interface OpenDocument {
   handle: MarkdownEditorHandle
   hostElement: HTMLDivElement
   encoding: FileEncodingInfo
+  /** Ticket #20 acceptance criterion #5: true once this document's backing file was deleted externally. */
+  deleted: boolean
+  /**
+   * Mutable holder for the path this document's autosave writes to.
+   * Normally equal to the `documents` map key it's stored under, but a
+   * "Save As" (ticket #20) can retarget it to a new path without
+   * recreating the editor - see `createDocumentForTab`/`saveAs`.
+   */
+  pathHolder: { path: string }
 }
 
 async function bootstrap(): Promise<void> {
@@ -55,12 +65,34 @@ async function bootstrap(): Promise<void> {
   function rerenderTabBar(): void {
     renderTabBar(tabBarContainer!, tabState, {
       onSelectTab: (path) => void switchToTab(path),
-      onCloseTab: (path) => void closeDocumentTab(path)
+      onCloseTab: (path) => void closeDocumentTab(path),
+      isDeleted: (path) => documents.get(path)?.deleted ?? false
     })
     for (const [path, doc] of documents) {
       doc.hostElement.classList.toggle('cf-editor-pane-active', path === tabState.activePath)
     }
+    updateStatusBar()
   }
+
+  // --- Ticket #20: status bar for the active tab's "deleted externally" state (acceptance criterion #5) ---
+
+  const statusBar = document.getElementById('status-bar')
+  const statusBarMessage = document.getElementById('status-bar-message')
+  const statusBarSaveAsButton = document.getElementById('status-bar-save-as')
+
+  function updateStatusBar(): void {
+    if (!statusBar || !statusBarMessage) return
+    const activeDoc = tabState.activePath ? documents.get(tabState.activePath) : undefined
+    const showDeleted = Boolean(activeDoc?.deleted)
+    statusBar.classList.toggle('cf-status-bar-visible', showDeleted)
+    if (showDeleted) {
+      statusBarMessage.textContent = '文件已被外部删除，改动无法保存到原路径 - 请另存为'
+    }
+  }
+
+  statusBarSaveAsButton?.addEventListener('click', () => {
+    if (tabState.activePath) void saveAs(tabState.activePath)
+  })
 
   function rerenderFileTree(nodes: FileTreeNode[]): void {
     renderFileTree(fileTreeContainer!, nodes, {
@@ -72,12 +104,16 @@ async function bootstrap(): Promise<void> {
   /**
    * Flushes the currently active tab's autosave before switching away
    * from it (acceptance criterion #5). Safe to call when there is no
-   * active tab yet (first open).
+   * active tab yet (first open). Skips the flush for a tab whose file
+   * was deleted externally (ticket #20 acceptance criterion #5) -
+   * writing there would silently resurrect the file at its old path
+   * instead of respecting the deletion, and the status bar already
+   * tells the user their only path forward is Save As.
    */
   async function flushActiveTab(): Promise<void> {
     if (!tabState.activePath) return
     const doc = documents.get(tabState.activePath)
-    if (doc) await doc.handle.flushSave()
+    if (doc && !doc.deleted) await doc.handle.flushSave()
   }
 
   async function switchToTab(path: string): Promise<void> {
@@ -91,7 +127,7 @@ async function bootstrap(): Promise<void> {
   async function closeDocumentTab(path: string): Promise<void> {
     const doc = documents.get(path)
     if (doc) {
-      await doc.handle.flushSave() // acceptance criterion #5: save on close
+      if (!doc.deleted) await doc.handle.flushSave() // acceptance criterion #5: save on close (unless the file is already gone)
       doc.handle.destroy()
       doc.hostElement.remove()
       documents.delete(path)
@@ -152,18 +188,120 @@ async function bootstrap(): Promise<void> {
       encoding = { hasBOM: false, lineEnding: 'CRLF' }
     }
 
+    // Mutable holder rather than closing over `path` directly: ticket
+    // #20's "Save As" flow (for a tab whose file was deleted externally,
+    // or the conflict dialog's "save a copy" choice) re-targets this
+    // same open document/editor instance at a new path without
+    // recreating the CM6 view - `saveAs` below updates `pathHolder.path`
+    // so this `onSave` callback (and future autosaves) write to the new
+    // location from then on.
+    const pathHolder = { path }
     const lineSeparator = encoding.lineEnding === 'CRLF' ? '\r\n' : '\n'
     const handle = createMarkdownEditor(
       inner,
       content,
       async (docContent) => {
-        await window.api.writeFile(path, docContent, { hasBOM: encoding.hasBOM })
+        await window.api.writeFile(pathHolder.path, docContent, { hasBOM: encoding.hasBOM })
       },
       lineSeparator
     )
 
-    documents.set(path, { handle, hostElement, encoding })
+    documents.set(path, { handle, hostElement, encoding, deleted: false, pathHolder })
   }
+
+  // --- External change handling (ticket #20, acceptance criteria #3-#7) ---
+  //
+  // The main process's chokidar watcher (src/main/externalWatch.ts) pushes
+  // one coalesced event per logical filesystem change via
+  // `watch:externalChange`. `handleExternalChangeEvent` (pure routing
+  // logic, unit tested against fake hooks in externalChangeHandler.test.ts)
+  // decides silent-reload/mark-deleted/conflict-dialog; the hooks below
+  // are what actually touch `documents`/the editor/disk.
+
+  async function silentReload(path: string): Promise<void> {
+    const doc = documents.get(path)
+    if (!doc) return
+    try {
+      const result = await window.api.readFile(path)
+      doc.handle.reloadContent(result.content)
+      doc.encoding = result.encoding
+    } catch (err) {
+      console.error('Failed to reload externally changed file', path, err)
+    }
+  }
+
+  function markDeleted(path: string): void {
+    const doc = documents.get(path)
+    if (!doc) return
+    doc.deleted = true
+    rerenderTabBar()
+  }
+
+  /** Conflict resolution: "keep my version" - overwrite disk with the current in-memory content. */
+  async function keepMine(path: string): Promise<void> {
+    const doc = documents.get(path)
+    if (!doc) return
+    await doc.handle.flushSave()
+  }
+
+  /** Conflict resolution: "use external version" - discard local edits and reload from disk. */
+  async function useExternal(path: string): Promise<void> {
+    await silentReload(path)
+  }
+
+  /**
+   * Conflict resolution (and the deleted-file status bar action): "save
+   * a copy" via a native Save As dialog. Writes the current in-memory
+   * content to the chosen path, then re-targets this same open
+   * tab/editor instance at the new path (rather than just writing a
+   * copy and leaving the tab pointed at the old, gone path) - future
+   * edits/autosaves go to the new location, the tab label updates, and
+   * (for the deleted-file case) the red "已删除" state clears since the
+   * document now has a real, existing backing file again.
+   */
+  async function saveAs(path: string): Promise<void> {
+    const doc = documents.get(path)
+    if (!doc) return
+    const chosenPath = await window.api.saveAsDialog(path)
+    if (!chosenPath) return
+
+    const content = doc.handle.view.state.doc.sliceString(
+      0,
+      doc.handle.view.state.doc.length,
+      doc.encoding.lineEnding === 'CRLF' ? '\r\n' : '\n'
+    )
+    await window.api.writeFile(chosenPath, content, { hasBOM: doc.encoding.hasBOM })
+
+    if (chosenPath === path) {
+      // Saved back over the same path (e.g. re-picked the identical
+      // name from the dialog) - just clear the deleted flag, no
+      // map/tab-state key change needed.
+      doc.deleted = false
+    } else {
+      documents.delete(path)
+      doc.deleted = false
+      doc.pathHolder.path = chosenPath
+      documents.set(chosenPath, doc)
+      tabState = renameTab(tabState, path, chosenPath)
+    }
+
+    rerenderTabBar()
+  }
+
+  const externalChangeHooks: ExternalChangeHooks = {
+    isOpen: (path) => documents.has(path),
+    isDirty: (path) => documents.get(path)?.handle.isDirty() ?? false,
+    silentReload,
+    markDeleted,
+    keepMine,
+    useExternal,
+    saveAs,
+    labelFor: (path) => basename(path)
+  }
+
+  window.api.onExternalChange((event) => {
+    void handleExternalChangeEvent(event, externalChangeHooks)
+  })
 
   // --- Library open flow (acceptance criterion #1) ---
 
@@ -221,7 +359,9 @@ async function bootstrap(): Promise<void> {
     documents.set(samplePath, {
       handle,
       hostElement,
-      encoding: { hasBOM: false, lineEnding: 'CRLF' }
+      encoding: { hasBOM: false, lineEnding: 'CRLF' },
+      deleted: false,
+      pathHolder: { path: samplePath }
     })
     tabState = { tabs: [samplePath], activePath: samplePath }
   }
