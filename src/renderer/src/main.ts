@@ -15,7 +15,13 @@ async function bootstrap(): Promise<void> {
 
   if (filePath) {
     try {
-      content = await window.api.readFile(filePath)
+      const result = await window.api.readFile(filePath)
+      content = result.content
+      if (result.warning) {
+        // UI treatment (e.g. a visible banner) lands in a later ticket;
+        // for #14 we only need the main process to detect and surface this.
+        console.warn(result.warning)
+      }
     } catch (err) {
       content = `# Could not open file\n\n${filePath}\n\n\`\`\`\n${String(err)}\n\`\`\`\n`
     }

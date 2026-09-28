@@ -1,7 +1,7 @@
 import { app, shell, BrowserWindow, ipcMain } from 'electron'
 import { join } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
-import { readFile } from './fileSystem'
+import { readFile, type ReadFileResult } from './fileSystem'
 import { findMarkdownPathInArgv } from './cli'
 
 function createWindow(): void {
@@ -41,7 +41,7 @@ app.whenReady().then(() => {
     optimizer.watchWindowShortcuts(window)
   })
 
-  ipcMain.handle('file:read', async (_event, filePath: string) => {
+  ipcMain.handle('file:read', async (_event, filePath: string): Promise<ReadFileResult> => {
     return readFile(filePath)
   })
 
