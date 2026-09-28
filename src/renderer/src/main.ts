@@ -38,10 +38,16 @@ async function bootstrap(): Promise<void> {
     content = SAMPLE_DOC
   }
 
-  const handle = createMarkdownEditor(host, content, async (docContent) => {
-    if (!filePath) return // Nothing to save back to when there's no file on disk (sample doc).
-    await window.api.writeFile(filePath, docContent, { hasBOM: encoding.hasBOM })
-  })
+  const lineSeparator = encoding.lineEnding === 'CRLF' ? '\r\n' : '\n'
+  const handle = createMarkdownEditor(
+    host,
+    content,
+    async (docContent) => {
+      if (!filePath) return // Nothing to save back to when there's no file on disk (sample doc).
+      await window.api.writeFile(filePath, docContent, { hasBOM: encoding.hasBOM })
+    },
+    lineSeparator
+  )
 
   wireLifecycleFlush(handle)
 }

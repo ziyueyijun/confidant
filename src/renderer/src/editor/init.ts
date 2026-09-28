@@ -72,18 +72,30 @@ function frontmatterPlugin(source: string): Extension {
 /**
  * Wires the 500ms-after-typing-stops autosave (acceptance criterion #3)
  * using the document-agnostic `AutosaveController` from ./autosave.
- * `onSave` gets the exact current doc text via `state.doc.toString()` -
- * no re-serialization/AST round-trip, so whatever bytes CM6 is holding
- * (untouched lines, indentation, CRLF, trailing hard-break spaces) are
- * exactly what gets written (minimal-diff requirement).
+ *
+ * `onSave` gets the doc text via `state.doc.sliceString(0, length,
+ * lineSeparator)`, NOT `state.doc.toString()`. `Text.toString()` is
+ * documented to always join lines with a bare `\n` regardless of what
+ * was loaded (CM6's `Text` class stores a document as an array of line
+ * strings with the separators already stripped out - there's no
+ * "preserved" CRLF sitting in the model for `toString()` to return).
+ * `sliceString`'s optional `lineSep` parameter is the actual supported
+ * way to reconstitute the original separator on the way out. Passing
+ * the exact on-disk separator here is what makes minimal-diff saves
+ * (acceptance criterion #6) work for CRLF files - which on Windows are
+ * the common case, not an edge case.
  */
-function autosavePlugin(view: () => EditorView, onSave: (content: string) => Promise<void>): {
+function autosavePlugin(
+  view: () => EditorView,
+  onSave: (content: string) => Promise<void>,
+  lineSeparator: string
+): {
   extension: Extension
   controller: AutosaveController
 } {
   const controller = createAutosaveController({
     save: onSave,
-    getContent: () => view().state.doc.toString()
+    getContent: () => view().state.doc.sliceString(0, view().state.doc.length, lineSeparator)
   })
 
   const extension = EditorView.updateListener.of((update) => {
@@ -117,19 +129,38 @@ export interface MarkdownEditorHandle {
  * the returned `flushSave`). The caller is responsible for actually
  * persisting it (main-process IPC + atomic write - see
  * src/main/fileSystem.ts `writeMarkdownFile`).
+ *
+ * `lineSeparator` MUST be the exact line ending detected on disk
+ * (`fileSystem.ts`'s `detectLineEnding`, either `'\r\n'` or `'\n'`).
+ * `Text.toString()` always joins lines with a bare `\n` (that's its
+ * documented behavior - CM6's `Text` stores a document as an array of
+ * line strings with separators already stripped, so there's no
+ * "preserved" CRLF for `toString()` to return regardless of what was
+ * loaded or which facets are set). `autosavePlugin` reads the doc via
+ * `sliceString(0, length, lineSeparator)` instead, which is the API
+ * that actually supports round-tripping the original separator. We
+ * also pin the `EditorState.lineSeparator` facet here so that CM6-driven
+ * edits (e.g. inserting a newline while typing) use the matching
+ * separator internally, keeping the two consistent.
  */
 export function createMarkdownEditor(
   parent: HTMLElement,
   content: string,
-  onSave: (content: string) => Promise<void>
+  onSave: (content: string) => Promise<void>,
+  lineSeparator: '\r\n' | '\n' = '\n'
 ): MarkdownEditorHandle {
   let viewRef: EditorView
 
-  const { extension: autosaveExtension, controller } = autosavePlugin(() => viewRef, onSave)
+  const { extension: autosaveExtension, controller } = autosavePlugin(
+    () => viewRef,
+    onSave,
+    lineSeparator
+  )
 
   const state = EditorState.create({
     doc: content,
     extensions: [
+      EditorState.lineSeparator.of(lineSeparator),
       markdown({ codeLanguages: languages, extensions: [Table] }),
       EditorView.lineWrapping,
       frontmatterPlugin(content),
