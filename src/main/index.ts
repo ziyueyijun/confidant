@@ -1,6 +1,6 @@
 import { app, shell, BrowserWindow, ipcMain, dialog } from 'electron'
 import { promises as fsPromises } from 'fs'
-import { join } from 'path'
+import { join, extname } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import {
   readFile,
@@ -19,6 +19,7 @@ import { readThemeConfig, writeThemeConfig } from './themeStore'
 import { readLibraryConfig, writeLibraryConfig } from './libraryStore'
 import { watchLibrary, computeEtag, type ExternalWatchHandle } from './externalWatch'
 import { runLibrarySearch, type SearchQuery } from './search'
+import { saveImageToAttachments, downloadImageFromUrl } from './imageHandler'
 import type { ThemeConfig } from '../shared/theme'
 import { addRecentLibrary, type LibraryConfig } from '../shared/library'
 import type { FileTreeNode } from '../shared/fileTree'
@@ -265,6 +266,34 @@ app.whenReady().then(() => {
   ipcMain.on('search:cancel', (_event, sessionId: string): void => {
     activeSearchControllers.get(sessionId)?.abort()
     activeSearchControllers.delete(sessionId)
+  })
+
+  /**
+   * Ticket #24: saves a clipboard image (base64 data URL) to the library's
+   * attachments folder as a PNG file. Returns the filename (not full path).
+   */
+  ipcMain.handle('image:saveFromClipboard', async (_event, libraryPath: string, imageData: string): Promise<string> => {
+    const buffer = Buffer.from(imageData.split(',')[1], 'base64')
+    return await saveImageToAttachments(libraryPath, buffer, '.png')
+  })
+
+  /**
+   * Ticket #24: copies a local image file to the library's attachments
+   * folder, preserving the original extension. Returns the filename.
+   */
+  ipcMain.handle('image:copyFile', async (_event, libraryPath: string, sourcePath: string): Promise<string> => {
+    const buffer = await fsPromises.readFile(sourcePath)
+    const extension = extname(sourcePath)
+    return await saveImageToAttachments(libraryPath, buffer, extension)
+  })
+
+  /**
+   * Ticket #24: downloads an image from a URL (browser drag-and-drop) and
+   * saves it to the library's attachments folder. Returns the filename.
+   */
+  ipcMain.handle('image:downloadFromUrl', async (_event, libraryPath: string, url: string): Promise<string> => {
+    const { buffer, extension } = await downloadImageFromUrl(url)
+    return await saveImageToAttachments(libraryPath, buffer, extension)
   })
 
   createWindow()

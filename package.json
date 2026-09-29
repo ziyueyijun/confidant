@@ -25,7 +25,8 @@
     "@electron-toolkit/utils": "^3.0.0",
     "@lezer/markdown": "^1.7.2",
     "chokidar": "4.0.3",
-    "markdown-it": "^14.1.0"
+    "markdown-it": "^14.1.0",
+    "path-browserify": "^1.0.1"
   },
   "devDependencies": {
     "@electron-toolkit/tsconfig": "^1.0.1",

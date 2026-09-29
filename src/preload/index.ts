@@ -180,7 +180,28 @@ const api = {
     ): void => callback(sessionId, error)
     ipcRenderer.on('search:error', listener)
     return () => ipcRenderer.removeListener('search:error', listener)
-  }
+  },
+
+  /**
+   * Ticket #24: saves a clipboard image (screenshot paste, Ctrl+V) as PNG
+   * to the library's attachments folder. Returns the filename.
+   */
+  saveImageFromClipboard: (libraryPath: string, imageData: string): Promise<string> =>
+    ipcRenderer.invoke('image:saveFromClipboard', libraryPath, imageData),
+
+  /**
+   * Ticket #24: copies a local image file (drag-and-drop from file system)
+   * to the library's attachments folder. Returns the filename.
+   */
+  copyImageFile: (libraryPath: string, sourcePath: string): Promise<string> =>
+    ipcRenderer.invoke('image:copyFile', libraryPath, sourcePath),
+
+  /**
+   * Ticket #24: downloads an image from a URL (drag-and-drop from browser)
+   * and saves it to the library's attachments folder. Returns the filename.
+   */
+  downloadImage: (libraryPath: string, url: string): Promise<string> =>
+    ipcRenderer.invoke('image:downloadFromUrl', libraryPath, url)
 }
 
 contextBridge.exposeInMainWorld('api', api)

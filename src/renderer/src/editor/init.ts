@@ -12,6 +12,8 @@ import { revealAndHighlightLine, revealLineExtensions } from './revealLine'
 import { formattingKeymapExtension } from './extensions/formattingKeymap'
 import { headingKeymapExtension } from './extensions/headingKeymap'
 import { contextualTabExtension } from './extensions/contextualTab'
+import { imagePasteExtension } from './extensions/imagePaste'
+import { imageWidgetExtension } from './extensions/imageWidget'
 
 /**
  * Ticket #15: the editor is now live.
@@ -179,12 +181,18 @@ export interface MarkdownEditorHandle {
  * also pin the `EditorState.lineSeparator` facet here so that CM6-driven
  * edits (e.g. inserting a newline while typing) use the matching
  * separator internally, keeping the two consistent.
+ *
+ * Ticket #24: `getLibraryPath` and `getCurrentFilePath` are used by the
+ * image paste/drop extension to save images to attachments/ and compute
+ * correct relative paths.
  */
 export function createMarkdownEditor(
   parent: HTMLElement,
   content: string,
   onSave: (content: string) => Promise<void>,
-  lineSeparator: '\r\n' | '\n' = '\n'
+  lineSeparator: '\r\n' | '\n' = '\n',
+  getLibraryPath: () => string | null = () => null,
+  getCurrentFilePath: () => string | null = () => null
 ): MarkdownEditorHandle {
   let viewRef: EditorView
   // Ticket #23: the Ctrl+F keymap must be part of the extensions passed
@@ -227,6 +235,9 @@ export function createMarkdownEditor(
       formattingKeymapExtension(),
       headingKeymapExtension(),
       contextualTabExtension(),
+      // Ticket #24: image paste/drop handling and inline rendering
+      imagePasteExtension(getLibraryPath, getCurrentFilePath),
+      imageWidgetExtension(),
       frontmatterPlugin(content),
       wysiwygPlugin(),
       taskCheckboxPlugin(),
