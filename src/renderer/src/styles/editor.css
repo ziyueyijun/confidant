@@ -1,0 +1,940 @@
+/* Visual spec source: spec.md 8.1/8.2/8.3 and prototypes/ui-layout/layout.html */
+
+/*
+ * Ticket #18: theme variables.
+ *
+ * `:root` holds the light-theme defaults (and the default
+ * `--editor-max-width`) so the app renders correctly even before the
+ * renderer JS applies a persisted theme. `body[data-theme="dark"]`
+ * overrides the palette for dark mode. `applyTheme()`
+ * (renderer/src/theme/applyTheme.ts) also sets these same custom
+ * properties as inline styles on `<body>` at runtime — the CSS values
+ * below are the fallback/initial paint before that JS runs, and are
+ * kept in sync with `src/shared/theme.ts` intentionally (single named
+ * palette, defined in two forms: TS for logic/tests, CSS for the
+ * pre-JS paint). We do not duplicate every rule into a second full
+ * dark stylesheet: only the variable values differ per theme.
+ */
+:root {
+  --bg-primary: #ffffff;
+  --bg-secondary: #f5f5f5;
+  --bg-tertiary: #e8e8e8;
+  --text-primary: #1a1a1a;
+  --text-secondary: #666666;
+  --border: #d0d0d0;
+  --accent: #0066cc;
+  --editor-max-width: 800px;
+}
+
+body[data-theme='dark'] {
+  --bg-primary: #1e1e1e;
+  --bg-secondary: #252526;
+  --bg-tertiary: #2d2d2d;
+  --text-primary: #d4d4d4;
+  --text-secondary: #858585;
+  --border: #3c3c3c;
+  --accent: #4a9eff;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  height: 100%;
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Microsoft YaHei', sans-serif;
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+
+#theme-toggle,
+#width-toggle,
+#open-library-button {
+  position: absolute;
+  top: 12px;
+  z-index: 10;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  border: 1px solid var(--border);
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+  cursor: pointer;
+  font-size: 16px;
+  line-height: 1;
+}
+
+#theme-toggle {
+  right: 16px;
+}
+
+#width-toggle {
+  right: 56px;
+}
+
+#open-library-button {
+  right: 96px;
+}
+
+#theme-toggle:hover,
+#width-toggle:hover,
+#open-library-button:hover {
+  background: var(--bg-tertiary);
+}
+
+#app {
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Ticket #17: sidebar (file tree) + main column (tab bar + editor). */
+#workspace {
+  flex: 1;
+  display: flex;
+  min-height: 0;
+}
+
+#sidebar {
+  width: 260px;
+  flex: 0 0 260px;
+  border-right: 1px solid var(--border);
+  background: var(--bg-secondary);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  transition: width 0.15s ease, flex-basis 0.15s ease;
+}
+
+/* Acceptance criterion #6: sidebar collapses to 0 width, expanded width is 260px. */
+#sidebar.cf-sidebar-collapsed {
+  width: 0;
+  flex: 0 0 0;
+  border-right: none;
+}
+
+#sidebar-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px;
+  border-bottom: 1px solid var(--border);
+  flex: 0 0 auto;
+}
+
+#sidebar-collapse-toggle {
+  border: none;
+  background: transparent;
+  color: var(--text-primary);
+  cursor: pointer;
+  font-size: 16px;
+  padding: 4px 6px;
+  border-radius: 4px;
+}
+
+#sidebar-collapse-toggle:hover {
+  background: var(--bg-tertiary);
+}
+
+#library-name {
+  flex: 1;
+  font-size: 13px;
+  color: var(--text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+#sidebar-search-toggle {
+  border: none;
+  background: transparent;
+  color: var(--text-primary);
+  cursor: pointer;
+  font-size: 14px;
+  padding: 4px 6px;
+  border-radius: 4px;
+  flex: 0 0 auto;
+}
+
+#sidebar-search-toggle:hover {
+  background: var(--bg-tertiary);
+}
+
+#file-tree {
+  flex: 1;
+  overflow: auto;
+  padding: 4px;
+}
+
+.cf-tree-list {
+  list-style: none;
+  margin: 0;
+  padding-left: 14px;
+}
+
+#file-tree > .cf-tree-list {
+  padding-left: 0;
+}
+
+.cf-tree-folder,
+.cf-tree-file {
+  padding: 4px 6px;
+  border-radius: 4px;
+  font-size: 13px;
+  cursor: default;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.cf-tree-folder {
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.cf-tree-file-openable {
+  cursor: pointer;
+}
+
+.cf-tree-file-openable:hover,
+.cf-tree-folder:hover {
+  background: var(--bg-tertiary);
+}
+
+.cf-tree-file-active {
+  background: var(--accent);
+  color: #fff;
+}
+
+.cf-tree-file-inert {
+  color: var(--text-secondary);
+}
+
+.cf-tree-collapsed > .cf-tree-list {
+  display: none;
+}
+
+/* Ticket #19: right-click context menu (new file / rename / delete). */
+.cf-context-menu {
+  position: fixed;
+  z-index: 1000;
+  min-width: 140px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+  padding: 4px;
+  display: flex;
+  flex-direction: column;
+}
+
+.cf-context-menu-item {
+  border: none;
+  background: transparent;
+  color: var(--text-primary);
+  text-align: left;
+  font-size: 13px;
+  padding: 6px 10px;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.cf-context-menu-item:hover {
+  background: var(--bg-tertiary);
+}
+
+/* Ticket #19: inline rename input replaces the tree label's text. */
+.cf-tree-rename-input {
+  width: 100%;
+  font-size: 13px;
+  font-family: inherit;
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  border: 1px solid var(--accent);
+  border-radius: 3px;
+  padding: 1px 4px;
+}
+
+/* Ticket #22: full-text search sidebar panel. */
+.cf-search-sidebar {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  padding: 8px;
+  gap: 6px;
+  overflow: hidden;
+}
+
+.cf-search-sidebar-input-row {
+  display: flex;
+}
+
+.cf-search-sidebar-input {
+  flex: 1;
+  padding: 6px 8px;
+  font-size: 13px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--bg-primary);
+  color: var(--text-primary);
+}
+
+.cf-search-sidebar-options {
+  display: flex;
+  gap: 4px;
+}
+
+.cf-search-option-toggle {
+  flex: 0 0 auto;
+  width: 28px;
+  height: 24px;
+  padding: 0;
+  font-size: 12px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--bg-primary);
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+
+.cf-search-option-toggle:hover {
+  background: var(--bg-tertiary);
+}
+
+.cf-search-option-active {
+  background: var(--accent);
+  color: #fff;
+  border-color: var(--accent);
+}
+
+.cf-search-sidebar-status {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 12px;
+  color: var(--text-secondary);
+  gap: 6px;
+}
+
+.cf-search-sidebar-cancel {
+  flex: 0 0 auto;
+  padding: 2px 8px;
+  font-size: 12px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  cursor: pointer;
+}
+
+.cf-search-sidebar-cancel:hover {
+  background: var(--bg-tertiary);
+}
+
+.cf-search-sidebar-results {
+  flex: 1;
+  overflow: auto;
+}
+
+.cf-search-result-file {
+  margin-bottom: 4px;
+}
+
+.cf-search-result-file summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 4px 6px;
+  font-size: 13px;
+  cursor: pointer;
+  border-radius: 4px;
+  list-style: none;
+}
+
+.cf-search-result-file summary::-webkit-details-marker {
+  display: none;
+}
+
+.cf-search-result-file summary:hover {
+  background: var(--bg-tertiary);
+}
+
+.cf-search-result-filename {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 600;
+}
+
+.cf-search-result-count {
+  flex: 0 0 auto;
+  margin-left: 8px;
+  padding: 0 6px;
+  font-size: 11px;
+  border-radius: 8px;
+  background: var(--bg-tertiary);
+  color: var(--text-secondary);
+}
+
+.cf-search-result-matches {
+  list-style: none;
+  margin: 0;
+  padding-left: 8px;
+}
+
+.cf-search-result-match {
+  padding: 4px 6px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-family: 'Consolas', 'Monaco', monospace;
+  font-size: 12px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.cf-search-result-match:hover {
+  background: var(--bg-tertiary);
+}
+
+.cf-search-result-context {
+  color: var(--text-secondary);
+  opacity: 0.75;
+}
+
+.cf-search-result-match-line {
+  color: var(--text-primary);
+}
+
+.cf-search-result-highlight {
+  background: #ffe066;
+  color: #1a1a1a;
+  border-radius: 2px;
+}
+
+.cf-search-result-more {
+  padding: 4px 6px;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+#main-column {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+/* Acceptance criterion #4: tab strip scrolls horizontally on overflow. */
+#tab-bar {
+  display: flex;
+  flex: 0 0 auto;
+  overflow-x: auto;
+  overflow-y: hidden;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-secondary);
+  scrollbar-width: thin;
+}
+
+.cf-tab {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 10px;
+  border-right: 1px solid var(--border);
+  font-size: 13px;
+  cursor: pointer;
+  white-space: nowrap;
+  flex: 0 0 auto;
+  color: var(--text-secondary);
+}
+
+.cf-tab-active {
+  background: var(--bg-primary);
+  color: var(--text-primary);
+}
+
+.cf-tab-close {
+  border: none;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  font-size: 14px;
+  line-height: 1;
+  padding: 0 2px;
+  border-radius: 3px;
+  visibility: hidden;
+}
+
+.cf-tab:hover .cf-tab-close {
+  visibility: visible;
+}
+
+.cf-tab-close:hover {
+  background: var(--bg-tertiary);
+}
+
+/* Ticket #20 acceptance criterion #5: file deleted externally while its
+   tab is still open - the tab turns red so the user notices before
+   their next edit tries (and fails) to autosave back to a path that no
+   longer exists. */
+.cf-tab-deleted,
+.cf-tab-deleted .cf-tab-label {
+  color: #d64545;
+}
+
+.cf-tab-deleted.cf-tab-active {
+  background: color-mix(in srgb, #d64545 12%, var(--bg-primary));
+}
+
+#editor-area {
+  flex: 1;
+  overflow: auto;
+  position: relative;
+}
+
+.cf-editor-pane {
+  display: none;
+  max-width: var(--editor-max-width);
+  margin: 0 auto;
+  padding: 40px 20px;
+}
+
+.cf-editor-pane-active {
+  display: block;
+}
+
+.cf-editor-host {
+  position: relative;
+  font-size: 16px;
+  line-height: 1.8;
+}
+
+.cf-editor-host .cm-editor {
+  outline: none;
+}
+
+.cf-editor-host .cm-content {
+  font-family: inherit;
+}
+
+/* WYSIWYG node styling, driven by decorations in editor/decorations.ts */
+
+.cf-editor-host .cf-h1 {
+  font-size: 32px;
+  font-weight: 700;
+}
+
+.cf-editor-host .cf-h2 {
+  font-size: 24px;
+  font-weight: 600;
+}
+
+.cf-editor-host .cf-h3 {
+  font-size: 20px;
+  font-weight: 600;
+}
+
+.cf-editor-host .cf-h4,
+.cf-editor-host .cf-h5,
+.cf-editor-host .cf-h6 {
+  font-size: 17px;
+  font-weight: 600;
+}
+
+.cf-editor-host .cf-strong {
+  font-weight: 600;
+}
+
+.cf-editor-host .cf-em {
+  font-style: italic;
+}
+
+.cf-editor-host .cf-code-inline {
+  background: var(--bg-tertiary);
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-family: 'Consolas', 'Monaco', monospace;
+  font-size: 14px;
+}
+
+.cf-editor-host .cf-code-block {
+  background: var(--bg-secondary);
+  border-left: 1px solid var(--border);
+  border-right: 1px solid var(--border);
+  font-family: 'Consolas', 'Monaco', monospace;
+  font-size: 14px;
+}
+
+.cf-editor-host .cf-code-block-start {
+  border-top: 1px solid var(--border);
+  padding-top: 4px;
+}
+
+.cf-editor-host .cf-code-block-end {
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 4px;
+}
+
+.cf-editor-host .cf-blockquote {
+  border-left: 4px solid var(--accent);
+  padding-left: 12px;
+  color: var(--text-secondary);
+  font-style: italic;
+}
+
+.cf-editor-host .cf-frontmatter {
+  background: var(--bg-tertiary);
+  color: var(--text-secondary);
+  font-family: 'Consolas', 'Monaco', monospace;
+  font-size: 13px;
+}
+
+.cf-editor-host .cf-link {
+  color: var(--accent);
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+/* Tables: MVP read-only display (spec.md 5.4, superseded — full block-edit
+   mode is #25). We keep the raw "| a | b |" source text but style each row
+   so it reads as a table instead of bare pipe-delimited text. */
+.cf-editor-host .cf-table-row {
+  background: var(--bg-secondary);
+  font-family: 'Consolas', 'Monaco', monospace;
+  font-size: 14px;
+  border-bottom: 1px solid var(--border);
+}
+
+.cf-editor-host .cf-table-header {
+  font-weight: 600;
+  border-bottom: 2px solid var(--border);
+}
+
+/* Ticket #16: GFM task list items (`- [ ] ` / `- [x] `). The checkbox
+   itself is a widget decoration (editor/decorations.ts
+   `TaskCheckboxWidget`), not raw text - styling here only covers the
+   line and the checked-state strikethrough. */
+#editor-host .cf-task {
+  list-style: none;
+}
+
+#editor-host .cf-task-checked {
+  color: var(--text-secondary);
+  text-decoration: line-through;
+}
+
+#editor-host .cf-task-checkbox {
+  margin-right: 6px;
+  cursor: pointer;
+  vertical-align: middle;
+}
+
+/* Syntax markers: hidden while the cursor/selection is outside their
+   node (Typora-style Live Preview), shown (dimmed, not deleted from the
+   document) while the cursor/selection is inside - see decorations.ts
+   `computeActiveNodeRanges`/`buildWysiwygDecorations` (#15). */
+.cf-editor-host .cf-syntax-hidden {
+  display: none;
+}
+
+.cf-editor-host .cf-syntax-visible {
+  color: var(--text-secondary);
+}
+
+/* Ticket #23: find-in-document. Match highlights are plain CM6 marks
+   (see editor/searchPanel.ts), styled here like the rest of the WYSIWYG
+   classes above. The floating panel itself is native DOM anchored inside
+   .cf-editor-host (which is `position: relative`, see above; renamed from
+   the #editor-host id by ticket #17's multi-tab rewrite - each tab now has
+   its own host element), positioned in its top-right corner per acceptance
+   criterion #1. */
+.cf-editor-host .cf-search-match {
+  background: #ffe066;
+  color: #1a1a1a;
+  border-radius: 2px;
+}
+
+.cf-editor-host .cf-search-match-current {
+  background: #ff9f40;
+  color: #1a1a1a;
+  border-radius: 2px;
+}
+
+.cf-search-panel {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 8px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+}
+
+.cf-search-input {
+  width: 160px;
+  padding: 4px 6px;
+  font-size: 13px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--bg-primary);
+  color: var(--text-primary);
+}
+
+.cf-search-count {
+  min-width: 44px;
+  font-size: 12px;
+  color: var(--text-secondary);
+  text-align: center;
+  white-space: nowrap;
+}
+
+.cf-search-btn {
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  cursor: pointer;
+  font-size: 13px;
+  line-height: 1;
+}
+
+.cf-search-btn:hover {
+  background: var(--bg-tertiary);
+}
+
+.cf-search-close {
+  font-size: 16px;
+}
+
+/* Ticket #20 acceptance criterion #5: status bar showing "changes can't
+   be saved" for a tab whose backing file was deleted externally, with a
+   Save As affordance. Sits below the editor area, above nothing (bottom
+   of #main-column). */
+#status-bar {
+  display: none;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 6px 12px;
+  font-size: 12px;
+  background: #d64545;
+  color: #ffffff;
+}
+
+#status-bar.cf-status-bar-visible {
+  display: flex;
+}
+
+#status-bar-save-as {
+  border: 1px solid rgba(255, 255, 255, 0.6);
+  border-radius: 4px;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  padding: 3px 10px;
+  font-size: 12px;
+}
+
+#status-bar-save-as:hover {
+  background: rgba(255, 255, 255, 0.15);
+}
+
+/* Ticket #20 acceptance criterion #6: three-way conflict dialog (local
+   unsaved changes + an external change both present). Native DOM modal,
+   consistent with #14/#18/#23's "no framework" convention. */
+.cf-conflict-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+}
+
+.cf-conflict-dialog {
+  width: 420px;
+  max-width: 90vw;
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  border-radius: 8px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.35);
+  padding: 20px;
+}
+
+.cf-conflict-title {
+  font-size: 15px;
+  font-weight: 600;
+  margin: 0 0 8px;
+}
+
+.cf-conflict-message {
+  font-size: 13px;
+  color: var(--text-secondary);
+  margin: 0 0 16px;
+  word-break: break-all;
+}
+
+.cf-conflict-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.cf-conflict-btn {
+  padding: 8px 12px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+  cursor: pointer;
+  font-size: 13px;
+  text-align: left;
+}
+
+.cf-conflict-btn:hover {
+  background: var(--bg-tertiary);
+}
+
+.cf-conflict-btn-primary {
+  border-color: var(--accent);
+}
+
+/* Ticket #21: Ctrl+P quick switcher. Unlike the find panel above, this
+   overlay is global (not anchored inside a single .cf-editor-host), so
+   it's appended to document.body and centers itself via the flexbox
+   backdrop below rather than absolute-positioning against an editor. */
+.cf-quick-switcher-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  padding-top: 15vh;
+  background: rgba(0, 0, 0, 0.35);
+}
+
+.cf-quick-switcher-panel {
+  display: flex;
+  flex-direction: column;
+  max-height: 60vh;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
+  overflow: hidden;
+}
+
+.cf-quick-switcher-input {
+  padding: 12px 14px;
+  font-size: 15px;
+  border: none;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  outline: none;
+}
+
+.cf-quick-switcher-results {
+  list-style: none;
+  margin: 0;
+  padding: 4px;
+  overflow-y: auto;
+}
+
+.cf-quick-switcher-empty {
+  padding: 10px 12px;
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+.cf-quick-switcher-result {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  padding: 8px 10px;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.cf-quick-switcher-result:hover {
+  background: var(--bg-tertiary);
+}
+
+.cf-quick-switcher-result-selected {
+  background: var(--bg-tertiary);
+}
+
+.cf-quick-switcher-icon {
+  flex: none;
+  font-size: 13px;
+}
+
+.cf-quick-switcher-name {
+  flex: none;
+  font-size: 14px;
+  color: var(--text-primary);
+}
+
+.cf-quick-switcher-path {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-size: 12px;
+  color: var(--text-secondary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Ticket #22 acceptance criterion #5: transient 3s line highlight when a
+   full-text search result is clicked (see editor/revealLine.ts). */
+.cf-editor-host .cf-line-highlight {
+  background: rgba(255, 224, 102, 0.35);
+  transition: background-color 0.3s ease;
+}
+
+/* Ticket #25: table block edit mode with click-to-edit. */
+.table-widget {
+  border: 1px solid var(--border);
+  margin: 8px 0;
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 4px;
+  transition: border-color 0.15s ease;
+}
+
+.table-widget:hover {
+  border-color: #999;
+}
+
+.table-widget table {
+  border-collapse: collapse;
+  width: 100%;
+}
+
+.table-widget th,
+.table-widget td {
+  border: 1px solid var(--border);
+  padding: 8px;
+  text-align: left;
+}
+
+.table-widget th {
+  background-color: var(--bg-tertiary);
+  font-weight: bold;
+}

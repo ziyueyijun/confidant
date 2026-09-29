@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'"
+    />
+    <title>Confidant</title>
+  </head>
+  <body>
+    <div id="app">
+      <button id="theme-toggle" type="button" title="Toggle light/dark theme" aria-label="Toggle light/dark theme">
+        &#9788;
+      </button>
+      <button
+        id="width-toggle"
+        type="button"
+        title="Cycle editor width (800px / 1000px / 100%)"
+        aria-label="Cycle editor width"
+      >
+        &#8596;
+      </button>
+      <button
+        id="open-library-button"
+        type="button"
+        title="Open library folder"
+        aria-label="Open library folder"
+      >
+        &#128194;
+      </button>
+      <div id="workspace">
+        <aside id="sidebar">
+          <div id="sidebar-header">
+            <button
+              id="sidebar-collapse-toggle"
+              type="button"
+              title="Collapse/expand sidebar"
+              aria-label="Collapse/expand sidebar"
+            >
+              &#9776;
+            </button>
+            <span id="library-name"></span>
+            <button
+              id="sidebar-search-toggle"
+              type="button"
+              title="Search (Ctrl+Shift+F)"
+              aria-label="Toggle search panel"
+            >
+              &#128269;
+            </button>
+          </div>
+          <div id="file-tree"></div>
+          <div id="search-panel" hidden></div>
+        </aside>
+        <div id="main-column">
+          <div id="tab-bar" role="tablist"></div>
+          <div id="editor-area">
+            <div id="editor-hosts"></div>
+          </div>
+          <div id="status-bar" role="status">
+            <span id="status-bar-message"></span>
+            <button id="status-bar-save-as" type="button">另存为</button>
+          </div>
+        </div>
+      </div>
+    </div>
+    <script type="module" src="./src/main.ts"></script>
+  </body>
+</html>
