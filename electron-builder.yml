@@ -1,0 +1,27 @@
+appId: com.confidant.app
+productName: Confidant
+directories:
+  output: dist
+  buildResources: build
+files:
+  - out/**/*
+  - package.json
+win:
+  target:
+    - nsis
+    - portable
+  fileAssociations:
+    - ext: md
+      name: Markdown File
+      description: Markdown document
+      role: Editor
+nsis:
+  oneClick: false
+  allowToChangeInstallationDirectory: true
+  perMachine: false
+  createDesktopShortcut: always
+  createStartMenuShortcut: true
+  shortcutName: Confidant
+  deleteAppDataOnUninstall: false
+portable:
+  artifactName: ${productName}-${version}-portable.exe

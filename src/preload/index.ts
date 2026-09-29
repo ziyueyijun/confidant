@@ -201,7 +201,17 @@ const api = {
    * and saves it to the library's attachments folder. Returns the filename.
    */
   downloadImage: (libraryPath: string, url: string): Promise<string> =>
-    ipcRenderer.invoke('image:downloadFromUrl', libraryPath, url)
+    ipcRenderer.invoke('image:downloadFromUrl', libraryPath, url),
+
+  /**
+   * Ticket #28: subscribes to command-line file-open events (both first
+   * launch and second-instance activation). Returns an unsubscribe function.
+   */
+  onOpenFileFromArgv: (callback: (filePath: string) => void): (() => void) => {
+    const listener = (_event: unknown, filePath: string): void => callback(filePath)
+    ipcRenderer.on('open-file-from-argv', listener)
+    return () => ipcRenderer.removeListener('open-file-from-argv', listener)
+  }
 }
 
 contextBridge.exposeInMainWorld('api', api)

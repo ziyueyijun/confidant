@@ -9,6 +9,9 @@
   "scripts": {
     "dev": "electron-vite dev",
     "build": "electron-vite build",
+    "build:win": "npm run build && electron-builder --win",
+    "build:win:nsis": "npm run build && electron-builder --win nsis",
+    "build:win:portable": "npm run build && electron-builder --win portable",
     "typecheck:node": "tsc --noEmit -p tsconfig.node.json --composite false",
     "typecheck:web": "tsc --noEmit -p tsconfig.web.json --composite false",
     "typecheck": "npm run typecheck:node && npm run typecheck:web",
@@ -33,6 +36,7 @@
     "@types/markdown-it": "^14.1.2",
     "@types/node": "^22.10.2",
     "electron": "^44.4.5",
+    "electron-builder": "^26.15.3",
     "electron-vite": "^4.0.1",
     "jsdom": "^30.1.1",
     "typescript": "^5.7.2",

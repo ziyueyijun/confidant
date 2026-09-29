@@ -26,8 +26,11 @@ import type { FileTreeNode } from '../shared/fileTree'
 import type { CoalescedEvent } from '../shared/externalWatch'
 import type { GroupedFileResult } from '../shared/search'
 
+// Ticket #28: store mainWindow reference for single-instance handling
+let mainWindow: BrowserWindow | null = null
+
 function createWindow(): void {
-  const mainWindow = new BrowserWindow({
+  mainWindow = new BrowserWindow({
     width: 1100,
     height: 750,
     show: false,
@@ -36,12 +39,17 @@ function createWindow(): void {
       preload: join(__dirname, '../preload/index.js'),
       sandbox: true,
       contextIsolation: true,
-      nodeIntegration: false
+      nodeIntegration: false,
+      v8CacheOptions: 'code' // Ticket #28: enable V8 code cache for faster startup
     }
   })
 
   mainWindow.on('ready-to-show', () => {
-    mainWindow.show()
+    mainWindow?.show()
+  })
+
+  mainWindow.on('closed', () => {
+    mainWindow = null
   })
 
   mainWindow.webContents.setWindowOpenHandler((details) => {
@@ -54,9 +62,37 @@ function createWindow(): void {
   } else {
     mainWindow.loadFile(join(__dirname, '../renderer/index.html'))
   }
+
+  // Ticket #28: handle command-line file path on first launch
+  const initialFilePath = findMarkdownPathInArgv(process.argv)
+  if (initialFilePath) {
+    mainWindow.webContents.once('did-finish-load', () => {
+      mainWindow?.webContents.send('open-file-from-argv', initialFilePath)
+    })
+  }
 }
 
-app.whenReady().then(() => {
+// Ticket #28: single-instance lock - activate existing window instead of opening new instances
+const gotTheLock = app.requestSingleInstanceLock()
+
+if (!gotTheLock) {
+  app.quit()
+} else {
+  app.on('second-instance', (_event, commandLine, _workingDirectory) => {
+    // Someone tried to run a second instance, activate existing window
+    if (mainWindow) {
+      if (mainWindow.isMinimized()) mainWindow.restore()
+      mainWindow.focus()
+
+      // Handle command-line file path from second instance
+      const filePath = findMarkdownPathInArgv(commandLine)
+      if (filePath) {
+        mainWindow.webContents.send('open-file-from-argv', filePath)
+      }
+    }
+  })
+
+  app.whenReady().then(() => {
   electronApp.setAppUserModelId('com.confidant.app')
 
   app.on('browser-window-created', (_, window) => {
@@ -296,12 +332,13 @@ app.whenReady().then(() => {
     return await saveImageToAttachments(libraryPath, buffer, extension)
   })
 
-  createWindow()
+    createWindow()
 
-  app.on('activate', () => {
-    if (BrowserWindow.getAllWindows().length === 0) createWindow()
+    app.on('activate', () => {
+      if (BrowserWindow.getAllWindows().length === 0) createWindow()
+    })
   })
-})
+}
 
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') {

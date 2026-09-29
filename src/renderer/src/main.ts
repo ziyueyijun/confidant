@@ -610,6 +610,11 @@ async function bootstrap(): Promise<void> {
     await openSampleDocument()
   }
 
+  // Ticket #28: handle file paths from command line (second-instance activation)
+  window.api.onOpenFileFromArgv((filePath) => {
+    void openFileInTab(filePath)
+  })
+
   rerenderTabBar()
   wireLifecycleFlush()
 
