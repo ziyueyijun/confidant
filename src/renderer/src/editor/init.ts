@@ -9,6 +9,9 @@ import { splitFrontmatter } from '../lib/markdown'
 import { createAutosaveController, type AutosaveController } from './autosave'
 import { attachSearchPanel, findKeymapExtension, searchExtensions, type SearchPanelHandle } from './searchPanel'
 import { revealAndHighlightLine, revealLineExtensions } from './revealLine'
+import { formattingKeymapExtension } from './extensions/formattingKeymap'
+import { headingKeymapExtension } from './extensions/headingKeymap'
+import { contextualTabExtension } from './extensions/contextualTab'
 
 /**
  * Ticket #15: the editor is now live.
@@ -217,6 +220,13 @@ export function createMarkdownEditor(
       // wasn't wired up by #14/#15 yet.
       history(),
       keymap.of([...defaultKeymap, ...historyKeymap]),
+      // Ticket #26: formatting shortcuts (Ctrl+B/I), heading shortcuts
+      // (Ctrl+0~6), and context-aware Tab/Shift+Tab (list indent/dedent,
+      // code block tab insertion). These are registered before
+      // `defaultKeymap` above so they take precedence.
+      formattingKeymapExtension(),
+      headingKeymapExtension(),
+      contextualTabExtension(),
       frontmatterPlugin(content),
       wysiwygPlugin(),
       taskCheckboxPlugin(),
