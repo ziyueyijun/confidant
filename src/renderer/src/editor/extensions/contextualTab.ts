@@ -34,6 +34,38 @@ function contextualTab(view: EditorView): boolean {
   const tree = syntaxTree(view.state)
   const node = tree.resolveInner(from, -1)
 
+  // 检查是否在表格内（Ticket #25）
+  const tableNode = findAncestor(node, (name) => name === 'Table')
+
+  if (tableNode) {
+    // 在表格内，查找下一个 | 位置
+    const line = view.state.doc.lineAt(from)
+    const lineText = line.text
+    const offset = from - line.from
+    const nextPipe = lineText.indexOf('|', offset + 1)
+
+    if (nextPipe !== -1) {
+      // 跳到下一个 | 之后
+      view.dispatch({
+        selection: { anchor: line.from + nextPipe + 1 }
+      })
+      return true
+    }
+
+    // 行末，跳到下一行第一个 |
+    if (line.number < view.state.doc.lines) {
+      const nextLine = view.state.doc.line(line.number + 1)
+      const firstPipe = nextLine.text.indexOf('|')
+      if (firstPipe !== -1) {
+        view.dispatch({
+          selection: { anchor: nextLine.from + firstPipe + 1 }
+        })
+        return true
+      }
+    }
+    return true // 表格内但没找到下一个位置，吃掉 Tab
+  }
+
   // 检查是否在列表项内
   const listNode = findAncestor(node, (name) =>
     name.includes('ListItem') || name === 'BulletList' || name === 'OrderedList'

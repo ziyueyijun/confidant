@@ -907,3 +907,34 @@ body {
   background: rgba(255, 224, 102, 0.35);
   transition: background-color 0.3s ease;
 }
+
+/* Ticket #25: table block edit mode with click-to-edit. */
+.table-widget {
+  border: 1px solid var(--border);
+  margin: 8px 0;
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 4px;
+  transition: border-color 0.15s ease;
+}
+
+.table-widget:hover {
+  border-color: #999;
+}
+
+.table-widget table {
+  border-collapse: collapse;
+  width: 100%;
+}
+
+.table-widget th,
+.table-widget td {
+  border: 1px solid var(--border);
+  padding: 8px;
+  text-align: left;
+}
+
+.table-widget th {
+  background-color: var(--bg-tertiary);
+  font-weight: bold;
+}

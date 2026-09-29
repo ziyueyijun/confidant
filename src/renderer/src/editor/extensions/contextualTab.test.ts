@@ -2,28 +2,94 @@ import { describe, expect, it } from 'vitest'
 import { EditorState, EditorSelection } from '@codemirror/state'
 import { EditorView } from '@codemirror/view'
 import { markdown } from '@codemirror/lang-markdown'
+import { Table } from '@lezer/markdown'
 import { contextualTabExtension } from './contextualTab'
 
 /**
  * Ticket #26: Tab/Shift+Tab 上下文相关行为测试
+ * Ticket #25: 表格内 Tab 键跳转测试
  */
 
 function createTestView(doc: string, cursorPos: number): EditorView {
   const state = EditorState.create({
     doc,
-    extensions: [markdown(), contextualTabExtension()],
+    extensions: [markdown({ extensions: [Table] }), contextualTabExtension()],
     selection: EditorSelection.single(cursorPos)
   })
   return new EditorView({ state })
 }
 
+describe('contextualTab - Tab in tables (Ticket #25)', () => {
+  it('跳转到同一行的下一个单元格', () => {
+    const tableDoc = `| Name | Age |
+| --- | --- |
+| Alice | 30 |`
+    const view = createTestView(tableDoc, 2) // 在 "Name" 中
+
+    view.contentDOM.dispatchEvent(new KeyboardEvent('keydown', { key: 'Tab', bubbles: true }))
+
+    // 应该跳到第一个 | 之后（Age 列）
+    const cursorPos = view.state.selection.main.anchor
+    const line = view.state.doc.lineAt(cursorPos)
+    expect(line.text).toBe('| Name | Age |')
+    // 应该跳过第一个单元格，光标位置应该大于初始位置
+    expect(cursorPos).toBeGreaterThan(2)
+
+    view.destroy()
+  })
+
+  it('从行末跳转到下一行第一个单元格', () => {
+    const tableDoc = `| A | B |
+| --- | --- |
+| C | D |`
+    const view = createTestView(tableDoc, 8) // 在第一行 "B" 之后
+
+    view.contentDOM.dispatchEvent(new KeyboardEvent('keydown', { key: 'Tab', bubbles: true }))
+
+    // 应该跳到下一行（对齐行）
+    const cursorPos = view.state.selection.main.anchor
+    const line = view.state.doc.lineAt(cursorPos)
+    expect(line.text).toContain('---')
+
+    view.destroy()
+  })
+
+  it('在表格内时 Tab 键不会插入制表符', () => {
+    const tableDoc = `| Col |
+| --- |
+| Val |`
+    const view = createTestView(tableDoc, 3) // 在 "Col" 中
+    const before = view.state.doc.toString()
+
+    view.contentDOM.dispatchEvent(new KeyboardEvent('keydown', { key: 'Tab', bubbles: true }))
+
+    // 应该只移动光标，不插入字符
+    const after = view.state.doc.toString()
+    expect(after).toBe(before)
+
+    view.destroy()
+  })
+
+  it('表格内跳转不影响文档内容', () => {
+    const tableDoc = `| Header |
+| --- |
+| Data |`
+    const view = createTestView(tableDoc, 2)
+    const lengthBefore = view.state.doc.length
+
+    view.contentDOM.dispatchEvent(new KeyboardEvent('keydown', { key: 'Tab', bubbles: true }))
+
+    expect(view.state.doc.length).toBe(lengthBefore)
+
+    view.destroy()
+  })
+})
+
 describe('contextualTab - Tab in list items', () => {
   it('indents a bullet list item by adding two spaces', () => {
     const view = createTestView('- item one\n- item two', 2)
 
-    view.contentDOM.dispatchEvent(
-      new KeyboardEvent('keydown', { key: 'Tab', bubbles: true })
-    )
+    view.contentDOM.dispatchEvent(new KeyboardEvent('keydown', { key: 'Tab', bubbles: true }))
 
     expect(view.state.doc.toString()).toBe('  - item one\n- item two')
 
@@ -33,9 +99,7 @@ describe('contextualTab - Tab in list items', () => {
   it('indents an ordered list item', () => {
     const view = createTestView('1. first item\n2. second item', 3)
 
-    view.contentDOM.dispatchEvent(
-      new KeyboardEvent('keydown', { key: 'Tab', bubbles: true })
-    )
+    view.contentDOM.dispatchEvent(new KeyboardEvent('keydown', { key: 'Tab', bubbles: true }))
 
     expect(view.state.doc.toString()).toBe('  1. first item\n2. second item')
 
@@ -45,9 +109,7 @@ describe('contextualTab - Tab in list items', () => {
   it('indents nested list item further', () => {
     const view = createTestView('  - nested item', 4)
 
-    view.contentDOM.dispatchEvent(
-      new KeyboardEvent('keydown', { key: 'Tab', bubbles: true })
-    )
+    view.contentDOM.dispatchEvent(new KeyboardEvent('keydown', { key: 'Tab', bubbles: true }))
 
     expect(view.state.doc.toString()).toBe('    - nested item')
 
@@ -110,9 +172,7 @@ describe('contextualTab - Tab in code blocks', () => {
   it('inserts a tab character in fenced code block', () => {
     const view = createTestView('```js\nconst x = 1\n```', 11)
 
-    view.contentDOM.dispatchEvent(
-      new KeyboardEvent('keydown', { key: 'Tab', bubbles: true })
-    )
+    view.contentDOM.dispatchEvent(new KeyboardEvent('keydown', { key: 'Tab', bubbles: true }))
 
     expect(view.state.doc.toString()).toBe('```js\nconst\t x = 1\n```')
 
@@ -122,9 +182,7 @@ describe('contextualTab - Tab in code blocks', () => {
   it('inserts tab at beginning of code line', () => {
     const view = createTestView('```\ncode line\n```', 4)
 
-    view.contentDOM.dispatchEvent(
-      new KeyboardEvent('keydown', { key: 'Tab', bubbles: true })
-    )
+    view.contentDOM.dispatchEvent(new KeyboardEvent('keydown', { key: 'Tab', bubbles: true }))
 
     expect(view.state.doc.toString()).toBe('```\n\tcode line\n```')
 
@@ -139,9 +197,7 @@ describe('contextualTab - Tab in plain text', () => {
     // Tab 在普通文本中应该返回 false，让 CM6 使用默认行为
     // 这里我们测试按下 Tab 后文档是否保持不变（因为我们的处理器返回 false）
 
-    view.contentDOM.dispatchEvent(
-      new KeyboardEvent('keydown', { key: 'Tab', bubbles: true })
-    )
+    view.contentDOM.dispatchEvent(new KeyboardEvent('keydown', { key: 'Tab', bubbles: true }))
 
     // 由于我们的处理器返回 false，CM6 会使用默认行为
     // 默认行为可能是插入 Tab 或其他，这取决于 defaultKeymap
@@ -153,9 +209,7 @@ describe('contextualTab - Tab in plain text', () => {
   it('recognizes heading as plain text context', () => {
     const view = createTestView('# Heading', 5)
 
-    view.contentDOM.dispatchEvent(
-      new KeyboardEvent('keydown', { key: 'Tab', bubbles: true })
-    )
+    view.contentDOM.dispatchEvent(new KeyboardEvent('keydown', { key: 'Tab', bubbles: true }))
 
     // 标题不是列表也不是代码块，应该使用默认行为
 

@@ -14,6 +14,7 @@ import { headingKeymapExtension } from './extensions/headingKeymap'
 import { contextualTabExtension } from './extensions/contextualTab'
 import { imagePasteExtension } from './extensions/imagePaste'
 import { imageWidgetExtension } from './extensions/imageWidget'
+import { tableWidgetExtension } from './extensions/tableWidget'
 
 /**
  * Ticket #15: the editor is now live.
@@ -238,6 +239,8 @@ export function createMarkdownEditor(
       // Ticket #24: image paste/drop handling and inline rendering
       imagePasteExtension(getLibraryPath, getCurrentFilePath),
       imageWidgetExtension(),
+      // Ticket #25: table block edit mode with click-to-edit
+      tableWidgetExtension(),
       frontmatterPlugin(content),
       wysiwygPlugin(),
       taskCheckboxPlugin(),
