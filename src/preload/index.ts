@@ -16,17 +16,53 @@ export type { GroupedFileResult, LineMatch, SearchOptions } from '../shared/sear
  * still load, but the renderer should be told so it can warn the user
  * in a later ticket). `encoding` (added in #15) is the BOM/line-ending
  * info the renderer must hand back unchanged on `file:write`.
+ *
+ * Ticket #27: now includes error handling for large files, binary files,
+ * encoding issues, and permission problems.
  */
 export interface FileEncodingInfo {
   hasBOM: boolean
   lineEnding: 'CRLF' | 'LF'
 }
 
+export type ReadFileError =
+  | 'FILE_TOO_LARGE'
+  | 'BINARY_FILE'
+  | 'ENCODING_ERROR'
+  | 'ACCESS_DENIED'
+
 export interface ReadFileResult {
+  success: true
   content: string
   warning?: string
   encoding: FileEncodingInfo
+  detectedEncoding?: string
 }
+
+export interface ReadFileErrorResult {
+  success: false
+  error: ReadFileError
+  message: string
+}
+
+export type ReadFileResultOrError = ReadFileResult | ReadFileErrorResult
+
+/**
+ * Ticket #27: write operation result with error handling.
+ */
+export type WriteFileError = 'READ_ONLY' | 'PERMISSION_DENIED' | 'DISK_FULL'
+
+export interface WriteFileSuccess {
+  success: true
+}
+
+export interface WriteFileErrorResult {
+  success: false
+  error: WriteFileError
+  message: string
+}
+
+export type WriteFileResult = WriteFileSuccess | WriteFileErrorResult
 
 /**
  * Narrow, explicit API surface exposed to the renderer.
@@ -38,7 +74,7 @@ export interface ReadFileResult {
  */
 const api = {
   /** Read a UTF-8 text file from disk. */
-  readFile: (filePath: string): Promise<ReadFileResult> => ipcRenderer.invoke('file:read', filePath),
+  readFile: (filePath: string): Promise<ReadFileResultOrError> => ipcRenderer.invoke('file:read', filePath),
   /**
    * Atomically writes markdown content back to `filePath`, re-applying
    * the BOM detected at read time (ticket #15). Line endings are not
@@ -46,8 +82,10 @@ const api = {
    * (which already carries whatever line endings it was loaded with),
    * so the main process never re-normalizes/rewrites lines the user
    * didn't touch (minimal-diff requirement).
+   *
+   * Ticket #27: now returns a result indicating success or error.
    */
-  writeFile: (filePath: string, content: string, encoding: Pick<FileEncodingInfo, 'hasBOM'>): Promise<void> =>
+  writeFile: (filePath: string, content: string, encoding: Pick<FileEncodingInfo, 'hasBOM'>): Promise<WriteFileResult> =>
     ipcRenderer.invoke('file:write', filePath, content, encoding),
   /**
    * Opens a native "Save As" dialog pre-filled with `defaultPath`

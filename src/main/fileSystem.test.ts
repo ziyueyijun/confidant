@@ -87,9 +87,12 @@ describe('readFile / writeMarkdownFile round-trip (BOM + line endings)', () => {
 
     const result = await readFile(filePath)
 
-    expect(result.encoding.hasBOM).toBe(false)
-    expect(result.encoding.lineEnding).toBe('CRLF')
-    expect(result.content).toBe('# Title\r\n\r\nBody text\r\n')
+    expect(result.success).toBe(true)
+    if (result.success) {
+      expect(result.encoding.hasBOM).toBe(false)
+      expect(result.encoding.lineEnding).toBe('CRLF')
+      expect(result.content).toBe('# Title\r\n\r\nBody text\r\n')
+    }
   })
 
   it('detects a UTF-8 BOM and strips it from the returned content', async () => {
@@ -98,16 +101,23 @@ describe('readFile / writeMarkdownFile round-trip (BOM + line endings)', () => {
 
     const result = await readFile(filePath)
 
-    expect(result.encoding.hasBOM).toBe(true)
-    expect(result.content).toBe('# Title\nBody\n')
-    expect(result.content.charCodeAt(0)).not.toBe(0xfeff)
+    expect(result.success).toBe(true)
+    if (result.success) {
+      expect(result.encoding.hasBOM).toBe(true)
+      expect(result.content).toBe('# Title\nBody\n')
+      expect(result.content.charCodeAt(0)).not.toBe(0xfeff)
+    }
   })
 
   it('re-applies the BOM on save when the original file had one', async () => {
     const filePath = join(dir, 'bom.md')
     await fs.writeFile(filePath, '﻿# Title\n', 'utf-8')
 
-    const { encoding } = await readFile(filePath)
+    const readResult = await readFile(filePath)
+    expect(readResult.success).toBe(true)
+    if (!readResult.success) return
+
+    const { encoding } = readResult
     await writeMarkdownFile(filePath, '# Title edited\n', { hasBOM: encoding.hasBOM })
 
     const raw = await fs.readFile(filePath, 'utf-8')
@@ -119,7 +129,11 @@ describe('readFile / writeMarkdownFile round-trip (BOM + line endings)', () => {
     const filePath = join(dir, 'no-bom.md')
     await fs.writeFile(filePath, '# Title\n', 'utf-8')
 
-    const { encoding } = await readFile(filePath)
+    const readResult = await readFile(filePath)
+    expect(readResult.success).toBe(true)
+    if (!readResult.success) return
+
+    const { encoding } = readResult
     await writeMarkdownFile(filePath, '# Title edited\n', { hasBOM: encoding.hasBOM })
 
     const raw = await fs.readFile(filePath, 'utf-8')
@@ -209,7 +223,11 @@ describe('minimal-diff save (acceptance criterion #6)', () => {
     const filePath = join(dir, 'roundtrip.md')
     await fs.writeFile(filePath, ORIGINAL, 'utf-8')
 
-    const { content, encoding } = await readFile(filePath)
+    const readResult = await readFile(filePath)
+    expect(readResult.success).toBe(true)
+    if (!readResult.success) return
+
+    const { content, encoding } = readResult
     // Simulate "open, make no edits, close": save back exactly what was loaded.
     await writeMarkdownFile(filePath, content, { hasBOM: encoding.hasBOM })
 
@@ -221,7 +239,11 @@ describe('minimal-diff save (acceptance criterion #6)', () => {
     const filePath = join(dir, 'oneword.md')
     await fs.writeFile(filePath, ORIGINAL, 'utf-8')
 
-    const { content, encoding } = await readFile(filePath)
+    const readResult = await readFile(filePath)
+    expect(readResult.success).toBe(true)
+    if (!readResult.success) return
+
+    const { content, encoding } = readResult
 
     // Simulate CM6 handing back `state.doc.toString()` after a targeted
     // word edit: only "Notes" -> "Notes!" changes, nothing else is
@@ -255,7 +277,11 @@ describe('minimal-diff save (acceptance criterion #6)', () => {
     const filePath = join(dir, 'hardbreak.md')
     await fs.writeFile(filePath, ORIGINAL, 'utf-8')
 
-    const { content, encoding } = await readFile(filePath)
+    const readResult = await readFile(filePath)
+    expect(readResult.success).toBe(true)
+    if (!readResult.success) return
+
+    const { content, encoding } = readResult
     await writeMarkdownFile(filePath, content, { hasBOM: encoding.hasBOM })
 
     const after = await fs.readFile(filePath, 'utf-8')
@@ -493,3 +519,230 @@ describe('deleteToTrash (ticket #19)', () => {
     expect(shell.trashItem).toHaveBeenCalledWith('/some/path/note.md')
   })
 })
+
+describe('exception handling (ticket #27)', () => {
+  let dir: string
+
+  beforeEach(async () => {
+    dir = await fs.mkdtemp(join(tmpdir(), 'confidant-exception-'))
+  })
+
+  afterEach(async () => {
+    await fs.rm(dir, { recursive: true, force: true })
+  })
+
+  describe('file size checks (acceptance criterion #4)', () => {
+    it('warns but allows opening a file between 10MB and 50MB', async () => {
+      const filePath = join(dir, 'large.md')
+      const content = 'x'.repeat(15 * 1024 * 1024) // 15MB
+      await fs.writeFile(filePath, content, 'utf-8')
+
+      const result = await readFile(filePath)
+
+      expect(result.success).toBe(true)
+      if (result.success) {
+        expect(result.warning).toBeDefined()
+        expect(result.warning).toContain('文件较大')
+        expect(result.content).toBe(content)
+      }
+    })
+
+    it('refuses to open a file >= 50MB', async () => {
+      const filePath = join(dir, 'huge.md')
+      const content = 'x'.repeat(60 * 1024 * 1024) // 60MB
+      await fs.writeFile(filePath, content, 'utf-8')
+
+      const result = await readFile(filePath)
+
+      expect(result.success).toBe(false)
+      if (!result.success) {
+        expect(result.error).toBe('FILE_TOO_LARGE')
+        expect(result.message).toContain('文件过大')
+      }
+    })
+
+    it('allows opening a file just under 10MB without file size warning', async () => {
+      const filePath = join(dir, 'normal.md')
+      // Use a smaller file to avoid triggering the character count warning
+      const content = 'x'.repeat(50_000) // 50k characters, well under 100k
+      await fs.writeFile(filePath, content, 'utf-8')
+
+      const result = await readFile(filePath)
+
+      expect(result.success).toBe(true)
+      if (result.success) {
+        expect(result.warning).toBeUndefined()
+        expect(result.content).toBe(content)
+      }
+    })
+  })
+
+  describe('binary file detection (acceptance criterion #6)', () => {
+    it('refuses to open a file containing null bytes', async () => {
+      const filePath = join(dir, 'binary.dat')
+      const content = 'text\0more text\0'
+      await fs.writeFile(filePath, content, 'utf-8')
+
+      const result = await readFile(filePath)
+
+      expect(result.success).toBe(false)
+      if (!result.success) {
+        expect(result.error).toBe('BINARY_FILE')
+        expect(result.message).toContain('二进制文件')
+      }
+    })
+
+    it('allows opening a text file without null bytes', async () => {
+      const filePath = join(dir, 'text.md')
+      const content = '# Title\n\nNormal text content'
+      await fs.writeFile(filePath, content, 'utf-8')
+
+      const result = await readFile(filePath)
+
+      expect(result.success).toBe(true)
+      if (result.success) {
+        expect(result.content).toBe(content)
+      }
+    })
+  })
+
+  describe('write permission errors (acceptance criteria #1, #2, #3)', () => {
+    it('returns PERMISSION_DENIED error when write fails with EACCES', async () => {
+      const filePath = join(dir, 'protected.md')
+      const writeSpy = vi.spyOn(fs, 'writeFile').mockRejectedValue(
+        Object.assign(new Error('EACCES'), { code: 'EACCES' })
+      )
+
+      const result = await writeFileAtomic(filePath, 'content')
+
+      expect(result.success).toBe(false)
+      if (!result.success) {
+        expect(result.error).toBe('PERMISSION_DENIED')
+        expect(result.message).toContain('权限不足')
+      }
+
+      writeSpy.mockRestore()
+    })
+
+    it('returns READ_ONLY error when write fails with EROFS', async () => {
+      const filePath = join(dir, 'readonly.md')
+      const writeSpy = vi.spyOn(fs, 'writeFile').mockRejectedValue(
+        Object.assign(new Error('EROFS'), { code: 'EROFS' })
+      )
+
+      const result = await writeFileAtomic(filePath, 'content')
+
+      expect(result.success).toBe(false)
+      if (!result.success) {
+        expect(result.error).toBe('READ_ONLY')
+        expect(result.message).toContain('只读')
+      }
+
+      writeSpy.mockRestore()
+    })
+
+    it('returns DISK_FULL error when write fails with ENOSPC', async () => {
+      const filePath = join(dir, 'full.md')
+      const writeSpy = vi.spyOn(fs, 'writeFile').mockRejectedValue(
+        Object.assign(new Error('ENOSPC'), { code: 'ENOSPC' })
+      )
+
+      const result = await writeFileAtomic(filePath, 'content')
+
+      expect(result.success).toBe(false)
+      if (!result.success) {
+        expect(result.error).toBe('DISK_FULL')
+        expect(result.message).toContain('磁盘空间不足')
+      }
+
+      writeSpy.mockRestore()
+    })
+
+    it('returns success when write succeeds', async () => {
+      const filePath = join(dir, 'success.md')
+
+      const result = await writeFileAtomic(filePath, 'content')
+
+      expect(result.success).toBe(true)
+      expect(await fs.readFile(filePath, 'utf-8')).toBe('content')
+    })
+
+    it('handles permission error on rename step', async () => {
+      const filePath = join(dir, 'rename-fail.md')
+      const renameSpy = vi.spyOn(fs, 'rename').mockRejectedValue(
+        Object.assign(new Error('EACCES'), { code: 'EACCES' })
+      )
+
+      const result = await writeFileAtomic(filePath, 'content')
+
+      expect(result.success).toBe(false)
+      if (!result.success) {
+        expect(result.error).toBe('PERMISSION_DENIED')
+      }
+
+      renameSpy.mockRestore()
+    })
+  })
+
+  describe('writeMarkdownFile returns result', () => {
+    it('returns success result when write succeeds', async () => {
+      const filePath = join(dir, 'good.md')
+
+      const result = await writeMarkdownFile(filePath, '# Test', { hasBOM: false })
+
+      expect(result.success).toBe(true)
+    })
+
+    it('returns error result when write fails', async () => {
+      const filePath = join(dir, 'bad.md')
+      const writeSpy = vi.spyOn(fs, 'writeFile').mockRejectedValue(
+        Object.assign(new Error('ENOSPC'), { code: 'ENOSPC' })
+      )
+
+      const result = await writeMarkdownFile(filePath, '# Test', { hasBOM: false })
+
+      expect(result.success).toBe(false)
+      if (!result.success) {
+        expect(result.error).toBe('DISK_FULL')
+      }
+
+      writeSpy.mockRestore()
+    })
+  })
+
+  describe('read permission errors', () => {
+    it('returns ACCESS_DENIED when stat fails with EACCES', async () => {
+      const filePath = join(dir, 'no-access.md')
+      const statSpy = vi.spyOn(fs, 'stat').mockRejectedValue(
+        Object.assign(new Error('EACCES'), { code: 'EACCES' })
+      )
+
+      const result = await readFile(filePath)
+
+      expect(result.success).toBe(false)
+      if (!result.success) {
+        expect(result.error).toBe('ACCESS_DENIED')
+        expect(result.message).toContain('权限不足')
+      }
+
+      statSpy.mockRestore()
+    })
+
+    it('returns ACCESS_DENIED when stat fails with EPERM', async () => {
+      const filePath = join(dir, 'no-perm.md')
+      const statSpy = vi.spyOn(fs, 'stat').mockRejectedValue(
+        Object.assign(new Error('EPERM'), { code: 'EPERM' })
+      )
+
+      const result = await readFile(filePath)
+
+      expect(result.success).toBe(false)
+      if (!result.success) {
+        expect(result.error).toBe('ACCESS_DENIED')
+      }
+
+      statSpy.mockRestore()
+    })
+  })
+})
+

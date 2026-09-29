@@ -9,7 +9,8 @@ import {
   createFile,
   renameEntry,
   deleteToTrash,
-  type ReadFileResult,
+  type ReadFileResultOrError,
+  type WriteFileResult,
   type FileEncodingInfo,
   type RenameResult
 } from './fileSystem'
@@ -78,12 +79,14 @@ app.whenReady().then(() => {
     })
   }
 
-  ipcMain.handle('file:read', async (_event, filePath: string): Promise<ReadFileResult> => {
+  ipcMain.handle('file:read', async (_event, filePath: string): Promise<ReadFileResultOrError> => {
     const result = await readFile(filePath)
     // Record this read's on-disk state as "known" so a later chokidar
     // event that merely reflects what we just read (no actual change
     // since) isn't misreported as external (acceptance criterion #3).
-    await watchHandle?.noteKnownState(filePath)
+    if (result.success) {
+      await watchHandle?.noteKnownState(filePath)
+    }
     return result
   })
 
@@ -94,19 +97,22 @@ app.whenReady().then(() => {
       filePath: string,
       content: string,
       encoding: Pick<FileEncodingInfo, 'hasBOM'>
-    ): Promise<void> => {
-      await writeMarkdownFile(filePath, content, encoding)
+    ): Promise<WriteFileResult> => {
+      const result = await writeMarkdownFile(filePath, content, encoding)
       // Record the etag of what we just wrote *before* chokidar's event
       // for this write arrives, so the debounced handler recognizes it
       // as our own save rather than an external change (criterion #3).
-      try {
-        const stat = await fsPromises.stat(filePath)
-        watchHandle?.noteOwnWrite(filePath, computeEtag(stat))
-      } catch {
-        // Best-effort - if the stat fails right after a successful
-        // write (unlikely), the next external-change check will simply
-        // fall back to treating the next event as external.
+      if (result.success) {
+        try {
+          const stat = await fsPromises.stat(filePath)
+          watchHandle?.noteOwnWrite(filePath, computeEtag(stat))
+        } catch {
+          // Best-effort - if the stat fails right after a successful
+          // write (unlikely), the next external-change check will simply
+          // fall back to treating the next event as external.
+        }
       }
+      return result
     }
   )
 

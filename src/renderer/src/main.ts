@@ -45,7 +45,7 @@ import { createSearchPanel, type SearchPanelHandle } from './sidebar/searchPanel
  * file disappeared.
  */
 
-/** One open document: its editor instance, DOM host, and save-relevant metadata. */
+  /** One open document: its editor instance, DOM host, and save-relevant metadata. */
 interface OpenDocument {
   handle: MarkdownEditorHandle
   hostElement: HTMLDivElement
@@ -60,6 +60,8 @@ interface OpenDocument {
   savePath: { current: string }
   /** Ticket #20 acceptance criterion #5: true once this document's backing file was deleted externally. */
   deleted: boolean
+  /** Ticket #27: true if the file is read-only or has permission issues. */
+  readOnly: boolean
 }
 
 async function bootstrap(): Promise<void> {
@@ -126,10 +128,18 @@ async function bootstrap(): Promise<void> {
   function updateStatusBar(): void {
     if (!statusBar || !statusBarMessage) return
     const activeDoc = tabState.activePath ? documents.get(tabState.activePath) : undefined
+
+    // Ticket #27: show read-only status (acceptance criterion #1)
+    const showReadOnly = Boolean(activeDoc?.readOnly && !activeDoc.deleted)
     const showDeleted = Boolean(activeDoc?.deleted)
-    statusBar.classList.toggle('cf-status-bar-visible', showDeleted)
+    const showStatus = showReadOnly || showDeleted
+
+    statusBar.classList.toggle('cf-status-bar-visible', showStatus)
+
     if (showDeleted) {
       statusBarMessage.textContent = '文件已被外部删除，改动无法保存到原路径 - 请另存为'
+    } else if (showReadOnly) {
+      statusBarMessage.textContent = '[只读] 文件为只读或权限不足，无法保存到原路径 - 请另存为'
     }
   }
 
@@ -325,14 +335,44 @@ async function bootstrap(): Promise<void> {
 
     let content: string
     let encoding: FileEncodingInfo
+    let readOnly = false
+
     try {
       const result = await window.api.readFile(path)
-      content = result.content
-      encoding = result.encoding
-      if (result.warning) console.warn(result.warning)
+
+      // Ticket #27: handle read errors (acceptance criteria #4, #5, #6)
+      if (!result.success) {
+        let errorTitle = '无法打开文件'
+        let errorMessage = result.message
+
+        if (result.error === 'FILE_TOO_LARGE') {
+          errorTitle = '文件过大'
+        } else if (result.error === 'BINARY_FILE') {
+          errorTitle = '二进制文件'
+        } else if (result.error === 'ACCESS_DENIED') {
+          errorTitle = '权限不足'
+        }
+
+        window.alert(`${errorTitle}\n\n${errorMessage}`)
+
+        // Show error in editor
+        content = `# ${errorTitle}\n\n${path}\n\n${errorMessage}\n`
+        encoding = { hasBOM: false, lineEnding: 'CRLF' }
+        readOnly = true
+      } else {
+        content = result.content
+        encoding = result.encoding
+
+        // Ticket #27: show warning for large files (acceptance criterion #4)
+        if (result.warning) {
+          console.warn(result.warning)
+          window.alert(`警告：${result.warning}`)
+        }
+      }
     } catch (err) {
       content = `# Could not open file\n\n${path}\n\n\`\`\`\n${String(err)}\n\`\`\`\n`
       encoding = { hasBOM: false, lineEnding: 'CRLF' }
+      readOnly = true
     }
 
     // `savePath` is a mutable box, not the `path` parameter directly:
@@ -354,12 +394,37 @@ async function bootstrap(): Promise<void> {
       inner,
       content,
       async (docContent) => {
-        await window.api.writeFile(savePath.current, docContent, { hasBOM: encoding.hasBOM })
+        // Ticket #27: handle write errors (acceptance criteria #1, #2, #3)
+        const result = await window.api.writeFile(savePath.current, docContent, { hasBOM: encoding.hasBOM })
+
+        if (!result.success) {
+          const doc = documents.get(path)
+          if (!doc) return
+
+          // Mark as read-only so status bar shows the issue
+          doc.readOnly = true
+          updateStatusBar()
+
+          // Show error dialog with "Save As" option
+          let errorMessage = result.message
+          if (result.error === 'READ_ONLY') {
+            errorMessage = '文件为只读，无法保存。是否要另存为到其他位置？'
+          } else if (result.error === 'PERMISSION_DENIED') {
+            errorMessage = '权限不足，无法保存。是否要另存为到其他位置？'
+          } else if (result.error === 'DISK_FULL') {
+            errorMessage = '磁盘空间不足，无法保存。是否要另存为到其他位置？'
+          }
+
+          const shouldSaveAs = window.confirm(errorMessage)
+          if (shouldSaveAs) {
+            await saveAs(path)
+          }
+        }
       },
       lineSeparator
     )
 
-    documents.set(path, { handle, hostElement, encoding, savePath, deleted: false })
+    documents.set(path, { handle, hostElement, encoding, savePath, deleted: false, readOnly })
   }
 
   // --- External change handling (ticket #20, acceptance criteria #3-#7) ---
@@ -376,8 +441,12 @@ async function bootstrap(): Promise<void> {
     if (!doc) return
     try {
       const result = await window.api.readFile(path)
-      doc.handle.reloadContent(result.content)
-      doc.encoding = result.encoding
+      if (result.success) {
+        doc.handle.reloadContent(result.content)
+        doc.encoding = result.encoding
+      } else {
+        console.error('Failed to reload externally changed file', path, result.message)
+      }
     } catch (err) {
       console.error('Failed to reload externally changed file', path, err)
     }
@@ -423,16 +492,25 @@ async function bootstrap(): Promise<void> {
       doc.handle.view.state.doc.length,
       doc.encoding.lineEnding === 'CRLF' ? '\r\n' : '\n'
     )
-    await window.api.writeFile(chosenPath, content, { hasBOM: doc.encoding.hasBOM })
+
+    // Ticket #27: handle write errors in Save As
+    const result = await window.api.writeFile(chosenPath, content, { hasBOM: doc.encoding.hasBOM })
+
+    if (!result.success) {
+      window.alert(`保存失败：${result.message}`)
+      return
+    }
 
     if (chosenPath === path) {
       // Saved back over the same path (e.g. re-picked the identical
       // name from the dialog) - just clear the deleted flag, no
       // map/tab-state key change needed.
       doc.deleted = false
+      doc.readOnly = false // Ticket #27: clear read-only flag
     } else {
       documents.delete(path)
       doc.deleted = false
+      doc.readOnly = false // Ticket #27: clear read-only flag
       doc.savePath.current = chosenPath
       documents.set(chosenPath, doc)
       tabState = renameTabPath(tabState, path, chosenPath)
@@ -553,7 +631,8 @@ async function bootstrap(): Promise<void> {
       hostElement,
       encoding: { hasBOM: false, lineEnding: 'CRLF' },
       savePath: { current: samplePath }, // never actually written: onSave above is a no-op
-      deleted: false
+      deleted: false,
+      readOnly: false
     })
     tabState = { tabs: [samplePath], activePath: samplePath }
   }
